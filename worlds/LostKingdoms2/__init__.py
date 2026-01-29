@@ -1,12 +1,30 @@
-import sqlite3
 import os
+import threading
+import typing
+from dataclasses import fields
 from typing import Optional
 
-from BaseClasses import ItemClassification, Region, MultiWorld
+from BaseClasses import MultiWorld
 from worlds.AutoWorld import WebWorld, World
-from .Items import LK2Item
-from .Locations import LK2Location
-from .LK2Options import LostKingdoms2Options, WinConditionOptions
+from .client.constants import AP_WORLD_VERSION_NAME, CLIENT_VERSION
+from .client.lostkingdoms2_settings import LostKingdoms2Settings
+from ..LauncherComponents import launch_subprocess, components, Component, SuffixIdentifier, icon_paths, Type
+
+from .Items import *
+from .Locations import *
+from .LK2Options import *
+from .iso_helper.lk2_rom import LK2PlayerContainer
+
+
+def run_client(*args):
+    from .LK2Client import main  # lazy import
+    launch_subprocess(main, name="LK2Client", args=args)
+
+# Adds the launcher for our component and our client logo.
+components.append(
+    Component("Lost Kingdoms II Client", func=run_client, component_type=Type.CLIENT,
+        file_identifier=SuffixIdentifier(".aplm"), icon="Archipelago_Icon"))
+icon_paths["Archipelago_Icon"] = f"ap:{__name__}/data/Archipelago_Icon.png"
 
 class LostKingdoms2Web(WebWorld):
     theme = "jungle"
@@ -19,34 +37,26 @@ class LostKingdoms2World(World):
 
     game = "Lost Kingdoms II"
 
-    options_dataclass = LostKingdoms2Options  # options the player can set
+    options_dataclass = LK2Options.LostKingdoms2Options  # options the player can set
     options: LostKingdoms2Options  # typing hints for option results
-    #settings: typing.ClassVar[MyGameSettings]  # will be automatically assigned from type hint
+    settings: typing.ClassVar[LostKingdoms2Settings]  # will be automatically assigned from type hint
     topology_present = True  # show path to required location checks in spoiler
-
-    # ID of first item and location, could be hard-coded but code may be easier
-    # to read with this as a property.
-    base_id = 0
-    # instead of dynamic numbering, IDs could be part of data
 
     # The following two dicts are required for the generation to know which
     # items exist. They could be generated from json or something else. They can
     # include events, but don't have to since events will be placed manually.
 
-    conn = sqlite3.connect(os.path.join(os.path.dirname(__file__),"LK2DB.db"))
-    cursor = conn.cursor()
+    item_name_to_id = {}
+    for key in lost_kingdoms_2_items:
+        item_name_to_id[key] = lost_kingdoms_2_items[key]["number"]
 
-    cursor.execute("Select name from cards")
-    lost_kingdoms_2_items = [row[0] for row in cursor.fetchall()]
+    #id_to_item_name = {}
+    #for item_id_index in range(len(lost_kingdoms_2_items)):
+    #    item_name_to_id[base_id + item_id_index] = lost_kingdoms_2_items[item_id_index]
 
-    item_name_to_id = {name: id for
-                       id, name in enumerate(lost_kingdoms_2_items, base_id)}
-
-    cursor.execute("Select name from location")
-    lost_kingdoms_2_items = [row[0] for row in cursor.fetchall()]
-
-    location_name_to_id = {name: id for
-                           id, name in enumerate(lost_kingdoms_2_items, base_id)}
+    location_name_to_id = {}
+    for key in lost_kingdoms_2_locations:
+        location_name_to_id[key] = lost_kingdoms_2_locations[key]["id"]
 
     # Items can be grouped using their names to allow easy checking if any item
     # from that group has been collected. Group names can also be used for !hint
@@ -56,15 +66,32 @@ class LostKingdoms2World(World):
 
     def __init__(self, multiworld: MultiWorld, player: int):
         super(LostKingdoms2World, self).__init__(multiworld, player)
-        self.win_condition: Optional[int] = 0
+        self.win_condition : Optional[int] = 0
 
     def create_item(self, item: str) -> LK2Item:
-        cursor = self.conn.cursor()
-        item_data = cursor.execute("Select name, hexCode from cards where name = ?", (item,)).fetchone()
+
         classification = ItemClassification.filler
-        return LK2Item(item_data[0], item_data[1], classification, self.player)
+        item_data = lost_kingdoms_2_items[item]
+        return LK2Item(item, classification, item_data, self.player)
+
+    def create_items(self) -> None:
+        # Add items to the Multiworld.
+        # If there are two of the same item, the item has to be twice in the pool.
+        # Which items are added to the pool may depend on player options, e.g. custom win condition like triforce hunt.
+        # Having an item in the start inventory won't remove it from the pool.
+        # If you want to do that, use start_inventory_from_pool
+
+        for item in map(self.create_item, lost_kingdoms_2_items):
+            self.multiworld.itempool.append(item)
+
+        # itempool and number of locations should match up.
+        # If this is not the case we want to fill the itempool with junk.
+        junk = 0  # calculate this based on player options
+        self.multiworld.itempool += [self.create_item("nothing") for _ in range(junk)]
 
     def generate_early(self) -> None:
+
+        self.win_condition = self.options.win_condition
 
         starting_inventory = {"Hobgoblin", "Hobgoblin", "Hobgoblin", "Lizardman", "Lizardman", "Lizardman",
                               "Mandragora", "Mandragora", "Mandragora", "Fairy", "Dragon Knight"}
@@ -75,18 +102,18 @@ class LostKingdoms2World(World):
         menu_region = Region("Menu", self.player, self.multiworld)
         self.multiworld.regions.append(menu_region)
 
-        self.cursor.execute("Select distinct level from location").fetchall()
-        region_names = [row[0] for row in self.cursor.fetchall()]
-        for region_name in region_names:
-            region = Region(region_name, self.player, self.multiworld)
-            self.multiworld.regions.append(region)
-            menu_region.connect(region)
+        for region in lost_kingdoms_2_regions:
+            new_region = Region(region, self.player, self.multiworld)
+            self.multiworld.regions.append(new_region)
+            menu_region.connect(new_region)
 
-        locations_tuples = self.cursor.execute("Select level,name,isoAddress,missable from location").fetchall()
-
-        for location_tuple in locations_tuples:
-            location = LK2Location(location_tuple[0], location_tuple[1], location_tuple[2],location_tuple[3])
-            self.multiworld.get_region(location.name, self.player).locations.append(location)
+        for key in lost_kingdoms_2_locations:
+            region = self.multiworld.get_region(lost_kingdoms_2_locations[key]["level"], self.player)
+            location = lost_kingdoms_2_locations[key]
+            location_data = LK2LocationData(location["isoAddress"],location["missable"],
+                                            location["RAMAddress"],location["bitOffset"],
+                                            location["id"])
+            region.locations.append(LK2Location(self.player,key, region, location_data))
 
     def set_rules(self) -> None:
         pass
@@ -98,10 +125,26 @@ class LostKingdoms2World(World):
             "Seed": self.multiworld.seed,
             "Slot": self.player,
             "Name": self.player_name,
-            "Options": LostKingdoms2Options,
-            "Locations": {},
-            "Room Enemies": {},
-            "Hints": {},
-            "Client" : "APWorldVersion"
+            #"Locations":{},
+            AP_WORLD_VERSION_NAME: CLIENT_VERSION
         }
+
+        #for key in lost_kingdoms_2_locations:
+        #    item_info = {
+        #                    "player": self.player,
+        #                    "name": lost_kingdoms_2_locations[key]["cardName"],
+        #                    "game": self.game,
+        #                    "type": "card"
+        #                }
+        #    output_data["Locations"][key] = item_info
+
+        # Outputs the plando details to our expected output file
+        # Create the output path based on the current player + expected patch file ending.
+        patch_path = os.path.join(output_directory, f"{self.multiworld.get_out_file_name_base(self.player)}"
+                                                    f"{LK2PlayerContainer.patch_file_ending}")
+        # Create a zip (container) that will contain all the necessary output files for us to use during patching.
+        lm_container = LK2PlayerContainer(output_data, patch_path, self.multiworld.player_name[self.player], self.player)
+        # Write the expected output zip container to the Generated Seed folder.
+        lm_container.write()
+
 
