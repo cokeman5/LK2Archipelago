@@ -11,8 +11,9 @@ import Utils
 from CommonClient import ClientCommandProcessor, CommonContext, get_base_parser, gui_enabled, logger, server_loop
 from .iso_helper.lk2_rom import LK2USAAPPatch
 
-from .Locations import lost_kingdoms_2_locations, LK2LocationData
-from worlds.LostKingdoms2 import lost_kingdoms_2_items
+from .Locations import lost_kingdoms_2_locations, lost_kingdoms_2_regions, lost_kingdoms_2_combos
+from worlds.LostKingdoms2 import lost_kingdoms_2_cards, lost_kingdoms_2_key_items, lost_kingdoms_2_items, \
+    location_name_to_id
 
 if TYPE_CHECKING:
     import kvui
@@ -29,14 +30,28 @@ CONNECTION_LOST_STATUS = (
 CONNECTION_CONNECTED_STATUS = "Dolphin connected successfully."
 CONNECTION_INITIAL_STATUS = "Dolphin connection has not been initiated."
 
-SLOT_NAME_ADDR = 0x803FE8A0
+SLOT_NAME_ADDR = 0x80003DA0
 IS_IN_GAME_ADDR = 0x80223c88
 
+RED_FAIRY_COUNT_ADDRESS = 0x8025d032
+KEY_ITEM_ITEM_ADDRESS = 0x8025d068
+KEY_ITEM_LOCATION_ADDRESS = 0x80003edc
+MAGIC_BOOSTER_ADDRESS = 0x8025dd90
+Valkyrie_Ashura_ADDRESS = 0x8025e28c
+God_of_Harmony_Health_ADDRESS = 0x80223eb8
+God_of_Harmony_ID_ADDRESS = 0x80223e5c # = 8103a040
+Emporer_Health_ADDRESS = 0x80223fb8
+Emperor_ID_ADDRESS = 0x80223f6c # = 8153e580
+
+
 NUM_ITEMS_RECEIVED = 0
+
+ONE_TIME_MODIFIERS = False
 
 
 # This address is used to check/set the player's health for DeathLink.
 CURR_HEALTH_ADDR = 0x80223c98
+
 
 class LK2CommandProcessor(ClientCommandProcessor):
     """
@@ -73,7 +88,7 @@ class LK2Context(CommonContext):
     items_handling: int = 0b111  # full remote
     slot: str
 
-    def __init__(self, server_address: Optional[str], password: Optional[str], slot: str) -> None:
+    def __init__(self, server_address: Optional[str], password: Optional[str]) -> None:
         """
         :param server_address: Address of the Archipelago server.
         :param password: Password for server authentication.
@@ -86,7 +101,7 @@ class LK2Context(CommonContext):
         self.has_send_death: bool = False
         self.send_hints: int = 0
         self.hints = {}
-        self.slot = slot
+        self.slot_data = {}
 
     async def disconnect(self, allow_autoreconnect: bool = False) -> None:
         """
@@ -105,7 +120,7 @@ class LK2Context(CommonContext):
         :param args: The command arguments.
         """
         if cmd == "Connected":
-            logger.info(args["slot_data"])
+            self.slot_data = args["slot_data"]
             if "death_link" in args["slot_data"]:
                 Utils.async_start(self.update_death_link(bool(args["slot_data"]["death_link"])))
 
@@ -139,9 +154,12 @@ class LK2Context(CommonContext):
         """
         if password_requested and not self.password:
             await super().server_auth(password_requested)
-
-        self.auth = self.slot
-        logger.info("Current auth is:" + str(self.auth))
+        if not self.auth:
+            if self.awaiting_rom:
+                return
+            self.awaiting_rom = True
+            logger.info("Awaiting connection to Dolphin to get player information.")
+            return
         await self.send_connect()
 
 
@@ -175,7 +193,9 @@ def read_string(console_address: int, strlen: int) -> str:
     :param strlen: Length of the string to read.
     :return: The string.
     """
-    return dolphin_memory_engine.read_bytes(console_address, strlen).split(b"\0", 1)[0].decode()
+    string = dolphin_memory_engine.read_bytes(console_address, strlen).split(b"\0", 1)[0].decode()
+    logger.info("string read: " + str(string))
+    return string
 
 
 def _give_death(ctx: LK2Context) -> None:
@@ -202,17 +222,128 @@ def _give_item(ctx: LK2Context, item_name: str) -> bool:
     :param item_name: Name of the item to give.
     :return: Whether the item was successfully given.
     """
-    item_address = lost_kingdoms_2_items[item_name]["DolphinAddress"]
-    if item_address != "":
-        memory_address = int(item_address, 16)
+    item = lost_kingdoms_2_items.get(item_name, None)
+    if item is None:
+        return False
+    elif item["Type"] == "Card":
+        return give_card(item_name)
+    elif item["Type"] == "Red Fairy":
+        return give_red_fairy()
+    elif item["Type"] == "Key Item":
+        return give_key_item(item_name)
+    elif item["Type"] == "Magic Boosters":
+        return activate_magic_boosters()
+    else:
+        logger.error("Received Invalid Item:" + item_name + " " + str(item_name))
+        return False
+
+def give_red_fairy() -> bool:
+    logger.info("Giving fairy")
+    try:
+        memory_address = RED_FAIRY_COUNT_ADDRESS
+        current_amount_of_item = read_memory(memory_address, 1)
+        write_memory(memory_address, current_amount_of_item + 1,1)
+        global NUM_ITEMS_RECEIVED
+        NUM_ITEMS_RECEIVED+=1
+        return True
+    except Exception as e:
+        logger.error(e)
+        return False
+
+def give_card(card_name: str) -> bool:
+    logger.info("Giving card" + card_name)
+    try:
+        memory_address = int(lost_kingdoms_2_cards[card_name]["DolphinAddress"], 16)
         current_amount_of_item = read_memory(memory_address)
-        write_memory(memory_address, current_amount_of_item+1)
+        write_memory(memory_address, current_amount_of_item + 1)
         global NUM_ITEMS_RECEIVED
         NUM_ITEMS_RECEIVED += 1
         return True
-    else:
-        logger.error("Received Invalid Item:" + item_name + " " + str(item_address))
+    except Exception as e:
+        logger.error(e)
         return False
+
+def give_key_item(item_name: str) -> bool:
+    logger.info("Giving key item" + item_name)
+    try:
+        offset = 0
+        for key_item in lost_kingdoms_2_key_items:
+            offset += 1
+            if key_item == item_name:
+                break
+        value = read_memory(KEY_ITEM_ITEM_ADDRESS,4)
+        write_memory(KEY_ITEM_ITEM_ADDRESS, value | (1 << offset), 4)
+
+        match item_name:
+            case "Blue Key":
+                write_memory(0x8025d897, 0)
+                write_memory(0x8025d8a7, 0)
+                write_memory(0x8025d8b7, 0)
+                value = read_memory(0x8025dcd1, 1)
+                write_memory(0x8025dcd0, value | (1 << 0))
+            case "Red Key":
+                write_memory(0x8025d867, 0)
+                write_memory(0x8025d877, 0)
+                write_memory(0x8025d887, 0)
+                value = read_memory(0x8025dcd1, 1)
+                write_memory(0x8025dcd0, value | (1 << 1))
+            case "Green Key":
+                write_memory(0x8025d8c7, 0)
+                write_memory(0x8025d8d7, 0)
+                value = read_memory(0x8025dcd1, 1)
+                write_memory(0x8025dcd0, value | (1 << 2))
+
+        global NUM_ITEMS_RECEIVED
+        NUM_ITEMS_RECEIVED += 1
+        return True
+    except Exception as e:
+        logger.error(e)
+        return False
+
+def activate_magic_boosters() -> bool:
+    value = read_memory(MAGIC_BOOSTER_ADDRESS)
+    write_memory(0x8025dd90,value | 1 << 3)
+    return True
+
+def modify_code():
+    # Change the key item location addresses so the locations can be checked
+    # even after receiving the key items.
+
+    #Key locations
+    write_memory(0x8006e77c, 0x3CA08000, 4)
+    write_memory(0x8006e780, 0x38A53E80, 4)
+    #Fossil locations
+    write_memory(0x8006e7b8, 0x3C608000, 4)
+    write_memory(0x8006e7bc, 0x38633E24, 4)
+    #Magic Boosters
+    write_memory(0x8008816c, 0x3CC08000, 4)
+    write_memory(0x80088174, 0x60C63EE8, 4)
+    #Remove the branch preventing duplicates in shops
+    write_memory(0x800dc438, 0x60000000, 4)
+
+    logger.info("Modified code")
+
+def set_shop_contents_to_AP():
+    for x in range(40):
+        write_memory(0x80168700+(x*0x2), 0x00000000)
+
+def open_world():
+        for region in lost_kingdoms_2_regions:
+            write_memory(lost_kingdoms_2_regions[region]["RAMAddress"], -128, 1)
+
+async def check_victory_conditions(ctx: LK2Context):
+    match ctx.slot_data.get("open_world", -1):
+        case 0:
+            if read_memory(God_of_Harmony_Health_ADDRESS) == 0 and read_memory(God_of_Harmony_ID_ADDRESS,4) == 0x8103a040:
+                _give_item(ctx,"Victory")
+        case 1:
+            if read_memory(Emporer_Health_ADDRESS) == 0 and read_memory(Emperor_ID_ADDRESS,4) == 0x8153e580:
+                _give_item(ctx, "Victory")
+        case 2:
+            for key in lost_kingdoms_2_cards:
+                if read_memory(lost_kingdoms_2_cards[key]) <= 0:
+                    return
+            _give_item(ctx, "Victory")
 
 async def give_items(ctx: LK2Context) -> None:
     """
@@ -228,15 +359,19 @@ async def give_items(ctx: LK2Context) -> None:
 
     for x, item in enumerate(received_items[NUM_ITEMS_RECEIVED:], start=NUM_ITEMS_RECEIVED):
         item_name = None
-        logger.info("item:"+str(item.item))
-        for key in lost_kingdoms_2_items:
-            if lost_kingdoms_2_items[key]["number"] == item.item:
-                item_name  = key
-        # Attempt to give the item and increment the expected index.
-        while not _give_item(ctx, item_name):
-            await asyncio.sleep(0.01)
+        for lk2_item in lost_kingdoms_2_items:
+            if lost_kingdoms_2_items[lk2_item]["id"] == item.item:
+                item_name = lk2_item
+                break
+        logger.info(item.item)
+        logger.info(item_name)
+        if item_name is not None:
+            while not _give_item(ctx, item_name):
+                await asyncio.sleep(0.01)
+        else:
+            logger.error("Invalid item id" + str(item.item))
 
-def check_regular_location(ctx: LK2Context, location_data: LK2LocationData) -> bool:
+def check_regular_location(ctx: LK2Context, location: str) -> bool:
     """
     Check that the player has checked a given location.
     This function handles locations that only require checking that a particular bit is set.
@@ -244,19 +379,37 @@ def check_regular_location(ctx: LK2Context, location_data: LK2LocationData) -> b
     The check looks at the saved data for the stage at which the location is located and the data for the current stage.
     In the latter case, this data includes data that has not yet been written to the saved data.
 
+    :param location: The location.
     :param ctx: Lost Kingdoms 2 client context.
-    :param location_data: The location.
     :raises NotImplementedError: If a location with an unknown type is provided.
     """
-    if location_data.ram_address != "":
-        memory_value = read_memory(int(location_data.ram_address,16))
-        if location_data.bit_offset >= 1:
-            bit_value = (memory_value & (1 << location_data.bit_offset))
+    match lost_kingdoms_2_locations[location]["type"]:
+        case "Chest" | "Red Fairy" | "Magic Boosters":
+            if lost_kingdoms_2_locations[location]["RAMAddress"]!="":
+                if (location == "help valkyrie") | (location == "help ashura"):
+                    if read_memory(Valkyrie_Ashura_ADDRESS) != 256:
+                        return False
+                elif "FH - collect" in location:
+                    memory_value = read_memory(int(lost_kingdoms_2_locations[location]["RAMAddress"], 16),1)
+                    return memory_value >= lost_kingdoms_2_locations[location]["bitOffset"]
+                memory_value = read_memory(int(lost_kingdoms_2_locations[location]["RAMAddress"], 16))
+                if lost_kingdoms_2_locations[location]["bitOffset"] >= 1:
+                    bit_value = (memory_value & (1 << lost_kingdoms_2_locations[location]["bitOffset"]))
+                    return bit_value != 0
+                else:
+                    return False
+            else:
+                return False
+        case "Key Item":
+            memory_value = read_memory(KEY_ITEM_LOCATION_ADDRESS)
+            bit_value = (memory_value & (1 << lost_kingdoms_2_locations[location]["bitOffset"]))
             return bit_value != 0
-        else:
-            return False
-    else:
-        return False
+        case "Combo":
+            memory_value = read_memory(0x8025d070, 8)
+            bit_value = (memory_value & (1 << lost_kingdoms_2_combos[location]["bitOffset"]))
+            return bit_value != 0
+
+    return False
 
 async def check_locations(ctx: LK2Context) -> set[int]:
     """
@@ -270,13 +423,10 @@ async def check_locations(ctx: LK2Context) -> set[int]:
 
     # Loop through all locations to see if each has been checked.
     for key in lost_kingdoms_2_locations:
-        location = lost_kingdoms_2_locations[key]
-        location_data = LK2LocationData(location["isoAddress"], location["missable"],
-                                        location["RAMAddress"], location["bitOffset"],
-                                        location["id"])
-
-        if check_regular_location(ctx, location_data):
-            ctx.locations_checked.add(location_data.id)
+        if check_regular_location(ctx, key):
+            ctx.locations_checked.add(location_name_to_id[key])
+            if lost_kingdoms_2_locations[key]["type"] == "Red Fairy":
+                write_memory(int("8025d032",16), read_memory(int("8025d032",16)-1))
 
     # Send the list of newly-checked locations to the server.
     locations_checked = ctx.locations_checked.difference(ctx.checked_locations)
@@ -330,8 +480,9 @@ async def dolphin_sync_task_main_task(ctx: LK2Context):
 
     :param ctx: Lost Kingdoms 2 client context.
     """
-    logger.info("Starting Dolphin connector. Use /dolphin for status information.")
-    logger.info("auth is:" + ctx.auth)
+    global ONE_TIME_MODIFIERS
+    logger.info("Starting Dolphin connector. Use /dolphin for status information." + str(ctx.auth))
+    logger.info("auth is:" + str(ctx.auth))
     sleep_time = 0.0
     while not ctx.exit_event.is_set():
         if sleep_time > 0.0:
@@ -345,16 +496,25 @@ async def dolphin_sync_task_main_task(ctx: LK2Context):
 
         try:
             if dolphin_memory_engine.is_hooked() and ctx.dolphin_status == CONNECTION_CONNECTED_STATUS:
-                if not check_ingame():
-                    sleep_time = 0.1
-                    continue
                 if ctx.slot is not None:
+                    if not ONE_TIME_MODIFIERS:
+                        modify_code()
+                        if ctx.slot_data.get("open_world", 0):
+                            open_world()
+                        if ctx.slot_data.get("shopsanity", 0):
+                            set_shop_contents_to_AP()
+                        ONE_TIME_MODIFIERS = True
                     if "DeathLink" in ctx.tags:
                         await check_death(ctx)
+                    await check_victory_conditions(ctx)
                     await give_items(ctx)
                     await check_locations(ctx)
                 else:
-                    await ctx.server_auth()
+                    if not ctx.auth:
+                        ctx.auth = read_string(SLOT_NAME_ADDR, 0x40)
+                        logger.info("auth is:" + str(ctx.auth))
+                    if ctx.awaiting_rom:
+                        await ctx.server_auth()
                 sleep_time = 0.1
             else:
                 if ctx.dolphin_status == CONNECTION_CONNECTED_STATUS:
@@ -405,7 +565,6 @@ def main(*launch_args: str):
     parser.add_argument('--name', default=None, help="Slot Name to connect as.")
     args = parser.parse_args(launch_args)
     logger.info("Launch args: " + str(launch_args))
-    logger.info("Launch args: " + str(args))
 
     lk2_usa_manifest = None
     if args.aplm_file:
@@ -422,11 +581,8 @@ def main(*launch_args: str):
             raise ex
 
     async def _main(connect, password):
-        ctx = LK2Context(server_address if server_address else connect, password, lk2_usa_manifest["player_name"])
 
-        logger.info("Awaiting server authentication")
-        await ctx.server_auth()
-        logger.info(f"Authenticated: slot={ctx.slot}, team={ctx.team}")
+        ctx = LK2Context(server_address if server_address else connect, password)
 
         logger.info("Creating Server Loop")
         ctx.server_task = asyncio.create_task(server_loop(ctx), name="ServerLoop")
@@ -434,11 +590,15 @@ def main(*launch_args: str):
         if gui_enabled:
             ctx.run_gui()
         ctx.run_cli()
-        await ctx.wait_for_next_loop(WAIT_TIMER_LONG_TIMEOUT)
+        await asyncio.sleep(1)
 
         ctx.dolphin_sync_task = asyncio.create_task(dolphin_sync_task_main_task(ctx), name="DolphinSync")
 
         await ctx.exit_event.wait()
+
+        #ctx.watcher_event.set()
+        #ctx.server_address = None
+
         await ctx.shutdown()
 
         if ctx.dolphin_sync_task:
