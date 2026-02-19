@@ -97,10 +97,8 @@ class LostKingdoms2World(World):
         # Having an item in the start inventory won't remove it from the pool.
         # If you want to do that, use start_inventory_from_pool
 
-        #if self.options.win_condition.value == 0:
-        #    victory_loc = LK2Location(self.player, "Defeat the Final Boss", self.multiworld.get_region("Royal Tower, Upper",self.player), None)
-        #    victory_loc.place_locked_item(LK2Item("Victory", ItemClassification.progression, None, self.player))
-        #    self.multiworld.completion_condition[self.player] = lambda state: state.has("Victory", self.player)
+        self.multiworld.get_location("Defeat the God of Harmony",self.player,).place_locked_item(LK2Item("Victory", ItemClassification.progression, None, self.player))
+        self.multiworld.completion_condition[self.player] = lambda state: state.has("Victory", self.player)
 
         #ensure there is always at least 1 flyer, jumper, and smasher in the pool
         lost_kingdoms_2_cards_diluted = lost_kingdoms_2_cards.copy()
@@ -161,7 +159,13 @@ class LostKingdoms2World(World):
                 continue
             region = self.multiworld.get_region(lost_kingdoms_2_locations[key]["level"], self.player)
             location_data = LK2LocationData(self.location_name_to_id[key])
-            region.locations.append(LK2Location(self.player,key, region, location_data))
+            location = LK2Location(self.player,key, region, location_data)
+            if lost_kingdoms_2_locations[key].get("missable", 0) == 1:
+                location.progress_type = LocationProgressType.EXCLUDED
+            region.locations.append(location)
+
+        victory_location = LK2Location(self.player, "Defeat the God of Harmony",self.multiworld.get_region("Royal Tower, Upper", self.player), None)
+        self.multiworld.get_region("Royal Tower, Upper", self.player).locations.append(victory_location)
 
     def set_rules(self) -> None:
         for region_name in lost_kingdoms_2_regions:
@@ -181,8 +185,7 @@ class LostKingdoms2World(World):
                     previous_region.connect(region, previous_region.name + " -> " + region.name)
                 case "Fairy House":
                     previous_region = self.multiworld.get_region("Gromtull Desert", self.player)
-                    previous_region.connect(region, previous_region.name + " -> " + region.name)
-                    #lambda state: state.has("Black Liquid", self.player)
+                    previous_region.connect(region, previous_region.name + " -> " + region.name, lambda state: state.has("Black Liquid", self.player))
                 case "Bhashea Castle":
                     previous_region = self.multiworld.get_region("Bhashea High Road", self.player)
                     previous_region.connect(region, previous_region.name + " -> " + region.name, lambda state: state.has(progression_flyer, self.player) and state.has(progression_stationary, self.player))
@@ -258,226 +261,232 @@ class LostKingdoms2World(World):
             match location.name :
                 case "BHR - jump/flight chest" | "RC-UC - dragon chest 1" | "RC-UC - dragon chest 2" | "RF - flight/jump chest"\
                     | "FB - flight chest 1" | "FB - flight chest 2" | "RC-UC - Red Fairy near dragon" | "Oht Runestone":
-                    set_rule(location,lambda state: state.has(progression_jumper, self.player) or state.has(progression_flyer, self.player))
+                    add_rule(location,lambda state: state.has(progression_jumper, self.player) or state.has(progression_flyer, self.player))
                 case "BHR - flight chest" | "GD - flight chest" | "KF - flight chest" | "RC-LC - high water chest flight"\
                     | "FB - flight chest 1" | "FB - flight chest 2" | "PoR - flight chest" | "PoR - flight chest 2" | "AC - flight chest"\
                     | "RTL - flight chest 1" | "RTL - flight chest 2" | "KM - black dragon's card" | "ToS - flight chest"\
                     | "OG - flight chest 1" | "OG - flight chest 2" | "OG - flight chest 3" | "BHR - Red Fairy across bridge"\
                     | "KF - Red Fairy fly across" | "RTL - Red Fairy flight" | "KM - Red Fairy cave 1" | "KM - Red Fairy broken bridge 1"\
                     | "KM - Red Fairy broken bridge 2":
-                    set_rule(location, lambda state: state.has(progression_flyer,self.player))
-                case "BC - east jump chest" | "RF - jump chest" | "FB - chest behind cultist" | "FB - chest 3"\
-                    | "FB - chest 4" | "FB - chest 5" | "FB - chest 6" | "FB - chest 7" | "Sarvan - jump chest"\
+                    add_rule(location, lambda state: state.has(progression_flyer,self.player))
+                case "BC - east jump chest" | "RF - jump chest" | "FB - Red Fairy near jump pad" | "FB - Red Fairy jumping" | "FB - chest behind cultist" | "FB - chest 3"\
+                    | "FB - Red Fairy near 2nd jump pad" | "FB - chest 4" | "FB - chest 5" | "FB - chest 6" | "FB - chest 7" | "Sarvan - jump chest"\
                     | "RTL - jump chest 1" | "RTL - jump chest 2" | "KM - chest 1" | "KM - chest 2" | "KM - chest 3"\
                     | "KM - chest 4" | "KM - chest 5" | "KM - chest 6" | "GD - Red Fairy jump" | "AC - Red Fairy jump"\
                     | "Fossil Head" | "Fossil Torso" | "Fossil Tail" | "Fossil Rt Wing" | "Fossil Lt Wing" | "Fossil Rt Arm"\
                     | "Fossil Lt Arm" | "Fossil Lt Leg" | "Ebin Runestone":
-                    set_rule(location, lambda state: state.has(progression_jumper, self.player) and state.has("Magic Boosters", self.player))
+                    add_rule(location, lambda state: state.has(progression_jumper, self.player) and state.has("Magic Boosters", self.player))
                 case "BC - east jump chest" | "RC-UC - chest behind ice 1" | "RC-UC - chest behind ice 2" | "RTM - breakable wall chest 1"\
-                    | "RTM - breakable wall chest 2" | "OG - chest behind ice" | "BC - Red Fairy wall break rubble" | "FB - Red Fairy near 2nd jump pad"\
-                    | "FB - Red Fairy jumping" | "RTM - Red Fairy breakable wall 1" | "RTM - Red Fairy breakable wall 2":
-                    set_rule(location, lambda state: state.has("Stone Golem", self.player) and state.has("Magic Boosters", self.player))
+                    | "RTM - breakable wall chest 2" | "OG - chest behind ice" | "BC - Red Fairy wall break rubble" \
+                    | "RTM - Red Fairy breakable wall 1" | "RTM - Red Fairy breakable wall 2":
+                    add_rule(location, lambda state: state.has("Stone Golem", self.player) and state.has("Magic Boosters", self.player))
                 case "SBA2 - defeat Leod" | "SBA2 - defeat Thalnos" | "SBA2 - defeat Katia" | "SBA2 - Red Fairy Queen Katia":
-                    set_rule(location, lambda state: state.can_reach_region("Royal Tower, Upper", self.player))
+                    add_rule(location, lambda state: state.can_reach_region("Royal Tower, Upper", self.player))
+                case "Kadishu - garbage collection 2":
+                    add_rule(location, lambda state: state.can_reach_region("Ruldo Forest", self.player))
+                case "Kadishu - garbage collection 3":
+                    add_rule(location, lambda state: state.can_reach_region("Royal Tower, Lower", self.player))
                 case "Sarvan - caged chest":
-                    set_rule(location, lambda state: state.has(progression_flyer, self.player))
+                    add_rule(location, lambda state: state.has(progression_flyer, self.player))
                     location.progress_type = LocationProgressType.EXCLUDED
                 case "Sarvan - caged chest 2":
-                    set_rule(location, lambda state: state.has(progression_stationary, self.player))
+                    add_rule(location, lambda state: state.has(progression_stationary, self.player))
                     location.progress_type = LocationProgressType.EXCLUDED
                 case "Sarvan - puzzle chest":
-                    set_rule(location, lambda state: state.has(progression_stationary, self.player))
+                    add_rule(location, lambda state: state.has(progression_stationary, self.player))
                 case "HT - fountain card":
-                    set_rule(location, lambda state: state.has("Key to Fountain", self.player))
+                    add_rule(location, lambda state: state.has("Key to Fountain", self.player))
                 case "PoR - chest 6" | "PoR - chest 7" | "PoR - GoD card":
-                    set_rule(location, lambda state: state.has("Jewel of Alanjeh", self.player))
+                    add_rule(location, lambda state: state.has("Jewel of Alanjeh", self.player))
                 case "ToS - help valkyrie" | "ToS - help ashura" | "RC-UC - talk to Sol":
                     location.progress_type = LocationProgressType.EXCLUDED
                 case "NR - Red Fairy sculpture" | "NR - Red Fairy central" | "NR - Red Fairy office" | "Keil Runestone":
-                    set_rule(location, lambda state: state.has("Mysterious Key", self.player))
+                    add_rule(location, lambda state: state.has("Mysterious Key", self.player))
                 case "BHR - Red Fairy across bridge in rubble" | "BHR - Red Fairy chaos knight":
-                    set_rule(location, lambda state: state.has(progression_stationary, self.player))
+                    add_rule(location, lambda state: state.has(progression_stationary, self.player))
                     add_rule(location, lambda state: state.has(progression_flyer, self.player))
                 case "KF - Red Fairy past blue gate" | "KF - Red Fairy near Mechapult":
-                    set_rule(location, lambda state: state.has(progression_flyer, self.player) or state.has("Blue Key", self.player))
+                    add_rule(location, lambda state: state.has(progression_flyer, self.player) or state.has("Blue Key", self.player))
                 case "PoR - Red Fairy past gate" | "PoR - chest 4" | "PoR - chest 5" | "Elise Runestone":
-                    set_rule(location, lambda state: state.has("Castle Gate Key", self.player))
-                case "Red Key":
-                    set_rule(location, lambda state: state.has("Blue Key", self.player))
+                    add_rule(location, lambda state: state.has("Castle Gate Key", self.player))
+                case "Red Key" | "KF - chest 2":
+                    add_rule(location, lambda state: state.has("Blue Key", self.player))
                 case "KF - chest behind green door":
-                    set_rule(location, lambda state: state.has("Green Key", self.player))
+                    add_rule(location, lambda state: state.has("Green Key", self.player))
                     add_rule(location, lambda state: state.has(progression_flyer, self.player) or state.has("Blue Key",self.player))
+                case "KF - chest 4" | "KF - chest 5":
+                    add_rule(location,lambda state: state.has("Blue Key", self.player) and state.has("Red Key", self.player))
                 case "Green Key":
-                    set_rule(location, lambda state: state.has("Red Key", self.player))
+                    add_rule(location, lambda state: state.has("Red Key", self.player))
                 case "Black Liquid":
-                    set_rule(location, lambda state: state.has("Bottle", self.player))
-                case "GD - Red Fairy Jarvi 1" | "GD - Red Fairy Jarvi 2":
-                    set_rule(location, lambda state: state.has("Black Liquid", self.player))
+                    add_rule(location, lambda state: state.has("Bottle", self.player))
+                case "GD - Red Fairy Jarvi 1" | "GD - Red Fairy Jarvi 2" | "GD - jarvi cave chest 1" | "GD - jarvi cave chest 2":
+                    add_rule(location, lambda state: state.has("Black Liquid", self.player))
                 case "Stone of Sealing":
-                    set_rule(location, lambda state: state.has("Eno Runestone", self.player) and state.has("Oht Runestone", self.player) \
+                    add_rule(location, lambda state: state.has("Eno Runestone", self.player) and state.has("Oht Runestone", self.player) \
                              and state.has("Elise Runestone", self.player) and state.has("Olf Runestone", self.player) \
                              and state.has("Ebin Runestone", self.player) and state.has("Keil Runestone", self.player) \
                              and state.has("Nebeth Runestone", self.player))
                 case "FH - collect 1 fairy":
-                    set_rule(location, lambda state: state.has("Red Fairy", self.player, 1))
+                    add_rule(location, lambda state: state.has("Red Fairy", self.player, 1))
                 case "FH - collect 10 fairies":
-                    set_rule(location, lambda state: state.has("Red Fairy", self.player, 10))
+                    add_rule(location, lambda state: state.has("Red Fairy", self.player, 10))
                 case "FH - collect 20 fairies":
-                    set_rule(location, lambda state: state.has("Red Fairy", self.player, 20))
+                    add_rule(location, lambda state: state.has("Red Fairy", self.player, 20))
                 case "FH - collect 30 fairies":
-                    set_rule(location, lambda state: state.has("Red Fairy", self.player, 30))
+                    add_rule(location, lambda state: state.has("Red Fairy", self.player, 30))
                 case "FH - collect 50 fairies":
-                    set_rule(location, lambda state: state.has("Red Fairy", self.player, 50))
+                    add_rule(location, lambda state: state.has("Red Fairy", self.player, 50))
                 case "FH - collect 70 fairies":
-                    set_rule(location, lambda state: state.has("Red Fairy", self.player, 70))
+                    add_rule(location, lambda state: state.has("Red Fairy", self.player, 70))
                 case "FH - collect 80 fairies":
-                    set_rule(location, lambda state: state.has("Red Fairy", self.player, 80))
+                    add_rule(location, lambda state: state.has("Red Fairy", self.player, 80))
                 case "FH - collect 90 fairies":
-                    set_rule(location, lambda state: state.has("Red Fairy", self.player, 90))
+                    add_rule(location, lambda state: state.has("Red Fairy", self.player, 90))
                 case "FH - collect 100 fairies":
-                    set_rule(location, lambda state: state.has("Red Fairy", self.player, 100))
+                    add_rule(location, lambda state: state.has("Red Fairy", self.player, 100))
                 case "FB - zombie dragon chest":
-                    set_rule(location, lambda state: state.has("Fossil Head", self.player) and state.has("Fossil Torso", self.player) \
+                    add_rule(location, lambda state: state.has("Fossil Head", self.player) and state.has("Fossil Torso", self.player) \
                              and state.has("Fossil Tail", self.player) and state.has("Fossil Rt Wing", self.player) \
                              and state.has("Fossil Lt Wing", self.player) and state.has("Fossil Rt Arm", self.player) \
                              and state.has("Fossil Lt Arm", self.player) and state.has("Fossil Rt Leg", self.player) \
                              and state.has("Fossil Lt Leg", self.player))
                 case "Triple Hagan":
-                    set_rule(location, lambda state: state.has("Rock Hagan", self.player))
-                    set_rule(location, lambda state: state.has("Bum Hagan", self.player))
-                    set_rule(location, lambda state: state.has("Storm Hagan", self.player))
+                    add_rule(location, lambda state: state.has("Rock Hagan", self.player))
+                    add_rule(location, lambda state: state.has("Bum Hagan", self.player))
+                    add_rule(location, lambda state: state.has("Storm Hagan", self.player))
                 case "Ultimate Pasta":
-                    set_rule(location, lambda state: state.has("Red Dragon", self.player))
-                    set_rule(location, lambda state: state.has("Brine Dragon", self.player))
-                    set_rule(location, lambda state: state.has("Green Dragon", self.player))
-                    set_rule(location, lambda state: state.has("Amber Dragon", self.player))
+                    add_rule(location, lambda state: state.has("Red Dragon", self.player))
+                    add_rule(location, lambda state: state.has("Brine Dragon", self.player))
+                    add_rule(location, lambda state: state.has("Green Dragon", self.player))
+                    add_rule(location, lambda state: state.has("Amber Dragon", self.player))
                 case "Lizard War":
-                    set_rule(location, lambda state: state.has("Red Lizard", self.player))
-                    set_rule(location, lambda state: state.has("Venom Lizard", self.player))
-                    set_rule(location, lambda state: state.has("Lizardman", self.player))
-                    set_rule(location, lambda state: state.has("Basilisk", self.player))
+                    add_rule(location, lambda state: state.has("Red Lizard", self.player))
+                    add_rule(location, lambda state: state.has("Venom Lizard", self.player))
+                    add_rule(location, lambda state: state.has("Lizardman", self.player))
+                    add_rule(location, lambda state: state.has("Basilisk", self.player))
                 case "Rotary Death":
-                    set_rule(location, lambda state: state.has("Carbuncle", self.player))
-                    set_rule(location, lambda state: state.has("Decoy Pillar", self.player))
+                    add_rule(location, lambda state: state.has("Carbuncle", self.player))
+                    add_rule(location, lambda state: state.has("Decoy Pillar", self.player))
                 case "Rocky Forecast":
-                    set_rule(location, lambda state: state.has("Stone Head", self.player, 3))
+                    add_rule(location, lambda state: state.has("Stone Head", self.player, 3))
                 case "Sir Spear-A-Lot":
-                    set_rule(location, lambda state: state.has("Ghost Armor", self.player))
-                    set_rule(location, lambda state: state.has("Chaos Knight", self.player))
+                    add_rule(location, lambda state: state.has("Ghost Armor", self.player))
+                    add_rule(location, lambda state: state.has("Chaos Knight", self.player))
                 case "Temper Tantrum":
-                    set_rule(location, lambda state: state.has("Fire Golem", self.player))
-                    set_rule(location, lambda state: state.has("Ice Golem", self.player))
+                    add_rule(location, lambda state: state.has("Fire Golem", self.player))
+                    add_rule(location, lambda state: state.has("Ice Golem", self.player))
                 case "Goblin Guts":
-                    set_rule(location, lambda state: state.has("Hobgoblin", self.player))
-                    set_rule(location, lambda state: state.has("Goblin Lord", self.player))
+                    add_rule(location, lambda state: state.has("Hobgoblin", self.player))
+                    add_rule(location, lambda state: state.has("Goblin Lord", self.player))
                 case "Lethal Orbit":
-                    set_rule(location, lambda state: state.has("Carbuncle", self.player))
-                    set_rule(location, lambda state: state.has("Juggernaut", self.player))
-                    set_rule(location, lambda state: state.has("Whip Worm", self.player))
+                    add_rule(location, lambda state: state.has("Carbuncle", self.player))
+                    add_rule(location, lambda state: state.has("Juggernaut", self.player))
+                    add_rule(location, lambda state: state.has("Whip Worm", self.player))
                 case "Crystal Rage":
-                    set_rule(location, lambda state: state.has("Dragon Knight", self.player, 2))
-                    set_rule(location, lambda state: state.has("Crystal Rose", self.player))
+                    add_rule(location, lambda state: state.has("Dragon Knight", self.player, 2))
+                    add_rule(location, lambda state: state.has("Crystal Rose", self.player))
                 case "Mandragora Mixer":
-                    set_rule(location, lambda state: state.has("Mandragora", self.player))
-                    set_rule(location, lambda state: state.has("Mandra Dancer", self.player))
-                    set_rule(location, lambda state: state.has("King Mandragora", self.player))
+                    add_rule(location, lambda state: state.has("Mandragora", self.player))
+                    add_rule(location, lambda state: state.has("Mandra Dancer", self.player))
+                    add_rule(location, lambda state: state.has("King Mandragora", self.player))
                 case "Rust and Roll!":
-                    set_rule(location, lambda state: state.has("Acid Dragon", self.player))
-                    set_rule(location, lambda state: state.has("Pixie", self.player))
+                    add_rule(location, lambda state: state.has("Acid Dragon", self.player))
+                    add_rule(location, lambda state: state.has("Pixie", self.player))
                 case "EconoMagic":
-                    set_rule(location, lambda state: state.has("Panther Mage", self.player))
-                    set_rule(location, lambda state: state.has("Tiger Mage", self.player))
+                    add_rule(location, lambda state: state.has("Panther Mage", self.player))
+                    add_rule(location, lambda state: state.has("Tiger Mage", self.player))
                 case "Just Visiting":
-                    set_rule(location, lambda state: state.has("Doppelganger", self.player, 2))
+                    add_rule(location, lambda state: state.has("Doppelganger", self.player, 2))
                 case "Djinn and Bear It":
-                    set_rule(location, lambda state: state.has("Efreet", self.player))
-                    set_rule(location, lambda state: state.has("Dao", self.player))
-                    set_rule(location, lambda state: state.has("Marid", self.player))
+                    add_rule(location, lambda state: state.has("Efreet", self.player))
+                    add_rule(location, lambda state: state.has("Dao", self.player))
+                    add_rule(location, lambda state: state.has("Marid", self.player))
                 case "Triple Kamikaze":
-                    set_rule(location, lambda state: state.has("Flying Ray", self.player))
-                    set_rule(location, lambda state: state.has("Dark Raven", self.player, 2))
+                    add_rule(location, lambda state: state.has("Flying Ray", self.player))
+                    add_rule(location, lambda state: state.has("Dark Raven", self.player, 2))
                 case "One Way Ticket":
-                    set_rule(location, lambda state: state.has("Valkyrie", self.player))
-                    set_rule(location, lambda state: state.has("Thanatos", self.player))
+                    add_rule(location, lambda state: state.has("Valkyrie", self.player))
+                    add_rule(location, lambda state: state.has("Thanatos", self.player))
                 case "The Master's Four":
-                    set_rule(location, lambda state: state.has("Fenril", self.player))
-                    set_rule(location, lambda state: state.has("Behemoth", self.player))
-                    set_rule(location, lambda state: state.has("Demon Fox", self.player))
-                    set_rule(location, lambda state: state.has("Ice Golem", self.player))
+                    add_rule(location, lambda state: state.has("Fenril", self.player))
+                    add_rule(location, lambda state: state.has("Behemoth", self.player))
+                    add_rule(location, lambda state: state.has("Demon Fox", self.player))
+                    add_rule(location, lambda state: state.has("Ice Golem", self.player))
                 case "The Big Save":
-                    set_rule(location, lambda state: state.has("White Tiger", self.player))
-                    set_rule(location, lambda state: state.has("Golden Phoenix", self.player))
-                    set_rule(location, lambda state: state.has("Great Turtle", self.player))
-                    set_rule(location, lambda state: state.has("Blue Dragon", self.player))
+                    add_rule(location, lambda state: state.has("White Tiger", self.player))
+                    add_rule(location, lambda state: state.has("Golden Phoenix", self.player))
+                    add_rule(location, lambda state: state.has("Great Turtle", self.player))
+                    add_rule(location, lambda state: state.has("Blue Dragon", self.player))
                 case "Brutal Nightmare":
-                    set_rule(location, lambda state: state.has("Succubus", self.player))
-                    set_rule(location, lambda state: state.has("Incubus", self.player))
+                    add_rule(location, lambda state: state.has("Succubus", self.player))
+                    add_rule(location, lambda state: state.has("Incubus", self.player))
                 case "Phantom Bulldozer":
-                    set_rule(location, lambda state: state.has("Wraith", self.player))
-                    set_rule(location, lambda state: state.has("Lich", self.player))
-                    set_rule(location, lambda state: state.has("Sekmet", self.player))
+                    add_rule(location, lambda state: state.has("Wraith", self.player))
+                    add_rule(location, lambda state: state.has("Lich", self.player))
+                    add_rule(location, lambda state: state.has("Sekmet", self.player))
                 case "Living Large":
-                    set_rule(location, lambda state: state.has("Phoenix", self.player))
-                    set_rule(location, lambda state: state.has("Golden Phoenix", self.player))
+                    add_rule(location, lambda state: state.has("Phoenix", self.player))
+                    add_rule(location, lambda state: state.has("Golden Phoenix", self.player))
                 case "Elemental Victory":
-                    set_rule(location, lambda state: state.has("Dryad", self.player))
-                    set_rule(location, lambda state: state.has("Gnome", self.player))
-                    set_rule(location, lambda state: state.has("Salamander", self.player))
-                    set_rule(location, lambda state: state.has("Undine", self.player))
+                    add_rule(location, lambda state: state.has("Dryad", self.player))
+                    add_rule(location, lambda state: state.has("Gnome", self.player))
+                    add_rule(location, lambda state: state.has("Salamander", self.player))
+                    add_rule(location, lambda state: state.has("Undine", self.player))
                 case "Skullapalooza":
-                    set_rule(location, lambda state: state.has("Ice Skeleton", self.player))
-                    set_rule(location, lambda state: state.has("Demon Skeleton", self.player))
-                    set_rule(location, lambda state: state.has("Steel Skeleton", self.player))
-                    set_rule(location, lambda state: state.has("Skeleton", self.player))
+                    add_rule(location, lambda state: state.has("Ice Skeleton", self.player))
+                    add_rule(location, lambda state: state.has("Demon Skeleton", self.player))
+                    add_rule(location, lambda state: state.has("Steel Skeleton", self.player))
+                    add_rule(location, lambda state: state.has("Skeleton", self.player))
                 case "Stone Cold Sniper":
-                    set_rule(location, lambda state: state.has("Stone Golem", self.player))
-                    set_rule(location, lambda state: state.has("Archer Tree", self.player, 2))
+                    add_rule(location, lambda state: state.has("Stone Golem", self.player))
+                    add_rule(location, lambda state: state.has("Archer Tree", self.player, 2))
                 case "Mega Tremor":
-                    set_rule(location, lambda state: state.has("Elephant", self.player))
-                    set_rule(location, lambda state: state.has("Elephant King", self.player))
+                    add_rule(location, lambda state: state.has("Elephant", self.player))
+                    add_rule(location, lambda state: state.has("Elephant King", self.player))
                 case "Time Out!":
-                    set_rule(location, lambda state: state.has("Running Bird", self.player))
-                    set_rule(location, lambda state: state.has("Gold Butterfly", self.player))
+                    add_rule(location, lambda state: state.has("Running Bird", self.player))
+                    add_rule(location, lambda state: state.has("Gold Butterfly", self.player))
                 case "Hell Hole":
-                    set_rule(location, lambda state: state.has("Gravity Pillar", self.player))
-                    set_rule(location, lambda state: state.has("Doppelganger", self.player))
+                    add_rule(location, lambda state: state.has("Gravity Pillar", self.player))
+                    add_rule(location, lambda state: state.has("Doppelganger", self.player))
                 case "Spiritual Force":
-                    set_rule(location, lambda state: state.has("Earth Elemental", self.player))
-                    set_rule(location, lambda state: state.has("Fire Elemental", self.player))
-                    set_rule(location, lambda state: state.has("Water Elemental", self.player))
-                    set_rule(location, lambda state: state.has("Wood Elemental", self.player))
+                    add_rule(location, lambda state: state.has("Earth Elemental", self.player))
+                    add_rule(location, lambda state: state.has("Fire Elemental", self.player))
+                    add_rule(location, lambda state: state.has("Water Elemental", self.player))
+                    add_rule(location, lambda state: state.has("Wood Elemental", self.player))
                 case "Air Raid":
-                    set_rule(location, lambda state: state.has("Treant", self.player))
-                    set_rule(location, lambda state: state.has("Dark Raven", self.player, 2))
+                    add_rule(location, lambda state: state.has("Treant", self.player))
+                    add_rule(location, lambda state: state.has("Dark Raven", self.player, 2))
                 case "Tech Support!":
-                    set_rule(location, lambda state: state.has("Acid Cloud", self.player))
-                    set_rule(location, lambda state: state.has("Gold Butterfly", self.player))
+                    add_rule(location, lambda state: state.has("Acid Cloud", self.player))
+                    add_rule(location, lambda state: state.has("Gold Butterfly", self.player))
                 case "Song of Hades":
-                    set_rule(location, lambda state: state.has("Mermaid", self.player))
-                    set_rule(location, lambda state: state.has("Siren", self.player))
+                    add_rule(location, lambda state: state.has("Mermaid", self.player))
+                    add_rule(location, lambda state: state.has("Siren", self.player))
                 case "Hearing Aid":
-                    set_rule(location, lambda state: state.has("Sphinx", self.player))
-                    set_rule(location, lambda state: state.has("Mummy", self.player, 2))
+                    add_rule(location, lambda state: state.has("Sphinx", self.player))
+                    add_rule(location, lambda state: state.has("Mummy", self.player, 2))
                 case "Uber Vampire Root":
-                    set_rule(location, lambda state: state.has("Vampire Bush", self.player, 2))
+                    add_rule(location, lambda state: state.has("Vampire Bush", self.player, 2))
                 case "Mo Better Moray":
-                    set_rule(location, lambda state: state.has("Fire Moray", self.player))
-                    set_rule(location, lambda state: state.has("Water Moray", self.player))
-                    set_rule(location, lambda state: state.has("Earth Moray", self.player))
+                    add_rule(location, lambda state: state.has("Fire Moray", self.player))
+                    add_rule(location, lambda state: state.has("Water Moray", self.player))
+                    add_rule(location, lambda state: state.has("Earth Moray", self.player))
                 case "Prayer of the Wise":
-                    set_rule(location, lambda state: state.has("Sea Monk", self.player))
-                    set_rule(location, lambda state: state.has("Mind Flayer", self.player))
+                    add_rule(location, lambda state: state.has("Sea Monk", self.player))
+                    add_rule(location, lambda state: state.has("Mind Flayer", self.player))
                 case "Hawging the Action":
-                    set_rule(location, lambda state: state.has("Orc", self.player, 4))
+                    add_rule(location, lambda state: state.has("Orc", self.player, 4))
                 case "Stone All Around":
-                    set_rule(location, lambda state: state.has("Cockatrice", self.player, 2))
+                    add_rule(location, lambda state: state.has("Cockatrice", self.player, 2))
                 case "Tender Mercy":
-                    set_rule(location, lambda state: state.has("Fairy", self.player))
-                    set_rule(location, lambda state: state.has("Rheebus", self.player))
+                    add_rule(location, lambda state: state.has("Fairy", self.player))
+                    add_rule(location, lambda state: state.has("Rheebus", self.player))
                 case "Green Guardian":
-                    set_rule(location, lambda state: state.has("Elf", self.player))
-                    set_rule(location, lambda state: state.has("Elf Lord", self.player))
-                    set_rule(location, lambda state: state.has("Dark Elf", self.player))
+                    add_rule(location, lambda state: state.has("Elf", self.player))
+                    add_rule(location, lambda state: state.has("Elf Lord", self.player))
+                    add_rule(location, lambda state: state.has("Dark Elf", self.player))
 
     def fill_slot_data(self) -> dict:
         self.debug_regions()
@@ -485,7 +494,7 @@ class LostKingdoms2World(World):
         return {
             "win_condition": self.options.win_condition.value,
             "fairysanity": self.options.fairysanity.value,
-            "shopsanity": self.options.fairysanity.value,
+            "shopsanity": self.options.shopsanity.value,
             "combosanity": self.options.combosanity.value,
             "open_world": self.options.open_world.value,
             "death_link": self.options.death_link.value
@@ -524,6 +533,7 @@ class LostKingdoms2World(World):
             "Seed": self.multiworld.seed,
             "Slot": self.player,
             "Name": self.player_name,
+            "slot_data" : self.fill_slot_data(),
             #"Locations":{},
             AP_WORLD_VERSION_NAME: CLIENT_VERSION
         }

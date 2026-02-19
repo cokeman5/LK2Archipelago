@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from Options import Choice, Option, PerGameCommonOptions, Range, DeathLink, Toggle
+from Options import Choice, Option, PerGameCommonOptions, Range, DeathLink, Toggle, Visibility
 
 from typing import Dict
 
@@ -10,7 +10,7 @@ class WinConditionOption(Choice):
     display_name = "Win Condition"
     option_defeat_god_of_harmony = 0
     option_defeat_emperor = 1
-    option_collect_all_cards = 2
+    #option_collect_all_cards = 2
     default = 0
 
 class FairysanityConditionOption(Toggle):
@@ -20,6 +20,7 @@ class FairysanityConditionOption(Toggle):
 
 class ShopsanityConditionOption(Toggle):
     """Choose whether cards in the shop becomes AP items."""
+    visibility = Visibility.none
     display_name = "Shopsanity"
     default = 0
 
@@ -30,7 +31,9 @@ class CombosanityConditionOption(Toggle):
 
 class OpenWorldConditionOption(Toggle):
     """Choose whether all levels are unlocked from the start."""
+    visibility = Visibility.none
     display_name = "Open World"
+    default = 0
 
 
 @dataclass
