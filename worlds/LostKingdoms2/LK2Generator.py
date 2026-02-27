@@ -1,10 +1,11 @@
 import json, os
+import random
 import shutil
 from random import Random
 
 import Utils
 
-from worlds.LostKingdoms2 import lost_kingdoms_2_locations, lost_kingdoms_2_chests
+from worlds.LostKingdoms2 import lost_kingdoms_2_locations, lost_kingdoms_2_chests, lost_kingdoms_2_cards
 from worlds.LostKingdoms2.iso_helper.DOL_Updater import update_dol_offsets
 
 from .client.constants import CLIENT_VERSION, AP_WORLD_VERSION_NAME
@@ -13,6 +14,8 @@ import logging
 logger = logging.getLogger()
 
 RANDOMIZER_NAME = "Lost Kingdoms II"
+
+STARTING_DECK_ADDRESS = 0x16D641
 
 
 class LK2Randomizer:
@@ -59,10 +62,19 @@ class LK2Randomizer:
                 if location["isoAddress"] != "":
                     iso_file.seek(int(location["isoAddress"],16))
                     iso_file.write((int("0", 16).to_bytes(1, byteorder='big')))
+            self.randomize_starting_deck(iso_file)
 
         self.write_string(iso,0x1E000,0x00000100,0x80003100,0x80003DA0,self.output_data["Name"])
 
         logger.info("Rom modified")
+
+    def randomize_starting_deck(self, iso_file):
+        cards = list(lost_kingdoms_2_cards.values())
+        for x in range(12):
+            card = random.choice(cards)
+            cards.remove(card)
+            iso_file.seek(STARTING_DECK_ADDRESS+x*2)
+            iso_file.write(int(card["hexCode"], 16).to_bytes(1, byteorder='big'))
 
     def write_string(self, iso_path: str,main_dol_iso_offset: int,section_file_offset: int,section_ram: int,target_ram: int,text: str,max_len: int = 64):
 

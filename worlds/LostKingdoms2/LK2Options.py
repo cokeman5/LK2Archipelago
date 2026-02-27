@@ -35,6 +35,18 @@ class OpenWorldConditionOption(Toggle):
     display_name = "Open World"
     default = 0
 
+class RandomizeStartingDeck(Toggle):
+    display_name = "Randomize Starting Deck"
+    default = 1
+
+class RandomizeShopContents(Toggle):
+    display_name = "Randomize Shop Contents"
+    default = 1
+
+class RandomizeBonusDraws(Toggle):
+    display_name = "Randomize Bonus Draws"
+    default = 1
+
 
 @dataclass
 class LostKingdoms2Options(PerGameCommonOptions):
@@ -44,3 +56,6 @@ class LostKingdoms2Options(PerGameCommonOptions):
     combosanity: CombosanityConditionOption
     open_world : OpenWorldConditionOption
     death_link: DeathLink
+    randomize_starting_deck : RandomizeStartingDeck
+    randomize_shop_contents : RandomizeShopContents
+    randomize_bonus_draws : RandomizeBonusDraws

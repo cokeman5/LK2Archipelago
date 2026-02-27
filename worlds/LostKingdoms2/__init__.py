@@ -1,6 +1,7 @@
 import os
 import random
 import threading
+import time
 import typing
 from dataclasses import fields
 from typing import Optional
@@ -19,7 +20,9 @@ from .Locations import *
 from .LK2Options import *
 from .iso_helper.lk2_rom import LK2PlayerContainer
 
-logger = logging.getLogger()
+import logging
+
+logger = logging.getLogger(__name__)
 
 location_name_to_id = {}
 item_name_to_id = {}
@@ -76,6 +79,31 @@ class LostKingdoms2World(World):
 
     def __init__(self, multiworld: MultiWorld, player: int):
         super(LostKingdoms2World, self).__init__(multiworld, player)
+        self.configure_logging()
+
+    def configure_logging(self):
+        logger.propagate = False
+
+        # 🔹 IMPORTANT: allow DEBUG through the logger itself
+        logger.setLevel(logging.DEBUG)
+
+        root_logger = logging.getLogger()
+        file_handler = None
+        console_handler = None
+
+        for handler in root_logger.handlers:
+            if isinstance(handler, logging.FileHandler):
+                file_handler = handler
+            elif isinstance(handler, logging.StreamHandler):
+                console_handler = handler
+
+        if file_handler:
+            file_handler.setLevel(logging.DEBUG)  # file gets everything
+            logger.addHandler(file_handler)
+
+        if console_handler:
+            console_handler.setLevel(logging.INFO)  # console shows INFO+
+            logger.addHandler(console_handler)
 
     def create_item(self, item: str) -> LK2Item:
         if self.is_progression_item(item):
@@ -107,7 +135,7 @@ class LostKingdoms2World(World):
         lost_kingdoms_2_cards_diluted.pop(progression_stationary)
         lost_kingdoms_2_cards_diluted.pop("Stone Golem")
         lost_kingdoms_2_cards_diluted.pop("God of Destruction")
-        num_of_cards = (len(lost_kingdoms_2_chests) - 5) + (self.options.combosanity.value * len(lost_kingdoms_2_combos))
+        num_of_cards = (len(lost_kingdoms_2_chests) - 5) + (self.options.combosanity.value * len(lost_kingdoms_2_combos)) + (self.options.shopsanity.value * len(lost_kingdoms_2_shop_purchases))
         random_cards = random.sample(list(lost_kingdoms_2_cards_diluted.keys()), num_of_cards)
         random_cards.append(progression_flyer)
         random_cards.append(progression_jumper)
@@ -156,6 +184,10 @@ class LostKingdoms2World(World):
             if lost_kingdoms_2_locations[key]["type"] == "Red Fairy" and self.options.fairysanity.value==0:
                 continue
             if lost_kingdoms_2_locations[key]["type"] == "Combo" and self.options.combosanity.value==0:
+                continue
+            if lost_kingdoms_2_locations[key]["type"] == "Bonus Draw":
+                continue
+            if lost_kingdoms_2_locations[key]["type"] == "Shop Purchase" and self.options.shopsanity.value==0:
                 continue
             region = self.multiworld.get_region(lost_kingdoms_2_locations[key]["level"], self.player)
             location_data = LK2LocationData(self.location_name_to_id[key])
@@ -237,14 +269,14 @@ class LostKingdoms2World(World):
                 case "Krasheen Mountains":
                     previous_region = self.multiworld.get_region("Royal Tower, Lower", self.player)
                     previous_region.connect(region, previous_region.name + " -> " + region.name)
-                case "Grenfoel Church":
+                case "Grenfoel Cathedral":
                     previous_region = self.multiworld.get_region("Krasheen Mountains", self.player)
                     previous_region.connect(region, previous_region.name + " -> " + region.name)
                 case "Temple of Sharacia":
-                    previous_region = self.multiworld.get_region("Grenfoel Church", self.player)
+                    previous_region = self.multiworld.get_region("Grenfoel Cathedral", self.player)
                     previous_region.connect(region, previous_region.name + " -> " + region.name)
-                case "Grenfoel Church Shop":
-                    previous_region = self.multiworld.get_region("Grenfoel Church", self.player)
+                case "Grenfoel Cathedral Shop":
+                    previous_region = self.multiworld.get_region("Grenfoel Cathedral", self.player)
                     previous_region.connect(region, previous_region.name + " -> " + region.name)
                 case "Isamat Urbur":
                     previous_region = self.multiworld.get_region("Nobleman's Residence", self.player)
@@ -351,153 +383,159 @@ class LostKingdoms2World(World):
                              and state.has("Fossil Lt Wing", self.player) and state.has("Fossil Rt Arm", self.player) \
                              and state.has("Fossil Lt Arm", self.player) and state.has("Fossil Rt Leg", self.player) \
                              and state.has("Fossil Lt Leg", self.player))
-                case "Triple Hagan":
+                case "Combo - Triple Hagan":
                     add_rule(location, lambda state: state.has("Rock Hagan", self.player))
                     add_rule(location, lambda state: state.has("Bum Hagan", self.player))
                     add_rule(location, lambda state: state.has("Storm Hagan", self.player))
-                case "Ultimate Pasta":
+                case "Combo - Ultimate Pasta":
                     add_rule(location, lambda state: state.has("Red Dragon", self.player))
                     add_rule(location, lambda state: state.has("Brine Dragon", self.player))
                     add_rule(location, lambda state: state.has("Green Dragon", self.player))
                     add_rule(location, lambda state: state.has("Amber Dragon", self.player))
-                case "Lizard War":
+                case "Combo - Lizard War":
                     add_rule(location, lambda state: state.has("Red Lizard", self.player))
                     add_rule(location, lambda state: state.has("Venom Lizard", self.player))
                     add_rule(location, lambda state: state.has("Lizardman", self.player))
                     add_rule(location, lambda state: state.has("Basilisk", self.player))
-                case "Rotary Death":
+                case "Combo - Rotary Death":
                     add_rule(location, lambda state: state.has("Carbuncle", self.player))
                     add_rule(location, lambda state: state.has("Decoy Pillar", self.player))
-                case "Rocky Forecast":
+                case "Combo - Rocky Forecast":
                     add_rule(location, lambda state: state.has("Stone Head", self.player, 3))
-                case "Sir Spear-A-Lot":
+                case "Combo - Sir Spear-A-Lot":
                     add_rule(location, lambda state: state.has("Ghost Armor", self.player))
                     add_rule(location, lambda state: state.has("Chaos Knight", self.player))
-                case "Temper Tantrum":
+                case "Combo - Temper Tantrum":
                     add_rule(location, lambda state: state.has("Fire Golem", self.player))
                     add_rule(location, lambda state: state.has("Ice Golem", self.player))
-                case "Goblin Guts":
+                case "Combo - Goblin Guts":
                     add_rule(location, lambda state: state.has("Hobgoblin", self.player))
                     add_rule(location, lambda state: state.has("Goblin Lord", self.player))
-                case "Lethal Orbit":
+                case "Combo - Lethal Orbit":
                     add_rule(location, lambda state: state.has("Carbuncle", self.player))
                     add_rule(location, lambda state: state.has("Juggernaut", self.player))
                     add_rule(location, lambda state: state.has("Whip Worm", self.player))
-                case "Crystal Rage":
+                case "Combo - Crystal Rage":
                     add_rule(location, lambda state: state.has("Dragon Knight", self.player, 2))
                     add_rule(location, lambda state: state.has("Crystal Rose", self.player))
-                case "Mandragora Mixer":
+                case "Combo - Mandragora Mixer":
                     add_rule(location, lambda state: state.has("Mandragora", self.player))
                     add_rule(location, lambda state: state.has("Mandra Dancer", self.player))
                     add_rule(location, lambda state: state.has("King Mandragora", self.player))
-                case "Rust and Roll!":
+                case "Combo - Rust and Roll!":
                     add_rule(location, lambda state: state.has("Acid Dragon", self.player))
                     add_rule(location, lambda state: state.has("Pixie", self.player))
-                case "EconoMagic":
+                case "Combo - EconoMagic":
                     add_rule(location, lambda state: state.has("Panther Mage", self.player))
                     add_rule(location, lambda state: state.has("Tiger Mage", self.player))
-                case "Just Visiting":
+                case "Combo - Just Visiting":
                     add_rule(location, lambda state: state.has("Doppelganger", self.player, 2))
-                case "Djinn and Bear It":
+                case "Combo - Djinn and Bear It":
                     add_rule(location, lambda state: state.has("Efreet", self.player))
                     add_rule(location, lambda state: state.has("Dao", self.player))
                     add_rule(location, lambda state: state.has("Marid", self.player))
-                case "Triple Kamikaze":
+                case "Combo - Triple Kamikaze":
                     add_rule(location, lambda state: state.has("Flying Ray", self.player))
                     add_rule(location, lambda state: state.has("Dark Raven", self.player, 2))
-                case "One Way Ticket":
+                case "Combo - One Way Ticket":
                     add_rule(location, lambda state: state.has("Valkyrie", self.player))
                     add_rule(location, lambda state: state.has("Thanatos", self.player))
-                case "The Master's Four":
+                case "Combo - The Master's Four":
                     add_rule(location, lambda state: state.has("Fenril", self.player))
                     add_rule(location, lambda state: state.has("Behemoth", self.player))
                     add_rule(location, lambda state: state.has("Demon Fox", self.player))
                     add_rule(location, lambda state: state.has("Ice Golem", self.player))
-                case "The Big Save":
+                case "Combo - The Big Save":
                     add_rule(location, lambda state: state.has("White Tiger", self.player))
                     add_rule(location, lambda state: state.has("Golden Phoenix", self.player))
                     add_rule(location, lambda state: state.has("Great Turtle", self.player))
                     add_rule(location, lambda state: state.has("Blue Dragon", self.player))
-                case "Brutal Nightmare":
+                case "Combo - Brutal Nightmare":
                     add_rule(location, lambda state: state.has("Succubus", self.player))
                     add_rule(location, lambda state: state.has("Incubus", self.player))
-                case "Phantom Bulldozer":
+                case "Combo - Phantom Bulldozer":
                     add_rule(location, lambda state: state.has("Wraith", self.player))
                     add_rule(location, lambda state: state.has("Lich", self.player))
                     add_rule(location, lambda state: state.has("Sekmet", self.player))
-                case "Living Large":
+                case "Combo - Living Large":
                     add_rule(location, lambda state: state.has("Phoenix", self.player))
                     add_rule(location, lambda state: state.has("Golden Phoenix", self.player))
-                case "Elemental Victory":
+                case "Combo - Elemental Victory":
                     add_rule(location, lambda state: state.has("Dryad", self.player))
                     add_rule(location, lambda state: state.has("Gnome", self.player))
                     add_rule(location, lambda state: state.has("Salamander", self.player))
                     add_rule(location, lambda state: state.has("Undine", self.player))
-                case "Skullapalooza":
+                case "Combo - Skullapalooza":
                     add_rule(location, lambda state: state.has("Ice Skeleton", self.player))
                     add_rule(location, lambda state: state.has("Demon Skeleton", self.player))
                     add_rule(location, lambda state: state.has("Steel Skeleton", self.player))
                     add_rule(location, lambda state: state.has("Skeleton", self.player))
-                case "Stone Cold Sniper":
+                case "Combo - Stone Cold Sniper":
                     add_rule(location, lambda state: state.has("Stone Golem", self.player))
                     add_rule(location, lambda state: state.has("Archer Tree", self.player, 2))
-                case "Mega Tremor":
+                case "Combo - Mega Tremor":
                     add_rule(location, lambda state: state.has("Elephant", self.player))
                     add_rule(location, lambda state: state.has("Elephant King", self.player))
-                case "Time Out!":
+                case "Combo - Time Out!":
                     add_rule(location, lambda state: state.has("Running Bird", self.player))
                     add_rule(location, lambda state: state.has("Gold Butterfly", self.player))
-                case "Hell Hole":
+                case "Combo - Hell Hole":
                     add_rule(location, lambda state: state.has("Gravity Pillar", self.player))
                     add_rule(location, lambda state: state.has("Doppelganger", self.player))
-                case "Spiritual Force":
+                case "Combo - Spiritual Force":
                     add_rule(location, lambda state: state.has("Earth Elemental", self.player))
                     add_rule(location, lambda state: state.has("Fire Elemental", self.player))
                     add_rule(location, lambda state: state.has("Water Elemental", self.player))
                     add_rule(location, lambda state: state.has("Wood Elemental", self.player))
-                case "Air Raid":
+                case "Combo - Air Raid":
                     add_rule(location, lambda state: state.has("Treant", self.player))
                     add_rule(location, lambda state: state.has("Dark Raven", self.player, 2))
-                case "Tech Support!":
+                case "Combo - Tech Support!":
                     add_rule(location, lambda state: state.has("Acid Cloud", self.player))
                     add_rule(location, lambda state: state.has("Gold Butterfly", self.player))
-                case "Song of Hades":
+                case "Combo - Song of Hades":
                     add_rule(location, lambda state: state.has("Mermaid", self.player))
                     add_rule(location, lambda state: state.has("Siren", self.player))
-                case "Hearing Aid":
+                case "Combo - Hearing Aid":
                     add_rule(location, lambda state: state.has("Sphinx", self.player))
                     add_rule(location, lambda state: state.has("Mummy", self.player, 2))
-                case "Uber Vampire Root":
+                case "Combo - Uber Vampire Root":
                     add_rule(location, lambda state: state.has("Vampire Bush", self.player, 2))
-                case "Mo Better Moray":
+                case "Combo - Mo Better Moray":
                     add_rule(location, lambda state: state.has("Fire Moray", self.player))
                     add_rule(location, lambda state: state.has("Water Moray", self.player))
                     add_rule(location, lambda state: state.has("Earth Moray", self.player))
-                case "Prayer of the Wise":
+                case "Combo - Prayer of the Wise":
                     add_rule(location, lambda state: state.has("Sea Monk", self.player))
                     add_rule(location, lambda state: state.has("Mind Flayer", self.player))
-                case "Hawging the Action":
+                case "Combo - Hawging the Action":
                     add_rule(location, lambda state: state.has("Orc", self.player, 4))
-                case "Stone All Around":
+                case "Combo - Stone All Around":
                     add_rule(location, lambda state: state.has("Cockatrice", self.player, 2))
-                case "Tender Mercy":
+                case "Combo - Tender Mercy":
                     add_rule(location, lambda state: state.has("Fairy", self.player))
                     add_rule(location, lambda state: state.has("Rheebus", self.player))
-                case "Green Guardian":
+                case "Combo - Green Guardian":
                     add_rule(location, lambda state: state.has("Elf", self.player))
                     add_rule(location, lambda state: state.has("Elf Lord", self.player))
                     add_rule(location, lambda state: state.has("Dark Elf", self.player))
 
     def fill_slot_data(self) -> dict:
-        self.debug_regions()
-        self.debug_all_locations()
+        #self.debug_regions()
+        #self.debug_all_locations()
         return {
+            "Seed": self.multiworld.seed,
+            "Slot": self.player,
+            "Name": self.player_name,
             "win_condition": self.options.win_condition.value,
             "fairysanity": self.options.fairysanity.value,
             "shopsanity": self.options.shopsanity.value,
             "combosanity": self.options.combosanity.value,
             "open_world": self.options.open_world.value,
-            "death_link": self.options.death_link.value
+            "death_link": self.options.death_link.value,
+            "randomize_starting_deck": self.options.randomize_starting_deck.value,
+            "randomize_shop_contents": self.options.randomize_shop_contents.value,
+            "randomize_bonus_draws": self.options.randomize_bonus_draws.value,
         }
 
     def debug_regions(self):
@@ -512,10 +550,11 @@ class LostKingdoms2World(World):
         reachable = state.reachable_regions[self.player]
         unreachable = [r.name for r in self.multiworld.regions if r.player == self.player and r not in reachable]
 
-        logger.info(f"UNREACHABLE WITH ALL ITEMS: {unreachable}")
+        logger.debug(f"UNREACHABLE WITH ALL ITEMS: {unreachable}")
 
     def debug_all_locations(self):
-        logger.info("=== Full Location -> Item Mapping ===")
+
+        logger.debug("=== Full Location -> Item Mapping ===")
         for region in self.multiworld.regions:
             if region.player != self.player:
                 continue
@@ -524,7 +563,7 @@ class LostKingdoms2World(World):
                 item_classification = getattr(location.item, "classification", None)
                 if not item_name:
                     item_name = getattr(location, "item_name", None)
-                logger.info(f"Location '{location.name}' (Region: '{region.name}') contains: '{item_name or 'None'}' {item_classification}")
+                logger.debug(f"Location '{location.name}' (Region: '{region.name}') contains: '{item_name or 'None'}' {item_classification}")
 
     def generate_output(self, output_directory: str):
         # Output seed name and slot number to seed RNG in randomizer client
@@ -533,7 +572,6 @@ class LostKingdoms2World(World):
             "Seed": self.multiworld.seed,
             "Slot": self.player,
             "Name": self.player_name,
-            "slot_data" : self.fill_slot_data(),
             #"Locations":{},
             AP_WORLD_VERSION_NAME: CLIENT_VERSION
         }

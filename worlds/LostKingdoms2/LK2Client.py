@@ -1,4 +1,6 @@
 import asyncio
+import logging
+import random
 import sys
 import time
 import traceback
@@ -13,9 +15,10 @@ import Utils
 from CommonClient import ClientCommandProcessor, CommonContext, get_base_parser, gui_enabled, logger, server_loop
 from .iso_helper.lk2_rom import LK2USAAPPatch
 
-from .Locations import lost_kingdoms_2_locations, lost_kingdoms_2_regions, lost_kingdoms_2_combos
+from .Locations import lost_kingdoms_2_locations, lost_kingdoms_2_regions, lost_kingdoms_2_combos, \
+    lost_kingdoms_2_bonus_draws
 from worlds.LostKingdoms2 import lost_kingdoms_2_cards, lost_kingdoms_2_key_items, lost_kingdoms_2_items, \
-    location_name_to_id
+    location_name_to_id, lost_kingdoms_2_shop_purchases
 
 if TYPE_CHECKING:
     import kvui
@@ -48,15 +51,30 @@ God_of_Harmony_ID_ADDRESS = 0x80223e5c # = 2164498496
 Emperor_Health_ADDRESS = 0x80223fb8
 Emperor_ID_ADDRESS = 0x80223f6c # = 8153e580
 TEMP_DECK_ADDRESS = 0x80257ada
-CARD_INFO_TABLE = 0x80732be0
-
-
-ONE_TIME_MODIFIERS = False
-HAS_GOALED = False
-
-
-# This address is used to check/set the player's health for DeathLink.
+CARD_INFO_TABLE_ADDRESS = 0x80732be0
+CARD_SHOP_ADDRESS = 0x80168700
+STARTING_DECK_ADDRESS = 0x80152640
+BONUS_DRAW_ADDRESS = 0x80168168
+COMBO_LOCATION_ADDRESS = 0x8025d070
+KADISHU_SHOP_1_AND_2_ADDRESS = 0x8123cdc0
+KADISHU_SHOP_3_ADDRESS = 0x8124aa60
+CATHEDRAL_SHOP_ADDRESS = 0x812b2880
+KADISHU_SHOP_1_AND_2_UI_SELECTION_ADDRESS = 0x8125884a
+KADISHU_SHOP_3_UI_SELECTION_ADDRESS = 0x8123a7aa
+CATHEDRAL_SHOP_UI_SELECTION_ADDRESS = 0x812b026a
+SHOP_SUB_UI_FLAG = 0x80275c58
+THIRD_SHOP_UNLOCK_FLAG = 0x8025e04c
+SHOP_MENU_ADDRESS = 0x80275c58
+LEVEL_ID_ADDRESS = 0x80209262
+PLAYER_GOLD_ADDRESS = 0x8025d022
 CURR_HEALTH_ADDR = 0x80223c98
+SHOP_LOCATION_ADDRESS = 0x8025d018
+
+
+ONE_TIME_MODIFIERS_IN_GAME = False
+ONE_TIME_MODIFIERS_MAIN_MENU = False
+HAS_GOALED = False
+PLAYER_PREVIOUS_GOLD = 0
 
 
 class LK2CommandProcessor(ClientCommandProcessor):
@@ -108,6 +126,31 @@ class LK2Context(CommonContext):
         self.send_hints: int = 0
         self.hints = {}
         self.slot_data = {}
+        self.configure_logging()
+
+    def configure_logging(self):
+        logger.propagate = False
+
+        # 🔹 IMPORTANT: allow DEBUG through the logger itself
+        logger.setLevel(logging.DEBUG)
+
+        root_logger = logging.getLogger()
+        file_handler = None
+        console_handler = None
+
+        for handler in root_logger.handlers:
+            if isinstance(handler, logging.FileHandler):
+                file_handler = handler
+            elif isinstance(handler, logging.StreamHandler):
+                console_handler = handler
+
+        if file_handler:
+            file_handler.setLevel(logging.DEBUG)  # file gets everything
+            logger.addHandler(file_handler)
+
+        if console_handler:
+            console_handler.setLevel(logging.INFO)  # console shows INFO+
+            logger.addHandler(console_handler)
 
     async def disconnect(self, allow_autoreconnect: bool = False) -> None:
         """
@@ -126,7 +169,7 @@ class LK2Context(CommonContext):
         :param args: The command arguments.
         """
         if cmd == "Connected":
-            logger.info(f"CONNECTED SLOT DATA = {args['slot_data']}")
+            logger.debug(f"CONNECTED SLOT DATA = {args['slot_data']}")
             self.slot_data = args["slot_data"]
             if "death_link" in args["slot_data"]:
                 Utils.async_start(self.update_death_link(bool(args["slot_data"]["death_link"])))
@@ -221,7 +264,6 @@ def read_string(console_address: int, strlen: int) -> str:
     :return: The string.
     """
     string = dolphin_memory_engine.read_bytes(console_address, strlen).split(b"\0", 1)[0].decode()
-    logger.info("string read: " + str(string))
     return string
 
 
@@ -267,12 +309,12 @@ def _give_item(ctx: LK2Context, item_name: str) -> bool:
         return False
 
 def give_red_fairy(ctx) -> bool:
-    logger.info("Giving fairy")
+    logger.debug("Giving fairy")
     try:
         memory_address = RED_FAIRY_COUNT_ADDRESS
         current_amount_of_item = read_memory(memory_address, 1)
         write_memory(memory_address, current_amount_of_item + 1,1)
-        logger.info("Red fairy amount = " + str(current_amount_of_item + 1))
+        logger.debug("Red fairy amount = " + str(current_amount_of_item + 1))
 
         increment_item_index(ctx)
         return True
@@ -281,15 +323,14 @@ def give_red_fairy(ctx) -> bool:
         return False
 
 def give_card(ctx,card_name: str) -> bool:
-    logger.info("Giving card " + card_name)
+    logger.debug("Giving card " + card_name)
 
     try:
         #add card to player's collection
-        if read_memory(IS_IN_LEVEL_ADDRESS,1) != 1:
+        if True: #read_memory(IS_IN_LEVEL_ADDRESS,1) != 1:
             memory_address = int(lost_kingdoms_2_cards[card_name]["DolphinAddress"], 16)
             current_amount_of_item = read_memory(memory_address)
             write_memory(memory_address, current_amount_of_item + 1)
-
         else:
             #add card to player's available cards at a deck point
             offset = 0
@@ -300,7 +341,7 @@ def give_card(ctx,card_name: str) -> bool:
                 write_memory(TEMP_DECK_ADDRESS + offset, hex_code)
 
                 #Get the card type
-                card_info_memory = CARD_INFO_TABLE+0x160*(hex_code-0x01)
+                card_info_memory = CARD_INFO_TABLE_ADDRESS+0x160*(hex_code-0x01)
                 card_type_value = read_memory(card_info_memory+0x10*17+0x01,1)
 
                 #0 = independent, 1 = helper, 2 = summon, 3 = weapon, 4 = transform,
@@ -318,7 +359,7 @@ def give_card(ctx,card_name: str) -> bool:
         return False
 
 def give_key_item(ctx,item_name: str) -> bool:
-    logger.info("Giving key item " + item_name)
+    logger.debug("Giving key item " + item_name)
     try:
         offset = 1
         for key_item in lost_kingdoms_2_key_items:
@@ -333,19 +374,19 @@ def give_key_item(ctx,item_name: str) -> bool:
                         write_memory(0x8025d8b7, 0, 1)
                         value = read_memory(0x8025dcd1, 1)
                         write_memory(0x8025dcd1, value | (1 << 1), 1)
-                        logger.info("Blue Key Found")
+                        logger.debug("Blue Key Found")
                     case "Red Key":
                         write_memory(0x8025d867, 0, 1)
                         write_memory(0x8025d877, 0, 1)
                         write_memory(0x8025d887, 0, 1)
                         value = read_memory(0x8025dcd1, 1)
                         write_memory(0x8025dcd1, value | (1 << 0), 1)
-                        logger.info("Red Key Found")
+                        logger.debug("Red Key Found")
                     case "Green Key":
                         write_memory(0x8025d8c7, 0, 1)
                         value = read_memory(0x8025dcd1, 1)
                         write_memory(0x8025dcd1, value | (1 << 2), 1)
-                        logger.info("Green Key Found")
+                        logger.debug("Green Key Found")
                     case "Bottle":
                         value = read_memory(0x8025e150)
                         write_memory(0x8025e150, value + 2)
@@ -380,6 +421,10 @@ def modify_code(ctx):
     #Key locations
     write_memory(0x8006e78c, 0x80850004, 4)
     write_memory(0x8006e798, 0x90050004,4)
+    #Prevent KF doors being openable after killing the guards
+    #write_memory(0x80078fc0,0x60000000, 4)
+    #write_memory(0x80088188, 0x60000000, 4)
+    #write_memory(0x800874dc, 0x60000000, 4)
     #Prevent fossils respawning
     #write_memory(0x8006e7c4, 0x80030004, 4) Fixes fossils respawning, but breaks every other key item item
     #Magic Boosters visuals
@@ -395,16 +440,61 @@ def modify_code(ctx):
     if ctx.slot_data.get("fairysanity", 0):
         write_memory(0x80077034, 0x38040000, 4)
 
-    logger.info("Modified code")
+    logger.debug("Modified code")
+
+def prevent_KF_gates_from_being_openable():
+    if read_memory(LEVEL_ID_ADDRESS, 1) == 4:
+        if not ((read_memory(KEY_ITEM_ITEM_ADDRESS, 4) >> 2) & 1):
+            write_memory(0x8025d897, 1, 1)
+            write_memory(0x8025d8a7, 1, 1)
+            write_memory(0x8025d8b7, 1, 1)
+        if not ((read_memory(KEY_ITEM_ITEM_ADDRESS, 4) >> 1) & 1):
+            write_memory(0x8025d867, 1, 1)
+            write_memory(0x8025d877, 1, 1)
+            write_memory(0x8025d887, 1, 1)
+        if not ((read_memory(KEY_ITEM_ITEM_ADDRESS, 4) >> 3) & 1):
+            write_memory(0x8025d8c7, 1, 1)
 
 def set_shop_contents_to_AP():
     for x in range(40):
         write_memory(0x80168700+(x*0x2), 0x00000000)
 
 def open_world():
-    logger.info("Opening world")
+    logger.debug("Opening world")
     for region in lost_kingdoms_2_regions:
         write_memory(int(lost_kingdoms_2_regions[region]["RAMAddress"],16), 128, 1)
+
+def randomize_shop_contents(ctx):
+    random.seed(ctx.slot_data.get("Seed", -1))
+    cards = list(lost_kingdoms_2_cards.values())
+    for x in range (32):
+        card = random.choice(cards)
+        write_memory(CARD_SHOP_ADDRESS+x*2,int(card["hexCode"],16))
+        cards.remove(card)
+
+def randomize_starting_deck(ctx):
+    random.seed(ctx.slot_data.get("Seed", -1)+1)
+    cards = list(lost_kingdoms_2_cards.values())
+    for x in range(12):
+        card = random.choice(cards)
+        cards.remove(card)
+        write_memory(STARTING_DECK_ADDRESS + x * 2,int(card["hexCode"],16))
+
+def randomize_bonus_draws(ctx):
+    random.seed(ctx.slot_data.get("Seed", -1)+2)
+    cards = list(lost_kingdoms_2_cards.values())
+    group_dict = {}
+    for key in lost_kingdoms_2_bonus_draws:
+        bonus_draw = lost_kingdoms_2_bonus_draws[key]
+        if group_dict.get(bonus_draw["cardGroup"], 0):
+            card = group_dict.get(bonus_draw["cardGroup"])
+            write_memory(BONUS_DRAW_ADDRESS + int(bonus_draw["address"], 16) - 0x183169, int(card["hexCode"], 16))
+        else:
+            card = random.choice(cards)
+            cards.remove(card)
+            write_memory(BONUS_DRAW_ADDRESS + int(bonus_draw["address"], 16) - 0x183169, int(card["hexCode"], 16))
+            group_dict[bonus_draw["cardGroup"]] = card
+
 
 def has_item(self, name: str) -> bool:
     """Check if player has received an item"""
@@ -446,7 +536,7 @@ async def check_victory_conditions(ctx: LK2Context):
                 HAS_GOALED = True
 
 async def save_data(ctx: LK2Context):
-    logger.info("Saving data")
+    logger.debug("Saving data")
     await ctx.send_msgs([{
         "cmd": "Set",
         "key": f"lk2_{ctx.team}_{ctx.slot}_{ctx.auth}_item_index",  # Unique key per player
@@ -472,7 +562,7 @@ async def save_data(ctx: LK2Context):
     ctx.need_to_save = False
 
 async def load_data(ctx: LK2Context):
-    logger.info("Loading data")
+    logger.debug("Loading data")
     await ctx.send_msgs([{
         "cmd": "Get",
         "keys": [f"lk2_{ctx.team}_{ctx.slot}_{ctx.auth}_key_items",f"lk2_{ctx.team}_{ctx.slot}_{ctx.auth}_magic_booster",f"lk2_{ctx.team}_{ctx.slot}_{ctx.auth}_item_index"]
@@ -547,8 +637,12 @@ def check_regular_location(ctx: LK2Context, location: str) -> bool:
             else:
                 return False
         case "Combo":
-            memory_value = read_memory(0x8025d070, 8)
+            memory_value = read_memory(COMBO_LOCATION_ADDRESS, 8)
             bit_value = (memory_value >> lost_kingdoms_2_combos[location]["bitOffset"]) & 1
+            return bit_value
+        case "Shop Purchase":
+            memory_value = read_memory(SHOP_LOCATION_ADDRESS, 5)
+            bit_value = (memory_value >> lost_kingdoms_2_shop_purchases[location]["bitOffset"]) & 1
             return bit_value
 
     return False
@@ -571,7 +665,7 @@ async def check_locations(ctx: LK2Context) -> set[int]:
     # Send the list of newly-checked locations to the server.
     locations_checked = ctx.locations_checked.difference(ctx.checked_locations)
     if locations_checked:
-        logger.info("sending newly checked locations: " + str(locations_checked))
+        logger.debug("sending newly checked locations: " + str(locations_checked))
         await ctx.send_msgs([{"cmd": "LocationChecks", "locations": list(locations_checked)}])
         ctx.checked_locations.update(locations_checked)
     return locations_checked
@@ -596,9 +690,9 @@ async def check_death(ctx: LK2Context) -> None:
     if ctx.slot is not None and check_ingame():
         cur_health = read_memory(CURR_HEALTH_ADDR)
         if cur_health <= 0:
-            if not ctx.has_send_death and time.time() >= ctx.last_death_link + 3:
+            if not ctx.has_send_death and time.time() >= ctx.last_death_link + 10:
                 ctx.has_send_death = True
-                await ctx.send_death(ctx.player_names[1] + " ran out of hearts.")
+                await ctx.send_death(ctx.player_names[1] + " did not believe in the heart of the cards.")
         else:
             ctx.has_send_death = False
 
@@ -610,9 +704,47 @@ def check_ingame() -> bool:
     :return: `True` if the player is in-game, otherwise `False`.
     """
     try:
-        return read_memory(IS_IN_GAME_ADDR, 2) != 0
+        return read_memory(IS_IN_GAME_ADDR) != 0
     except:
         return False
+
+def check_inshop() -> bool:
+    try:
+        return read_memory(SHOP_MENU_ADDRESS) != 0
+    except:
+        return False
+
+async def track_shop_purchases():
+    shop_id = 0
+    shop_address = KADISHU_SHOP_1_AND_2_ADDRESS
+    ui_address = KADISHU_SHOP_1_AND_2_UI_SELECTION_ADDRESS
+    if read_memory(LEVEL_ID_ADDRESS, 1) == 42:
+        shop_id = 3
+        shop_address = CATHEDRAL_SHOP_ADDRESS
+        ui_address = CATHEDRAL_SHOP_UI_SELECTION_ADDRESS
+    elif read_memory(int(lost_kingdoms_2_regions["Runestone Caverns - Lower Chambers"]["RAMAddress"],16)-0x2, 1) == 1:
+        if read_memory(THIRD_SHOP_UNLOCK_FLAG, 1) == 1:
+            shop_id = 2
+            shop_address = KADISHU_SHOP_3_ADDRESS
+            ui_address = KADISHU_SHOP_3_UI_SELECTION_ADDRESS
+        else:
+            shop_id = 1
+
+    if read_memory(SHOP_SUB_UI_FLAG) == 1:
+        global PLAYER_PREVIOUS_GOLD
+        current_gold = read_memory(PLAYER_GOLD_ADDRESS)
+        if current_gold < PLAYER_PREVIOUS_GOLD:
+            index = read_memory(ui_address) + 10*shop_id
+            logger.debug("shop index" + str(index))
+            shop_location_data = read_memory(SHOP_LOCATION_ADDRESS, 5)
+            logger.debug("shop location data before: " + str(shop_location_data))
+            if (shop_location_data >> index) & 1 == 0:
+                shop_location_data = shop_location_data | (1<<index)
+                logger.debug("shop location data after: " + str(shop_location_data))
+                write_memory(SHOP_LOCATION_ADDRESS, shop_location_data, 5)
+        PLAYER_PREVIOUS_GOLD = current_gold
+
+
 
 
 async def dolphin_sync_task_main_task(ctx: LK2Context):
@@ -623,10 +755,10 @@ async def dolphin_sync_task_main_task(ctx: LK2Context):
 
     :param ctx: Lost Kingdoms 2 client context.
     """
-    global ONE_TIME_MODIFIERS
+    global ONE_TIME_MODIFIERS_IN_GAME
+    global ONE_TIME_MODIFIERS_MAIN_MENU
     global HAS_GOALED
     logger.info("Starting Dolphin connector. Use /dolphin for status information." + str(ctx.auth))
-    logger.info("auth is:" + str(ctx.auth))
     sleep_time = 0.0
     while not ctx.exit_event.is_set():
         if sleep_time > 0.0:
@@ -640,18 +772,31 @@ async def dolphin_sync_task_main_task(ctx: LK2Context):
 
         try:
             if dolphin_memory_engine.is_hooked() and ctx.dolphin_status == CONNECTION_CONNECTED_STATUS:
-                if not ONE_TIME_MODIFIERS and ctx.slot_data != {} and check_ingame():
+                if (not ONE_TIME_MODIFIERS_MAIN_MENU) and ctx.slot_data:
+                    logger.debug("Seed is " + str(ctx.slot_data["Seed"]))
+                    if ctx.slot_data.get("randomize_starting_deck", 0):
+                        randomize_starting_deck(ctx)
+                    if ctx.slot_data.get("randomize_shop_contents", 0):
+                        randomize_shop_contents(ctx)
+                    if ctx.slot_data.get("randomize_bonus_draws", 0):
+                        randomize_bonus_draws(ctx)
+                    ONE_TIME_MODIFIERS_MAIN_MENU = True
+                if (not ONE_TIME_MODIFIERS_IN_GAME) and ctx.slot_data and check_ingame():
                     modify_code(ctx)
-                    logger.info(ctx.slot_data)
+                    logger.debug("Slot data:" + str(ctx.slot_data))
                     if ctx.slot_data.get("open_world", 0):
                         open_world()
                     if ctx.slot_data.get("shopsanity", 0):
-                        set_shop_contents_to_AP()
-                    ONE_TIME_MODIFIERS = True
+                        pass
+                        #set_shop_contents_to_AP()
+                    ONE_TIME_MODIFIERS_IN_GAME = True
                 if ctx.slot is not None :
                     if check_ingame():
                         if "DeathLink" in ctx.tags:
                             await check_death(ctx)
+                        #if ctx.slot_data.get("shopsanity", 0) & check_inshop():
+                            #await track_shop_purchases()
+                        prevent_KF_gates_from_being_openable()
                         await check_victory_conditions(ctx)
                         await give_items(ctx)
                         await check_locations(ctx)
@@ -659,12 +804,12 @@ async def dolphin_sync_task_main_task(ctx: LK2Context):
                     HAS_GOALED = False
                     if not ctx.auth:
                         ctx.auth = read_string(SLOT_NAME_ADDR, 0x40)
-                        logger.info("auth is:" + str(ctx.auth))
                     if ctx.awaiting_rom:
                         await ctx.server_auth()
                 sleep_time = 0.1
             else:
-                ONE_TIME_MODIFIERS = False
+                ONE_TIME_MODIFIERS_IN_GAME = False
+                ONE_TIME_MODIFIERS_MAIN_MENU = False
                 HAS_GOALED = False
                 if ctx.dolphin_status == CONNECTION_CONNECTED_STATUS:
                     logger.info("Connection to Dolphin lost, reconnecting...")
