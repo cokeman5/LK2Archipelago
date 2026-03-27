@@ -282,15 +282,11 @@ lostkingdoms_2_custom_prices = {
 lost_kingdoms_2_flying_cards = ["Baba Yaga", "Birdman", "Garuda", "Wyvern", "Pazuzu"]
 lost_kingdoms_2_jumping_cards = ["Hell Hound", "Cerberus", "Centaur"]
 #lost_kingdoms_2_smashing_cards = ["Stone Golem", "Baba Yaga", "Talos", "CircaSaurus", "Devata", "Pazuzu", "Chariobot"]
-lost_kingdoms_2_stationary_cards = ["Dark Treant", "King Mandragora", "Rheebus", "Fairy", "Treant", "Gravity Pillar",
-                                    "Coal Treant", "Vampire Bush", "Mandragora", "Decoy Pillar", "Maelstrom", "Siren",
-                                    "MechaPult","Catoblepas","Myconid","Wood Elemental","Fire Elemental","Water Elemental",
-                                    "Kitty Trap", "Will 'o wisp", "Great Turtle", "Global Bust", "Super Pumper",
-                                    "AcidBot", "Claws-R-Us", "Earth Elemental", "Fire Moray", "Water Moray", "Earth Moray"]
-
-progression_flyer = random.choice(lost_kingdoms_2_flying_cards)
-progression_jumper = random.choice(lost_kingdoms_2_jumping_cards)
-progression_stationary = random.choice(lost_kingdoms_2_stationary_cards)
+#lost_kingdoms_2_stationary_cards = ["Dark Treant", "King Mandragora", "Rheebus", "Fairy", "Treant", "Gravity Pillar",
+#                                    "Coal Treant", "Vampire Bush", "Mandragora", "Decoy Pillar", "Maelstrom", "Siren",
+#                                    "MechaPult","Catoblepas","Myconid","Wood Elemental","Fire Elemental","Water Elemental",
+#                                    "Kitty Trap", "Will 'o wisp", "Great Turtle", "Global Bust", "Super Pumper",
+#                                    "AcidBot", "Claws-R-Us", "Earth Elemental", "Fire Moray", "Water Moray", "Earth Moray"]
 
 #Adds 176 cards randomly to the pool, matching the amount of chest locations in the game.
 for key in lost_kingdoms_2_cards:

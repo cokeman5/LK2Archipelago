@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import logging
 import random
 import sys
@@ -71,6 +72,10 @@ PLAYER_GOLD_ADDRESS = 0x8025d022
 CURR_HEALTH_ADDR = 0x80223c98
 SHOP_LOCATION_ADDRESS = 0x8025d018
 CARDS_LOADED = 0x80732bd4
+CUSTOM_CODE_JUMP = 0x80087fc8
+CUSTOM_CODE_RETURN = 0x8006e7a0
+CUSTOM_CODE_ADDRESS = 0x80001850
+INVALIDATE_ADDRESS = 0x800f31dc
 
 
 ONE_TIME_MODIFIERS_IN_GAME = False
@@ -268,6 +273,20 @@ def read_string(console_address: int, strlen: int) -> str:
     string = dolphin_memory_engine.read_bytes(console_address, strlen).split(b"\0", 1)[0].decode()
     return string
 
+def replace_game_id(ctx:LK2Context):
+        data = f"{ctx.slot_data.get("Seed", -1)}:{ctx.slot_data.get("Slot", -1)}".encode()
+        digest = hashlib.md5(data).hexdigest()
+
+        charset = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+
+        encoded_bytes = bytes([
+            charset[int(digest[i * 2:i * 2 + 2], 16) % 36]
+            for i in range(6)
+        ])
+
+        write_memory(0x80000000, int.from_bytes(encoded_bytes, byteorder="big"), 6)
+
 
 def _give_death(ctx: LK2Context) -> None:
     """
@@ -389,12 +408,6 @@ def give_key_item(ctx,item_name: str) -> bool:
                         value = read_memory(0x8025dcd1, 1)
                         write_memory(0x8025dcd1, value | (1 << 2), 1)
                         logger.debug("Green Key Found")
-                    case "Bottle":
-                        value = read_memory(0x8025e150)
-                        write_memory(0x8025e150, value + 2)
-                    case "Black Liquid":
-                        value = read_memory(0x8025e150)
-                        write_memory(0x8025e150, value + 4)
 
                 increment_item_index(ctx)
                 return True
@@ -416,6 +429,14 @@ def activate_magic_boosters(ctx) -> bool:
     increment_item_index(ctx)
     return True
 
+def make_bl(from_addr: int, to_addr: int) -> int:
+    offset = to_addr - from_addr
+    return 0x48000001 | (offset & 0x3FFFFFC)
+
+def make_b(from_addr: int, to_addr: int) -> int:
+    offset = to_addr - from_addr
+    return 0x48000000 | (offset & 0x3FFFFFC)
+
 def modify_code(ctx):
     # Change the key item location addresses so the locations can be checked
     # even after receiving the key items.
@@ -423,12 +444,8 @@ def modify_code(ctx):
     #Key locations
     write_memory(0x8006e78c, 0x80850004, 4)
     write_memory(0x8006e798, 0x90050004,4)
-    #Prevent KF doors being openable after killing the guards
-    #write_memory(0x80078fc0,0x60000000, 4)
-    #write_memory(0x80088188, 0x60000000, 4)
-    #write_memory(0x800874dc, 0x60000000, 4)
     #Prevent fossils respawning
-    #write_memory(0x8006e7c4, 0x80030004, 4) Fixes fossils respawning, but breaks every other key item item
+    write_memory(0x8006e7c4, 0x80030004, 4) #Fixes fossils respawning, but breaks every other key item item
     #Magic Boosters visuals
     write_memory(0x80075738, 0x3C808026, 4)
     write_memory(0x8007573c, 0x8004D014, 4)
@@ -442,20 +459,152 @@ def modify_code(ctx):
     if ctx.slot_data.get("fairysanity", 0):
         write_memory(0x80077034, 0x38040000, 4)
 
+    #Change the bl at CUSTOM_CODE_JUMP to go to our custom code
+    write_memory(CUSTOM_CODE_JUMP, make_bl(CUSTOM_CODE_JUMP,CUSTOM_CODE_ADDRESS), 4)
+    #Store the current value of r3
+    write_memory(CUSTOM_CODE_ADDRESS,0x9061FFF8,4)
+    #Store the current value of r4
+    write_memory(CUSTOM_CODE_ADDRESS+4, 0x9081FFF4, 4)
+    #Store the address we want to invalidate in r3
+    write_memory(CUSTOM_CODE_ADDRESS+8, 0x3C608006, 4)
+    write_memory(CUSTOM_CODE_ADDRESS+12,0x6063E7C4,4)
+    #Store the value 4 in r4 to only invalidate a single instruction
+    write_memory(CUSTOM_CODE_ADDRESS+16,0x38800004,4)
+    #Store the LR onto the stack
+    write_memory(CUSTOM_CODE_ADDRESS+20, 0x7C0802A6,4)
+    write_memory(CUSTOM_CODE_ADDRESS+24, 0x9001FFFC, 4)
+    #Jump to the ICInvalidateRange function
+    write_memory(CUSTOM_CODE_ADDRESS+28, make_bl(CUSTOM_CODE_ADDRESS + 28,INVALIDATE_ADDRESS),4)
+    #Write the stored LR back into the LR register
+    write_memory(CUSTOM_CODE_ADDRESS+32, 0x8001FFFC, 4)
+    write_memory(CUSTOM_CODE_ADDRESS+36, 0x7C0803A6, 4)
+    #Write the stored r3 value back into r3
+    write_memory(CUSTOM_CODE_ADDRESS+40, 0x8061FFF8, 4)
+    #Write the stored value of r4 back into r4
+    write_memory(CUSTOM_CODE_ADDRESS+44, 0x8081FFF4, 4)
+    #Jump back to original destination
+    write_memory(CUSTOM_CODE_ADDRESS+48, make_b(CUSTOM_CODE_ADDRESS+44,CUSTOM_CODE_RETURN), 4)
+
+
+
+
+
+
     logger.debug("Modified code")
 
-def prevent_KF_gates_from_being_openable():
-    if read_memory(LEVEL_ID_ADDRESS, 1) == 4:
-        if not ((read_memory(KEY_ITEM_ITEM_ADDRESS, 4) >> 2) & 1):
-            write_memory(0x8025d897, 1, 1)
-            write_memory(0x8025d8a7, 1, 1)
-            write_memory(0x8025d8b7, 1, 1)
-        if not ((read_memory(KEY_ITEM_ITEM_ADDRESS, 4) >> 1) & 1):
-            write_memory(0x8025d867, 1, 1)
-            write_memory(0x8025d877, 1, 1)
-            write_memory(0x8025d887, 1, 1)
-        if not ((read_memory(KEY_ITEM_ITEM_ADDRESS, 4) >> 3) & 1):
-            write_memory(0x8025d8c7, 1, 1)
+def level_modifications():
+    item_memory = read_memory(KEY_ITEM_ITEM_ADDRESS, 4)
+    level_id = read_memory(LEVEL_ID_ADDRESS, 1)
+    match level_id:
+        # Keep doors openable if they have key, otherwise, unopenable
+        case 4:
+            if (item_memory >> 2) & 1:
+                write_memory(0x8025d8a7, 0, 1)
+                write_memory(0x8025d8b7, 0, 1)
+            else:
+                write_memory(0x8025d8a7, 1, 1)
+                write_memory(0x8025d8b7, 1, 1)
+            if (item_memory >> 1) & 1:
+                write_memory(0x8025d867, 0, 1)
+                write_memory(0x8025d887, 0, 1)
+            else:
+                write_memory(0x8025d867, 1, 1)
+                write_memory(0x8025d887, 1, 1)
+            if (item_memory >> 3) & 1:
+                write_memory(0x8025d8d7, 0, 1)
+            else:
+                write_memory(0x8025d8d7, 1, 1)
+            #Kill the final guard when he spawns to prevent crashing. Temporary.
+            if read_memory(0x802241d8) not in [255,7]:
+                write_memory(0x802241d8,7)
+            #Set his health to 0 for good measure
+            write_memory(0x802241e8,0)
+        #Let swords be placed in Bhashea Castle
+        case 21:
+            #Blade of Skill placement
+            if (item_memory >> 15) & 1:
+                write_memory(0x8025d917, 0, 1)
+            else:
+                write_memory(0x8025d917, 1, 1)
+            #Blade of Power placement
+            if (item_memory >> 16) & 1:
+                write_memory(0x8025d927, 0, 1)
+            else:
+                write_memory(0x8025d927, 1, 1)
+            #Blade of Wisdom placement
+            if (item_memory >> 17) & 1:
+                write_memory(0x8025d937, 0, 1)
+            else:
+                write_memory(0x8025d937, 1, 1)
+            #Blade of Time placement
+            if (item_memory >> 18) & 1:
+                write_memory(0x8025d947, 0, 1)
+            else:
+                write_memory(0x8025d947, 1, 1)
+
+        #Make the runestones placeable in Isamat Urbur
+        case 20:
+            #Eno Runestone
+            if (item_memory >> 20) & 1:
+                write_memory(0x8025d870, 2149662488, 4)
+                write_memory(0x8025d867,0,1)
+            else:
+                write_memory(0x8025d870, 0, 4)
+            #Nebeth Runestone
+            if (item_memory >> 26) & 1:
+                write_memory(0x8025d860, 2149662216, 4)
+            else:
+                write_memory(0x8025d860, 0, 4)
+            #Olf Runestone
+            if (item_memory >> 23) & 1:
+                write_memory(0x8025d880, 2149662760, 4)
+            else:
+                write_memory(0x8025d880, 0, 4)
+            #Ebin Runestone
+            if (item_memory >> 24) & 1:
+                write_memory(0x8025d8a0, 2149663304, 4)
+            else:
+                write_memory(0x8025d8a0, 0, 4)
+            #Oht Runestone
+            if (item_memory >> 21) & 1:
+                write_memory(0x8025d890, 2149663032, 4)
+            else:
+                write_memory(0x8025d890, 0, 4)
+            #Elise Runestone
+            if (item_memory >> 22) & 1:
+                write_memory(0x8025d8c0, 2149663848, 4)
+            else:
+                write_memory(0x8025d8c0, 0, 4)
+            #Keil Runestone
+            if (item_memory >> 25) & 1:
+                write_memory(0x8025d8b0, 2149663576, 4)
+            else:
+                write_memory(0x8025d8b0, 0, 4)
+        case 22:
+            #Black Liquid
+            if ((item_memory >> 13) & 1) and read_memory(0x802e941e) == 55264:
+                logger.debug("black liquid usage")
+                write_memory(0x8025e151, 6, 1)
+            #Bottle
+            elif ((item_memory >> 12) & 1) and read_memory(0x802e941e) == 55248:
+                logger.debug("bottle usage")
+                write_memory(0x8025e151, 2, 1)
+            else:
+                write_memory(0x8025e151, 0, 1)
+        #If the player enters the plains without having killed the KF guard, but having the gate key, kill the guard to avoid crashing
+        case 10:
+            if (item_memory >> 28) & 1:
+                write_memory(0x802250c9, 0)
+                write_memory(0x802250b8,7)
+
+
+    #Ensure you can place the fossils in fossil boneyard, open the doors in Nobleman's Residence,
+    #the fountain in Holzogh Town and the gate in Plains of Rowahl
+    if (level_id==17 and read_memory(0x802e941e) == 55232) or (level_id==10 and read_memory(0x802e941e) in [55296,55344]) or (level_id==9 and read_memory(0x802e941e) == 55264) or level_id==1:
+        write_memory(0x8006e7c4, 0x8003005c, 4)
+    else:
+        write_memory(0x8006e7c4, 0x80030004, 4)
+
 
 def set_shop_contents_to_AP():
     for x in range(40):
@@ -663,18 +812,7 @@ def check_regular_location(ctx: LK2Context, location: str) -> bool:
         case "Key Item":
             memory_value = read_memory(KEY_ITEM_LOCATION_ADDRESS,4)
             bit_value = (memory_value & (1 << lost_kingdoms_2_locations[location]["bitOffset"]))
-            if bit_value != 0:
-                if location == "Bottle" and not has_item(ctx,"Bottle"):
-                    value = read_memory(0x8025e150)
-                    if value & (1 << 1):
-                        write_memory(0x8025e150, value - 2)
-                elif location == "Black Liquid" and not has_item(ctx,"Black Liquid"):
-                    value = read_memory(0x8025e150)
-                    if value & (1 << 2):
-                        write_memory(0x8025e150, value - 4)
-                return True
-            else:
-                return False
+            return bit_value
         case "Combo":
             memory_value = read_memory(COMBO_LOCATION_ADDRESS, 8)
             bit_value = (memory_value >> lost_kingdoms_2_combos[location]["bitOffset"]) & 1
@@ -819,6 +957,8 @@ async def dolphin_sync_task_main_task(ctx: LK2Context):
             if dolphin_memory_engine.is_hooked() and ctx.dolphin_status == CONNECTION_CONNECTED_STATUS:
                 if (not ONE_TIME_MODIFIERS_MAIN_MENU) and ctx.slot_data and check_cards_loaded():
                     logger.debug("Seed is " + str(ctx.slot_data["Seed"]))
+                    #This prevents saves from other playthroughs being loaded.
+                    replace_game_id(ctx)
                     if ctx.slot_data.get("randomize_magic_stone_costs", 0):
                         randomize_magic_stone_costs(ctx)
                     if ctx.slot_data.get("randomize_starting_deck", 0):
@@ -843,7 +983,7 @@ async def dolphin_sync_task_main_task(ctx: LK2Context):
                             await check_death(ctx)
                         #if ctx.slot_data.get("shopsanity", 0) & check_inshop():
                             #await track_shop_purchases()
-                        prevent_KF_gates_from_being_openable()
+                        level_modifications()
                         await check_victory_conditions(ctx)
                         await give_items(ctx)
                         await check_locations(ctx)

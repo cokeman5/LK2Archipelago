@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from ..LK2Generator import LostKingdoms2Randomizer
 
 CUSTOM_CODE_OFFSET_START = 0x39FA20
-LM_PLAYER_NAME_BYTE_LENGTH = 64
+LK2_PLAYER_NAME_BYTE_LENGTH = 64
 
 # Updates the main DOL file, which is the main file used for GC and Wii games. This section includes some custom code
 # inside the DOL file itself.
@@ -26,7 +26,7 @@ def update_dol_offsets(lk2_gen: "LostKingdoms2Randomizer"):
     # Store Player name
     lk2_player_name = str(slot_name).strip()
     lk2.data.seek(0x324740)
-    lk2.data.write(sbf.string_to_bytes_with_limit(lk2_player_name, LM_PLAYER_NAME_BYTE_LENGTH))
+    lk2.data.write(sbf.string_to_bytes_with_limit(lk2_player_name, LK2_PLAYER_NAME_BYTE_LENGTH))
 
 
     # Save all changes to the DOL itself.

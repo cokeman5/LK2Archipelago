@@ -62,7 +62,6 @@ class LK2Randomizer:
                 if location["isoAddress"] != "":
                     iso_file.seek(int(location["isoAddress"],16))
                     iso_file.write((int("0", 16).to_bytes(1, byteorder='big')))
-            self.randomize_starting_deck(iso_file)
 
         self.write_string(iso,0x1E000,0x00000100,0x80003100,0x80003DA0,self.output_data["Name"])
 

@@ -128,18 +128,20 @@ class LostKingdoms2World(World):
         self.multiworld.get_location("Defeat the God of Harmony",self.player,).place_locked_item(LK2Item("Victory", ItemClassification.progression, None, self.player))
         self.multiworld.completion_condition[self.player] = lambda state: state.has("Victory", self.player)
 
-        #ensure there is always at least 1 flyer, jumper, and smasher in the pool
+        #ensure GoD, stone golem, and all flyers/jumpers are in the pool
         lost_kingdoms_2_cards_diluted = lost_kingdoms_2_cards.copy()
-        lost_kingdoms_2_cards_diluted.pop(progression_flyer)
-        lost_kingdoms_2_cards_diluted.pop(progression_jumper)
-        lost_kingdoms_2_cards_diluted.pop(progression_stationary)
+        for flyer in lost_kingdoms_2_flying_cards:
+            lost_kingdoms_2_cards_diluted.pop(flyer)
+        for jumper in lost_kingdoms_2_jumping_cards:
+            lost_kingdoms_2_cards_diluted.pop(jumper)
         lost_kingdoms_2_cards_diluted.pop("Stone Golem")
         lost_kingdoms_2_cards_diluted.pop("God of Destruction")
-        num_of_cards = (len(lost_kingdoms_2_chests) - 5) + (self.options.combosanity.value * len(lost_kingdoms_2_combos)) + (self.options.shopsanity.value * len(lost_kingdoms_2_shop_purchases))
+        num_of_cards = len(lost_kingdoms_2_chests) + (self.options.combosanity.value * len(lost_kingdoms_2_combos)) + (self.options.shopsanity.value * len(lost_kingdoms_2_shop_purchases)) - len(lost_kingdoms_2_flying_cards) - len(lost_kingdoms_2_jumping_cards) - 2
         random_cards = random.sample(list(lost_kingdoms_2_cards_diluted.keys()), num_of_cards)
-        random_cards.append(progression_flyer)
-        random_cards.append(progression_jumper)
-        random_cards.append(progression_stationary)
+        for flyer in lost_kingdoms_2_flying_cards:
+            random_cards.append(flyer)
+        for jumper in lost_kingdoms_2_jumping_cards:
+            lost_kingdoms_2_cards_diluted.pop(jumper)
         random_cards.append("Stone Golem")
         random_cards.append("God of Destruction")
 
@@ -160,8 +162,7 @@ class LostKingdoms2World(World):
         self.multiworld.itempool += [self.create_item("nothing") for _ in range(junk)]
 
     def is_progression_item(self, item: str) -> bool:
-        return (item in [progression_flyer,"Stone Golem", progression_jumper, progression_stationary,
-                         "God of Destruction", "Magic Boosters"]) or (item in lost_kingdoms_2_key_items)
+        return item in ["Stone Golem", "God of Destruction", "Magic Boosters"] + lost_kingdoms_2_flying_cards + lost_kingdoms_2_jumping_cards + lost_kingdoms_2_key_items
 
     def generate_early(self) -> None:
         pass
@@ -215,7 +216,7 @@ class LostKingdoms2World(World):
                     previous_region.connect(region, previous_region.name + " -> " + region.name, lambda state: state.has("Black Liquid", self.player))
                 case "Bhashea Castle":
                     previous_region = self.multiworld.get_region("Bhashea High Road", self.player)
-                    previous_region.connect(region, previous_region.name + " -> " + region.name, lambda state: state.has(progression_flyer, self.player) and state.has(progression_stationary, self.player))
+                    previous_region.connect(region, previous_region.name + " -> " + region.name, lambda state: state.has_any(lost_kingdoms_2_flying_cards, self.player))
                 case "Gromtull Desert":
                     previous_region = self.multiworld.get_region("Kadishu", self.player)
                     previous_region.connect(region, previous_region.name + " -> " + region.name)
@@ -242,10 +243,10 @@ class LostKingdoms2World(World):
                     previous_region.connect(region, previous_region.name + " -> " + region.name)
                 case "Sarvan":
                     previous_region = self.multiworld.get_region("Fossil Boneyard", self.player)
-                    previous_region.connect(region, previous_region.name + " -> " + region.name,lambda state: state.has(progression_jumper, self.player) and state.has("Magic Boosters", self.player))
+                    previous_region.connect(region, previous_region.name + " -> " + region.name,lambda state: state.has_any(lost_kingdoms_2_flying_cards, self.player) and state.has("Magic Boosters", self.player))
                 case "Holzogh Town":
                     previous_region = self.multiworld.get_region("Sarvan", self.player)
-                    previous_region.connect(region, previous_region.name + " -> " + region.name,lambda state: state.has(progression_stationary, self.player))
+                    previous_region.connect(region, previous_region.name + " -> " + region.name)
                 case "Plains of Rowahl":
                     previous_region = self.multiworld.get_region("Holzogh Town", self.player)
                     previous_region.connect(region, previous_region.name + " -> " + region.name)
@@ -287,26 +288,30 @@ class LostKingdoms2World(World):
         for location in self.multiworld.get_locations(self.player):
             match location.name :
                 case "BHR - jump/flight chest" | "RC-UC - dragon chest 1" | "RC-UC - dragon chest 2" | "RF - flight/jump chest"\
-                    | "FB - flight chest 1" | "FB - flight chest 2" | "RC-UC - Red Fairy near dragon" | "Oht Runestone":
-                    add_rule(location,lambda state: state.has(progression_jumper, self.player) or state.has(progression_flyer, self.player))
+                    | "RC-UC - Red Fairy near dragon":
+                    add_rule(location,lambda state: state.has_any(lost_kingdoms_2_jumping_cards, self.player) or state.has_any(lost_kingdoms_2_flying_cards, self.player))
                 case "BHR - flight chest" | "GD - flight chest" | "KF - flight chest" | "RC-LC - high water chest flight"\
-                    | "FB - flight chest 1" | "FB - flight chest 2" | "PoR - flight chest" | "PoR - flight chest 2" | "AC - flight chest"\
+                    | "PoR - flight chest" | "PoR - flight chest 2" | "AC - flight chest"\
                     | "RTL - flight chest 1" | "RTL - flight chest 2" | "KM - black dragon's card" | "ToS - flight chest"\
                     | "OG - flight chest 1" | "OG - flight chest 2" | "OG - flight chest 3" | "BHR - Red Fairy across bridge"\
                     | "KF - Red Fairy fly across" | "RTL - Red Fairy flight" | "KM - Red Fairy cave 1" | "KM - Red Fairy broken bridge 1"\
                     | "KM - Red Fairy broken bridge 2":
-                    add_rule(location, lambda state: state.has(progression_flyer,self.player))
+                    add_rule(location, lambda state: state.has_any(lost_kingdoms_2_flying_cards,self.player))
                 case "BC - east jump chest" | "RF - jump chest" | "FB - Red Fairy near jump pad" | "FB - Red Fairy jumping" | "FB - chest behind cultist" | "FB - chest 3"\
                     | "FB - Red Fairy near 2nd jump pad" | "FB - chest 4" | "FB - chest 5" | "FB - chest 6" | "FB - chest 7" | "Sarvan - jump chest"\
                     | "RTL - jump chest 1" | "RTL - jump chest 2" | "KM - chest 1" | "KM - chest 2" | "KM - chest 3"\
-                    | "KM - chest 4" | "KM - chest 5" | "KM - chest 6" | "GD - Red Fairy jump" | "AC - Red Fairy jump"\
+                    | "KM - chest 4" | "KM - chest 5" | "KM - chest 6" | "AC - Red Fairy jump"\
                     | "Fossil Head" | "Fossil Torso" | "Fossil Tail" | "Fossil Rt Wing" | "Fossil Lt Wing" | "Fossil Rt Arm"\
-                    | "Fossil Lt Arm" | "Fossil Lt Leg" | "Ebin Runestone":
-                    add_rule(location, lambda state: state.has(progression_jumper, self.player) and state.has("Magic Boosters", self.player))
+                    | "Fossil Lt Arm" | "Fossil Lt Leg" | "Oht Runestone":
+                    add_rule(location, lambda state: state.has_any(lost_kingdoms_2_jumping_cards, self.player) and state.has("Magic Boosters", self.player))
+                case "Ebin Runestone" | "GD - Red Fairy jump":
+                    add_rule(location, lambda state: state.has_any(lost_kingdoms_2_jumping_cards-["Cerberus"], self.player))
                 case "BC - east jump chest" | "RC-UC - chest behind ice 1" | "RC-UC - chest behind ice 2" | "RTM - breakable wall chest 1"\
                     | "RTM - breakable wall chest 2" | "OG - chest behind ice" | "BC - Red Fairy wall break rubble" \
                     | "RTM - Red Fairy breakable wall 1" | "RTM - Red Fairy breakable wall 2":
                     add_rule(location, lambda state: state.has("Stone Golem", self.player) and state.has("Magic Boosters", self.player))
+                case "FB - flight chest 1" | "FB - flight chest 2":
+                    add_rule(location, lambda state: state.has_any(lost_kingdoms_2_jumping_cards, self.player) and state.has("Magic Boosters", self.player) and state.has_any(lost_kingdoms_2_flying_cards, self.player))
                 case "SBA2 - defeat Leod" | "SBA2 - defeat Thalnos" | "SBA2 - defeat Katia" | "SBA2 - Red Fairy Queen Katia":
                     add_rule(location, lambda state: state.can_reach_region("Royal Tower, Upper", self.player))
                 case "Kadishu - garbage collection 2":
@@ -314,13 +319,10 @@ class LostKingdoms2World(World):
                 case "Kadishu - garbage collection 3":
                     add_rule(location, lambda state: state.can_reach_region("Royal Tower, Lower", self.player))
                 case "Sarvan - caged chest":
-                    add_rule(location, lambda state: state.has(progression_flyer, self.player))
+                    add_rule(location, lambda state: state.has_any(lost_kingdoms_2_flying_cards, self.player))
                     location.progress_type = LocationProgressType.EXCLUDED
                 case "Sarvan - caged chest 2":
-                    add_rule(location, lambda state: state.has(progression_stationary, self.player))
                     location.progress_type = LocationProgressType.EXCLUDED
-                case "Sarvan - puzzle chest":
-                    add_rule(location, lambda state: state.has(progression_stationary, self.player))
                 case "HT - fountain card":
                     add_rule(location, lambda state: state.has("Key to Fountain", self.player))
                 case "PoR - chest 6" | "PoR - chest 7" | "PoR - GoD card":
@@ -330,17 +332,16 @@ class LostKingdoms2World(World):
                 case "NR - Red Fairy sculpture" | "NR - Red Fairy central" | "NR - Red Fairy office" | "Keil Runestone":
                     add_rule(location, lambda state: state.has("Mysterious Key", self.player))
                 case "BHR - Red Fairy across bridge in rubble" | "BHR - Red Fairy chaos knight":
-                    add_rule(location, lambda state: state.has(progression_stationary, self.player))
-                    add_rule(location, lambda state: state.has(progression_flyer, self.player))
+                    add_rule(location, lambda state: state.has_any(lost_kingdoms_2_flying_cards, self.player))
                 case "KF - Red Fairy past blue gate" | "KF - Red Fairy near Mechapult":
-                    add_rule(location, lambda state: state.has(progression_flyer, self.player) or state.has("Blue Key", self.player))
+                    add_rule(location, lambda state: state.has_any(lost_kingdoms_2_flying_cards, self.player) or state.has("Blue Key", self.player))
                 case "PoR - Red Fairy past gate" | "PoR - chest 4" | "PoR - chest 5" | "Elise Runestone":
                     add_rule(location, lambda state: state.has("Castle Gate Key", self.player))
                 case "Red Key" | "KF - chest 2":
                     add_rule(location, lambda state: state.has("Blue Key", self.player))
                 case "KF - chest behind green door":
                     add_rule(location, lambda state: state.has("Green Key", self.player))
-                    add_rule(location, lambda state: state.has(progression_flyer, self.player) or state.has("Blue Key",self.player))
+                    add_rule(location, lambda state: state.has_any(lost_kingdoms_2_flying_cards, self.player) or state.has("Blue Key",self.player))
                 case "KF - chest 4" | "KF - chest 5":
                     add_rule(location,lambda state: state.has("Blue Key", self.player) and state.has("Red Key", self.player))
                 case "Green Key":
