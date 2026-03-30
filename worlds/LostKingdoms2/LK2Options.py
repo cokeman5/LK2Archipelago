@@ -35,6 +35,11 @@ class OpenWorldConditionOption(Toggle):
     display_name = "Open World"
     default = 0
 
+class ExcludeSacredBattleArenaChecksOption(Toggle):
+    """By enabling, prevents the checks in the sacred battle arenas from being progressive.(There are still checks)"""
+    display_name = "Exclude Sacred Battle Checks"
+    default = 0
+
 class RandomizeStartingDeck(Choice):
     """
     Choose whether to randomize your starting deck.
@@ -87,6 +92,7 @@ class LostKingdoms2Options(PerGameCommonOptions):
     shopsanity: ShopsanityConditionOption
     combosanity: CombosanityConditionOption
     open_world : OpenWorldConditionOption
+    exclude_sacred_battle_arena_checks: ExcludeSacredBattleArenaChecksOption
     death_link: DeathLink
     randomize_starting_deck : RandomizeStartingDeck
     randomize_shop_contents : RandomizeShopContents

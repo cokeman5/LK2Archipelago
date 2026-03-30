@@ -387,28 +387,6 @@ def give_key_item(ctx,item_name: str) -> bool:
             if key_item == item_name:
                 value = read_memory(KEY_ITEM_ITEM_ADDRESS,4)
                 write_memory(KEY_ITEM_ITEM_ADDRESS, value | (1 << offset), 4)
-
-                match item_name:
-                    case "Blue Key":
-                        write_memory(0x8025d897, 0, 1)
-                        write_memory(0x8025d8a7, 0, 1)
-                        write_memory(0x8025d8b7, 0, 1)
-                        value = read_memory(0x8025dcd1, 1)
-                        write_memory(0x8025dcd1, value | (1 << 1), 1)
-                        logger.debug("Blue Key Found")
-                    case "Red Key":
-                        write_memory(0x8025d867, 0, 1)
-                        write_memory(0x8025d877, 0, 1)
-                        write_memory(0x8025d887, 0, 1)
-                        value = read_memory(0x8025dcd1, 1)
-                        write_memory(0x8025dcd1, value | (1 << 0), 1)
-                        logger.debug("Red Key Found")
-                    case "Green Key":
-                        write_memory(0x8025d8c7, 0, 1)
-                        value = read_memory(0x8025dcd1, 1)
-                        write_memory(0x8025dcd1, value | (1 << 2), 1)
-                        logger.debug("Green Key Found")
-
                 increment_item_index(ctx)
                 return True
             else:
@@ -444,8 +422,7 @@ def modify_code(ctx):
     #Key locations
     write_memory(0x8006e78c, 0x80850004, 4)
     write_memory(0x8006e798, 0x90050004,4)
-    #Prevent fossils respawning
-    write_memory(0x8006e7c4, 0x80030004, 4) #Fixes fossils respawning, but breaks every other key item item
+    write_memory(0x8006e7c4, 0x80030004, 4)
     #Magic Boosters visuals
     write_memory(0x80075738, 0x3C808026, 4)
     write_memory(0x8007573c, 0x8004D014, 4)
@@ -518,7 +495,7 @@ def level_modifications():
             if read_memory(0x802241d8) not in [255,7]:
                 write_memory(0x802241d8,7)
             #Set his health to 0 for good measure
-            write_memory(0x802241e8,0)
+                write_memory(0x802241e8, 0)
         #Let swords be placed in Bhashea Castle
         case 21:
             #Blade of Skill placement
@@ -591,11 +568,15 @@ def level_modifications():
                 write_memory(0x8025e151, 2, 1)
             else:
                 write_memory(0x8025e151, 0, 1)
-        #If the player enters the plains without having killed the KF guard, but having the gate key, kill the guard to avoid crashing
+        #If the player enters the plains without having killed the KF guard, but having the gate key and nearing the gate, kill the guard to avoid crashing
         case 10:
-            if (item_memory >> 28) & 1:
+            if ((item_memory >> 28) & 1) and read_memory(0x802e941e) == 55296 and read_memory(0x802250b8) != 7:
                 write_memory(0x802250c9, 0)
                 write_memory(0x802250b8,7)
+                write_memory(0x802091ea, 0)
+                write_memory(0x802091fa, 0)
+                write_memory(0x8020920a, 0)
+                write_memory(0x8020921a, 0)
 
 
     #Ensure you can place the fossils in fossil boneyard, open the doors in Nobleman's Residence,
@@ -795,7 +776,7 @@ def check_regular_location(ctx: LK2Context, location: str) -> bool:
     match lost_kingdoms_2_locations[location]["type"]:
         case "Chest" | "Red Fairy" | "Magic Boosters":
             if lost_kingdoms_2_locations[location]["RAMAddress"]!="":
-                if (location == "help valkyrie") | (location == "help ashura"):
+                if (location == "Temple of Sharacia - help valkyrie") | (location == "Temple of Sharacia - help ashura"):
                     if read_memory(Valkyrie_Ashura_ADDRESS) != 256:
                         return False
                 elif "FH - collect" in location:
