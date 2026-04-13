@@ -16,11 +16,8 @@ import Utils
 from CommonClient import ClientCommandProcessor, CommonContext, get_base_parser, gui_enabled, logger, server_loop
 from .iso_helper.lk2_rom import LK2USAAPPatch
 
-from .Locations import lost_kingdoms_2_locations, lost_kingdoms_2_regions, lost_kingdoms_2_combos, \
-    lost_kingdoms_2_bonus_draws
-from worlds.LostKingdoms2 import lost_kingdoms_2_cards, lost_kingdoms_2_key_items, lost_kingdoms_2_items, \
-    location_name_to_id, lost_kingdoms_2_shop_purchases, lost_kingdoms_2_jumping_cards, lost_kingdoms_2_flying_cards, \
-    lostkingdoms_2_custom_prices
+from .Locations import *
+from worlds.LostKingdoms2 import *
 
 if TYPE_CHECKING:
     import kvui
@@ -38,7 +35,7 @@ CONNECTION_CONNECTED_STATUS = "Dolphin connected successfully."
 CONNECTION_INITIAL_STATUS = "Dolphin connection has not been initiated."
 
 SLOT_NAME_ADDR = 0x80003DA0
-IS_IN_GAME_ADDR = 0x80223c88
+IS_IN_GAME_ADDR = 0x80a98aa8
 IS_IN_LEVEL_ADDRESS = 0x80223c88
 
 RED_FAIRY_COUNT_ADDRESS = 0x8025d032
@@ -72,9 +69,12 @@ PLAYER_GOLD_ADDRESS = 0x8025d022
 CURR_HEALTH_ADDR = 0x80223c98
 SHOP_LOCATION_ADDRESS = 0x8025d018
 CARDS_LOADED = 0x80732bd4
-CUSTOM_CODE_JUMP = 0x80087fc8
-CUSTOM_CODE_RETURN = 0x8006e7a0
-CUSTOM_CODE_ADDRESS = 0x80001850
+CUSTOM_CODE_JUMP_1 = 0x80087fc8
+CUSTOM_CODE_RETURN_1 = 0x8006e7a0
+CUSTOM_CODE_ADDRESS_1 = 0x80001850
+CUSTOM_CODE_JUMP_2 = 0x80091274
+CUSTOM_CODE_RETURN_2 = 0x800F7F04
+CUSTOM_CODE_ADDRESS_2 = CUSTOM_CODE_ADDRESS_1+52
 INVALIDATE_ADDRESS = 0x800f31dc
 
 
@@ -82,6 +82,8 @@ ONE_TIME_MODIFIERS_IN_GAME = False
 ONE_TIME_MODIFIERS_MAIN_MENU = False
 HAS_GOALED = False
 PLAYER_PREVIOUS_GOLD = 0
+
+global level_ordering
 
 
 class LK2CommandProcessor(ClientCommandProcessor):
@@ -137,8 +139,6 @@ class LK2Context(CommonContext):
 
     def configure_logging(self):
         logger.propagate = False
-
-        # 🔹 IMPORTANT: allow DEBUG through the logger itself
         logger.setLevel(logging.DEBUG)
 
         root_logger = logging.getLogger()
@@ -436,156 +436,287 @@ def modify_code(ctx):
     if ctx.slot_data.get("fairysanity", 0):
         write_memory(0x80077034, 0x38040000, 4)
 
-    #Change the bl at CUSTOM_CODE_JUMP to go to our custom code
-    write_memory(CUSTOM_CODE_JUMP, make_bl(CUSTOM_CODE_JUMP,CUSTOM_CODE_ADDRESS), 4)
-    #Store the current value of r3
-    write_memory(CUSTOM_CODE_ADDRESS,0x9061FFF8,4)
-    #Store the current value of r4
-    write_memory(CUSTOM_CODE_ADDRESS+4, 0x9081FFF4, 4)
-    #Store the address we want to invalidate in r3
-    write_memory(CUSTOM_CODE_ADDRESS+8, 0x3C608006, 4)
-    write_memory(CUSTOM_CODE_ADDRESS+12,0x6063E7C4,4)
-    #Store the value 4 in r4 to only invalidate a single instruction
-    write_memory(CUSTOM_CODE_ADDRESS+16,0x38800004,4)
-    #Store the LR onto the stack
-    write_memory(CUSTOM_CODE_ADDRESS+20, 0x7C0802A6,4)
-    write_memory(CUSTOM_CODE_ADDRESS+24, 0x9001FFFC, 4)
-    #Jump to the ICInvalidateRange function
-    write_memory(CUSTOM_CODE_ADDRESS+28, make_bl(CUSTOM_CODE_ADDRESS + 28,INVALIDATE_ADDRESS),4)
-    #Write the stored LR back into the LR register
-    write_memory(CUSTOM_CODE_ADDRESS+32, 0x8001FFFC, 4)
-    write_memory(CUSTOM_CODE_ADDRESS+36, 0x7C0803A6, 4)
-    #Write the stored r3 value back into r3
-    write_memory(CUSTOM_CODE_ADDRESS+40, 0x8061FFF8, 4)
-    #Write the stored value of r4 back into r4
-    write_memory(CUSTOM_CODE_ADDRESS+44, 0x8081FFF4, 4)
-    #Jump back to original destination
-    write_memory(CUSTOM_CODE_ADDRESS+48, make_b(CUSTOM_CODE_ADDRESS+44,CUSTOM_CODE_RETURN), 4)
+    # Change the bl at CUSTOM_CODE_JUMP_2 to go to our custom code
+    #write_memory(CUSTOM_CODE_JUMP_2, make_bl(CUSTOM_CODE_JUMP_2, CUSTOM_CODE_ADDRESS_2), 4)
+    # Allocate stack frame
+    #write_memory(CUSTOM_CODE_ADDRESS_2, 0x9421FFE0, 4)  # stwu sp, -0x20(sp)
+    # Store the current value of r3
+    #write_memory(CUSTOM_CODE_ADDRESS_2 + 4, 0x9061000C, 4)  # stw r3, 0x000C(sp)
+    # Store the current value of r4
+    #write_memory(CUSTOM_CODE_ADDRESS_2 + 8, 0x90810010, 4)  # stw r4, 0x0010(sp)
+    # Store the current value of r5
+    #write_memory(CUSTOM_CODE_ADDRESS_2 + 12, 0x90A10014, 4)  # stw r5, 0x0014(sp)
+    # Store the address we want to invalidate in r3
+    #write_memory(CUSTOM_CODE_ADDRESS_2 + 16, 0x3C608000, 4)  # lis r3, 0x8000
+    #write_memory(CUSTOM_CODE_ADDRESS_2 + 20, 0x606318A8, 4)  # ori r3, r3, 0x18A8
+    # Store the value 0x28 to invalidate all the nops
+    #write_memory(CUSTOM_CODE_ADDRESS_2 + 24, 0x38800028, 4)  # li r4, 0x28
+    # Store the LR onto the stack
+    #write_memory(CUSTOM_CODE_ADDRESS_2 + 28, 0x7C0802A6, 4)  # mflr r0
+    #write_memory(CUSTOM_CODE_ADDRESS_2 + 32, 0x90010008, 4)  # stw r0, 0x0008(sp)
+    # Write 10 nop instructions that can be used in the future
+    #for x in range(10):
+    #    write_memory(CUSTOM_CODE_ADDRESS_2 + x * 4 + 36, 0x60000000, 4)
+    # Jump to the ICInvalidateRange function
+    #write_memory(CUSTOM_CODE_ADDRESS_2 + 76, make_bl(CUSTOM_CODE_ADDRESS_2 + 76, INVALIDATE_ADDRESS), 4)
+    # Write the stored LR back into the LR register
+    #write_memory(CUSTOM_CODE_ADDRESS_2 + 80, 0x80010008, 4)  # lwz r0, 0x0008(sp)
+    #write_memory(CUSTOM_CODE_ADDRESS_2 + 84, 0x7C0803A6, 4)  # mtlr r0
+    # Write the stored r3 value back into r3
+    #write_memory(CUSTOM_CODE_ADDRESS_2 + 88, 0x8061000C, 4)  # lwz r3, 0x000C(sp)
+    # Write the stored value of r4 back into r4
+    #write_memory(CUSTOM_CODE_ADDRESS_2 + 92, 0x80810010, 4)  # lwz r4, 0x0010(sp)
+    # Write the stored value of r5 back into r5
+    #write_memory(CUSTOM_CODE_ADDRESS_2 + 96, 0x80A10014, 4)  # lwz r5, 0x0014(sp)
+    # Deallocate stack frame
+    #write_memory(CUSTOM_CODE_ADDRESS_2 + 100, 0x38210020, 4)  # addi sp, sp, 0x20
+    # Jump back to original destination
+    #write_memory(CUSTOM_CODE_ADDRESS_2 + 104, make_b(CUSTOM_CODE_ADDRESS_2 + 104, CUSTOM_CODE_RETURN_2), 4)
 
+    #setup for level randomization
+    if ctx.slot_data.get("randomize_levels", 0):
+        random.seed(ctx.slot_data.get("Seed", -1)+4)
+        global level_ordering
+        level_ordering = randomize_exits()
+        logger.debug("Level ordering is:" + str(level_ordering))
+        write_memory(0x800a69a8, 0x60000000, 4)
 
-
-
-
+        #Make it so Bhashea High Road's 2nd part isn't dependent on entering Kadishu
+        #write_memory(0x800881d8,0xa003ffc0,4)
+        #write_memory(0x800881dc,0x2c000000,4)
 
     logger.debug("Modified code")
 
-def level_modifications():
+def level_modifications(ctx):
     item_memory = read_memory(KEY_ITEM_ITEM_ADDRESS, 4)
     level_id = read_memory(LEVEL_ID_ADDRESS, 1)
-    match level_id:
-        # Keep doors openable if they have key, otherwise, unopenable
-        case 4:
-            if (item_memory >> 2) & 1:
-                write_memory(0x8025d8a7, 0, 1)
-                write_memory(0x8025d8b7, 0, 1)
-            else:
-                write_memory(0x8025d8a7, 1, 1)
-                write_memory(0x8025d8b7, 1, 1)
-            if (item_memory >> 1) & 1:
-                write_memory(0x8025d867, 0, 1)
-                write_memory(0x8025d887, 0, 1)
-            else:
-                write_memory(0x8025d867, 1, 1)
-                write_memory(0x8025d887, 1, 1)
-            if (item_memory >> 3) & 1:
-                write_memory(0x8025d8d7, 0, 1)
-            else:
-                write_memory(0x8025d8d7, 1, 1)
-            #Kill the final guard when he spawns to prevent crashing. Temporary.
-            if read_memory(0x802241d8) not in [255,7]:
-                write_memory(0x802241d8,7)
-            #Set his health to 0 for good measure
-                write_memory(0x802241e8, 0)
-        #Let swords be placed in Bhashea Castle
-        case 21:
-            #Blade of Skill placement
-            if (item_memory >> 15) & 1:
-                write_memory(0x8025d917, 0, 1)
-            else:
-                write_memory(0x8025d917, 1, 1)
-            #Blade of Power placement
-            if (item_memory >> 16) & 1:
-                write_memory(0x8025d927, 0, 1)
-            else:
-                write_memory(0x8025d927, 1, 1)
-            #Blade of Wisdom placement
-            if (item_memory >> 17) & 1:
-                write_memory(0x8025d937, 0, 1)
-            else:
-                write_memory(0x8025d937, 1, 1)
-            #Blade of Time placement
-            if (item_memory >> 18) & 1:
-                write_memory(0x8025d947, 0, 1)
-            else:
-                write_memory(0x8025d947, 1, 1)
+    # Keep doors openable if they have key, otherwise, unopenable
+    if level_id == lost_kingdoms_2_regions["Kendarie Fortress"]["levelID"]:
+        if (item_memory >> 2) & 1:
+            write_memory(0x8025d8a7, 0, 1)
+            write_memory(0x8025d8b7, 0, 1)
+        else:
+            write_memory(0x8025d8a7, 1, 1)
+            write_memory(0x8025d8b7, 1, 1)
+        if (item_memory >> 1) & 1:
+            write_memory(0x8025d867, 0, 1)
+            write_memory(0x8025d887, 0, 1)
+        else:
+            write_memory(0x8025d867, 1, 1)
+            write_memory(0x8025d887, 1, 1)
+        if (item_memory >> 3) & 1:
+            write_memory(0x8025d8d7, 0, 1)
+        else:
+            write_memory(0x8025d8d7, 1, 1)
+        #Kill the final guard when he spawns to prevent crashing. Temporary.
+        if read_memory(0x802241d8) not in [255,7]:
+            write_memory(0x802241d8,7)
+        #Set his health to 0 for good measure
+            write_memory(0x802241e8, 0)
+    #Let swords be placed in Bhashea Castle
+    elif level_id == lost_kingdoms_2_regions["Bhashea Castle"]["levelID"]:
+        #Blade of Skill placement
+        if (item_memory >> 15) & 1:
+            write_memory(0x8025d917, 0, 1)
+        else:
+            write_memory(0x8025d917, 1, 1)
+        #Blade of Power placement
+        if (item_memory >> 16) & 1:
+            write_memory(0x8025d927, 0, 1)
+        else:
+            write_memory(0x8025d927, 1, 1)
+        #Blade of Wisdom placement
+        if (item_memory >> 17) & 1:
+            write_memory(0x8025d937, 0, 1)
+        else:
+            write_memory(0x8025d937, 1, 1)
+        #Blade of Time placement
+        if (item_memory >> 18) & 1:
+            write_memory(0x8025d947, 0, 1)
+        else:
+            write_memory(0x8025d947, 1, 1)
 
-        #Make the runestones placeable in Isamat Urbur
-        case 20:
-            #Eno Runestone
-            if (item_memory >> 20) & 1:
-                write_memory(0x8025d870, 2149662488, 4)
-                write_memory(0x8025d867,0,1)
-            else:
-                write_memory(0x8025d870, 0, 4)
-            #Nebeth Runestone
-            if (item_memory >> 26) & 1:
-                write_memory(0x8025d860, 2149662216, 4)
-            else:
-                write_memory(0x8025d860, 0, 4)
-            #Olf Runestone
-            if (item_memory >> 23) & 1:
-                write_memory(0x8025d880, 2149662760, 4)
-            else:
-                write_memory(0x8025d880, 0, 4)
-            #Ebin Runestone
-            if (item_memory >> 24) & 1:
-                write_memory(0x8025d8a0, 2149663304, 4)
-            else:
-                write_memory(0x8025d8a0, 0, 4)
-            #Oht Runestone
-            if (item_memory >> 21) & 1:
-                write_memory(0x8025d890, 2149663032, 4)
-            else:
-                write_memory(0x8025d890, 0, 4)
-            #Elise Runestone
-            if (item_memory >> 22) & 1:
-                write_memory(0x8025d8c0, 2149663848, 4)
-            else:
-                write_memory(0x8025d8c0, 0, 4)
-            #Keil Runestone
-            if (item_memory >> 25) & 1:
-                write_memory(0x8025d8b0, 2149663576, 4)
-            else:
-                write_memory(0x8025d8b0, 0, 4)
-        case 22:
-            #Black Liquid
-            if ((item_memory >> 13) & 1) and read_memory(0x802e941e) == 55264:
-                logger.debug("black liquid usage")
-                write_memory(0x8025e151, 6, 1)
-            #Bottle
-            elif ((item_memory >> 12) & 1) and read_memory(0x802e941e) == 55248:
-                logger.debug("bottle usage")
-                write_memory(0x8025e151, 2, 1)
-            else:
-                write_memory(0x8025e151, 0, 1)
-        #If the player enters the plains without having killed the KF guard, but having the gate key and nearing the gate, kill the guard to avoid crashing
-        case 10:
-            if ((item_memory >> 28) & 1) and read_memory(0x802e941e) == 55296 and read_memory(0x802250b8) != 7:
-                write_memory(0x802250c9, 0)
-                write_memory(0x802250b8,7)
-                write_memory(0x802091ea, 0)
-                write_memory(0x802091fa, 0)
-                write_memory(0x8020920a, 0)
-                write_memory(0x8020921a, 0)
+    #Make the runestones placeable in Isamat Urbur
+    elif level_id == lost_kingdoms_2_regions["Isamat Urbur"]["levelID"]:
+        #Eno Runestone
+        if (item_memory >> 20) & 1:
+            write_memory(0x8025d870, 2149662488, 4)
+            write_memory(0x8025d867,0,1)
+        else:
+            write_memory(0x8025d870, 0, 4)
+        #Nebeth Runestone
+        if (item_memory >> 26) & 1:
+            write_memory(0x8025d860, 2149662216, 4)
+        else:
+            write_memory(0x8025d860, 0, 4)
+        #Olf Runestone
+        if (item_memory >> 23) & 1:
+            write_memory(0x8025d880, 2149662760, 4)
+        else:
+            write_memory(0x8025d880, 0, 4)
+        #Ebin Runestone
+        if (item_memory >> 24) & 1:
+            write_memory(0x8025d8a0, 2149663304, 4)
+        else:
+            write_memory(0x8025d8a0, 0, 4)
+        #Oht Runestone
+        if (item_memory >> 21) & 1:
+            write_memory(0x8025d890, 2149663032, 4)
+        else:
+            write_memory(0x8025d890, 0, 4)
+        #Elise Runestone
+        if (item_memory >> 22) & 1:
+            write_memory(0x8025d8c0, 2149663848, 4)
+        else:
+            write_memory(0x8025d8c0, 0, 4)
+        #Keil Runestone
+        if (item_memory >> 25) & 1:
+            write_memory(0x8025d8b0, 2149663576, 4)
+        else:
+            write_memory(0x8025d8b0, 0, 4)
+    elif level_id == lost_kingdoms_2_regions["Gromtull Desert"]["levelID"]:
+        #Black Liquid
+        if ((item_memory >> 14) & 1) and read_memory(0x802e941e) == 55264:
+            logger.debug("black liquid usage")
+            value = read_memory(0x8025e151,1)
+            write_memory(0x8025e151, value | 1 << 2, 1)
+        #Bottle
+        elif ((item_memory >> 13) & 1) and read_memory(0x802e941e) == 55248:
+            logger.debug("bottle usage")
+            value = read_memory(0x8025e151, 1)
+            write_memory(0x8025e151, value | 1 << 1, 1)
+        else:
+            value = read_memory(0x8025e151, 1)
+            write_memory(0x8025e151, value & ~((1 << 1) | (1 << 2)), 1)
+    #Fix the first chest of fossil boneyard so it doesn't give a Hell Hound
+    elif level_id == lost_kingdoms_2_regions["Fossil Boneyard"]["levelID"]:
+        write_memory(0x8025d964,0,1)
+    #Ensure that you can always unlock a level by talking to Jarvi's wife.
+    elif level_id == lost_kingdoms_2_regions["Kadishu"]["levelID"]:
+        if read_memory(0x802e941e)==55968 and is_in_level():
+            write_memory(0x8025e150, read_memory(0x8025e151,1),1)
+            write_memory(0x8025e151,0,1)
+        elif read_memory(0x8025e150,1) != 0:
+            write_memory(0x8025e151, read_memory(0x8025e150, 1), 1)
+            write_memory(0x8025e150, 0, 1)
+    #Make it so the guard that opens up Krasheen Mountains always spawns
+    elif level_id==lost_kingdoms_2_regions["Royal Tower, Lower"]["levelID"]:
+        write_memory(0x8006e7c4,0x38000001,4)
+    #Make it so if you beat Bhashea High Road, p2 loads without needing to enter Kadishu
+    elif level_id==lost_kingdoms_2_regions["Bhashea High Road"]["levelID"] and ctx.slot_data.get("randomize_levels", 0):
+        #If Kadishu hasn't been beaten, then load the first part of it
+        if read_memory(0x8025dc4c,1)==0:
+            if read_memory(0x8025dc91,1)!=0:
+                write_memory(0x8025dc90,read_memory(0x8025dc91,1),1)
+                write_memory(0x8025dc91, 0, 1)
+        #If Kadishu has been beaten exactly once, load the 2nd part of it
+        elif read_memory(0x8025dc4c,1)==2:
+            if read_memory(0x8025dc91,1)==0:
+                write_memory(0x8025dc91, 4, 1)
+    #Put the value back in the right place if not in Bhashea High Road
+    if not is_in_level() and ctx.slot_data.get("randomize_levels", 0):
+        if read_memory(0x8025dc90,1) != 0:
+            write_memory(0x8025dc91, read_memory(0x8025dc90,1), 1)
+            write_memory(0x8025dc90, 0, 1)
 
 
     #Ensure you can place the fossils in fossil boneyard, open the doors in Nobleman's Residence,
     #the fountain in Holzogh Town and the gate in Plains of Rowahl
-    if (level_id==17 and read_memory(0x802e941e) == 55232) or (level_id==10 and read_memory(0x802e941e) in [55296,55344]) or (level_id==9 and read_memory(0x802e941e) == 55264) or level_id==1:
+    if ((level_id==lost_kingdoms_2_regions["Fossil Boneyard"]["levelID"] and read_memory(0x802e941e) == 55232) or
+            (level_id==lost_kingdoms_2_regions["Plains of Rowahl"]["levelID"] and read_memory(0x802e941e) in [55296,55344] and read_memory(0x802250c9)==0) or
+            (level_id==lost_kingdoms_2_regions["Holzogh Town"]["levelID"] and read_memory(0x802e941e) == 55264) or
+            level_id==lost_kingdoms_2_regions["Nobleman's Residence"]["levelID"] and read_memory(0x55296) in [55296,55472]):
         write_memory(0x8006e7c4, 0x8003005c, 4)
     else:
         write_memory(0x8006e7c4, 0x80030004, 4)
 
+    if ctx.slot_data.get("randomize_levels", 0):
+        global level_ordering
+        if is_in_level():
+            if level_id == lost_kingdoms_2_regions["Nobleman's Residence"]["levelID"]:
+                write_memory(0x810879f8, lost_kingdoms_2_regions[level_ordering["Nobleman's Residence Exit 1"]]["levelID"], 4)
+                write_memory(0x81088290, lost_kingdoms_2_regions[level_ordering["Nobleman's Residence Exit 2"]]["levelID"], 4)
+            elif level_id == lost_kingdoms_2_regions["Bhashea High Road"]["levelID"]:
+                # Vanilla: Kendarie Fortress (Exit 2), Kadishu (Exit 1), Bhashea Castle (Exit 3)
+                write_memory(0x8113f89c, lost_kingdoms_2_regions[level_ordering["Bhashea High Road Exit 2"]]["levelID"], 4)
+                write_memory(0x8113fcfc, lost_kingdoms_2_regions[level_ordering["Bhashea High Road Exit 1"]]["levelID"], 4)
+                write_memory(0x8113ff08, lost_kingdoms_2_regions[level_ordering["Bhashea High Road Exit 3"]]["levelID"], 4)
+            elif level_id == lost_kingdoms_2_regions["Kadishu"]["levelID"]:
+                # Vanilla: Gromtull Desert (Exit 2), Kadishu Shop (Exit 1)
+                write_memory(0x810c99dc, lost_kingdoms_2_regions[level_ordering["Kadishu Exit 2"]]["levelID"], 4)
+                write_memory(0x810c9774, lost_kingdoms_2_regions[level_ordering["Kadishu Exit 1"]]["levelID"], 4)
+                write_memory(0x810c9780, lost_kingdoms_2_regions[level_ordering["Kadishu Exit 1"]]["levelID"], 4)
+            elif level_id == lost_kingdoms_2_regions["Gromtull Desert"]["levelID"]:
+                write_memory(0x8106dcac, lost_kingdoms_2_regions[level_ordering["Gromtull Desert Exit 1"]]["levelID"], 4)
+            elif level_id == lost_kingdoms_2_regions["Kendarie Fortress"]["levelID"]:
+                write_memory(0x81052dbc, lost_kingdoms_2_regions[level_ordering["Kendarie Fortress Exit 1"]]["levelID"], 4)
+            elif level_id == lost_kingdoms_2_regions["Runestone Caverns - Upper Chambers"]["levelID"]:
+                write_memory(0x80f91f04, lost_kingdoms_2_regions[level_ordering["Runestone Caverns - Upper Chambers Exit 1"]]["levelID"], 4)
+            elif level_id == lost_kingdoms_2_regions["Runestone Caverns - Lower Chambers"]["levelID"]:
+                write_memory(0x81053798, lost_kingdoms_2_regions[level_ordering["Runestone Caverns - Lower Chambers Exit 1"]]["levelID"], 4)
+            elif level_id == lost_kingdoms_2_regions["Ruldo Forest"]["levelID"]:
+                # Vanilla: Fossil Boneyard (Exit 1), Sacred Battle Arena 1 (Exit 2)
+                write_memory(0x80ffa518, lost_kingdoms_2_regions[level_ordering["Ruldo Forest Exit 1"]]["levelID"], 4)
+                write_memory(0x80ffacf8, lost_kingdoms_2_regions[level_ordering["Ruldo Forest Exit 2"]]["levelID"], 4)
+            elif level_id == lost_kingdoms_2_regions["Fossil Boneyard"]["levelID"]:
+                write_memory(0x8100f988, lost_kingdoms_2_regions[level_ordering["Fossil Boneyard Exit 1"]]["levelID"], 4)
+            elif level_id == lost_kingdoms_2_regions["Sarvan"]["levelID"]:
+                write_memory(0x8104b6c8, lost_kingdoms_2_regions[level_ordering["Sarvan Exit 1"]]["levelID"], 4)
+            elif level_id == lost_kingdoms_2_regions["Holzogh Town"]["levelID"]:
+                write_memory(0x81113dd8, lost_kingdoms_2_regions[level_ordering["Holzogh Town Exit 1"]]["levelID"], 4)
+                write_memory(0x8111488c, lost_kingdoms_2_regions[level_ordering["Holzogh Town Exit 2"]]["levelID"], 4)
+            elif level_id == lost_kingdoms_2_regions["Plains of Rowahl"]["levelID"]:
+                write_memory(0x81044b3c, lost_kingdoms_2_regions[level_ordering["Plains of Rowahl Exit 1"]]["levelID"], 4)
+            elif level_id == lost_kingdoms_2_regions["Royal Tower, Lower"]["levelID"]:
+                # Vanilla: Krasheen Mountains (Exit 1), Obenoix Gorge (Exit 2)
+                write_memory(0x810c1cf4, lost_kingdoms_2_regions[level_ordering["Royal Tower, Lower Exit 1"]]["levelID"], 4)
+            elif level_id == lost_kingdoms_2_regions["Krasheen Mountains"]["levelID"]:
+                write_memory(0x80f2743c, lost_kingdoms_2_regions[level_ordering["Krasheen Mountains Exit 1"]]["levelID"], 4)
+            elif level_id == lost_kingdoms_2_regions["Grenfoel Cathedral"]["levelID"]:
+                # Vanilla: Temple of Sharacia (Exit 1), Grenfoel Cathedral Shop (Exit 2)
+                write_memory(0x810ac678, lost_kingdoms_2_regions[level_ordering["Grenfoel Cathedral Exit 1"]]["levelID"], 4)
+                write_memory(0x810ac70c, lost_kingdoms_2_regions[level_ordering["Grenfoel Cathedral Exit 2"]]["levelID"], 4)
+                write_memory(0x810ac718, lost_kingdoms_2_regions[level_ordering["Grenfoel Cathedral Exit 2"]]["levelID"], 4)
+        else:
+            modify_default_level_selections()
+
+def modify_default_level_selections():
+    if is_level_unlocked("Runestone Caverns - Upper Chambers"):
+        write_memory(0x80167668,0x80167420, 4)
+    elif is_level_unlocked("Runestone Caverns - Lower Chambers"):
+        write_memory(0x80167668, 0x80167430, 4)
+
+    if is_level_unlocked("Kadishu"):
+        write_memory(0x80167664, 0x801673e0, 4)
+    elif is_level_unlocked("Fairy House"):
+        write_memory(0x80167664, 0x801673f0, 4)
+    elif is_level_unlocked("Kadishu Shop"):
+        write_memory(0x80167664, 0x80167400, 4)
+
+    if is_level_unlocked("Sacred Battle Arena 1"):
+        write_memory(0x8016766c, 0x80167450, 4)
+    elif is_level_unlocked("Sacred Battle Arena 2"):
+        write_memory(0x8016766c, 0x80167460, 4)
+
+    if is_level_unlocked("Alanjeh Castle"):
+        write_memory(0x80167670, 0x80167480, 4)
+    elif is_level_unlocked("Royal Tower, Lower"):
+        write_memory(0x80167670, 0x80167490, 4)
+    elif is_level_unlocked("Royal Tower, Middle"):
+        write_memory(0x80167670, 0x801674a0, 4)
+    elif is_level_unlocked("Royal Tower, Upper"):
+        write_memory(0x80167670, 0x801674b0, 4)
+
+    if is_level_unlocked("Grenfoel Cathedral"):
+        write_memory(0x80167674,0x801674d0, 4)
+    elif is_level_unlocked("Grenfoel Cathedral Shop"):
+        write_memory(0x80167674, 0x801674e0, 4)
+
+def is_level_unlocked(level: str) -> bool:
+    return read_memory(int(lost_kingdoms_2_regions[level]["RAMAddress"],16), 1) == 128
+
+def is_in_level() -> bool:
+    return read_memory(IS_IN_LEVEL_ADDRESS) != 255
 
 def set_shop_contents_to_AP():
     for x in range(40):
@@ -599,7 +730,6 @@ def open_world():
 #The higher the bias value, the less bias there is. 1 is the minimum
 def get_card_weights(cards, is_weighted: bool, target_cost: int, bias: int = 3) -> list[int]:
     weights = []
-    logger.debug("Is weighted? " + str(is_weighted))
     for card_name in cards:
         if is_weighted:
             weights.append(1 / (abs(lost_kingdoms_2_cards[card_name]["mana_cost"] - target_cost) + bias))
@@ -610,9 +740,9 @@ def get_card_weights(cards, is_weighted: bool, target_cost: int, bias: int = 3) 
 
 def randomize_shop_contents(ctx):
     random.seed(ctx.slot_data.get("Seed", -1))
-    cards = list(lost_kingdoms_2_cards.keys())
+    cards = sorted(list(lost_kingdoms_2_cards.keys()))
     excluded_cards = lost_kingdoms_2_flying_cards + lost_kingdoms_2_jumping_cards + ["God of Destruction"] + ["Stone Golem"]
-    cards = list(set(cards) - set(excluded_cards))
+    cards = sorted(list(set(cards) - set(excluded_cards)))
 
     for x in range (32):
         weights = get_card_weights(cards, ctx.slot_data.get("randomize_shop_contents", 0) == 1, (x//8)*4)
@@ -627,22 +757,21 @@ def randomize_shop_contents(ctx):
 
 def randomize_starting_deck(ctx):
     random.seed(ctx.slot_data.get("Seed", -1)+1)
-    cards = list(lost_kingdoms_2_cards.keys())
+    cards = sorted(list(lost_kingdoms_2_cards.keys()))
     excluded_cards = lost_kingdoms_2_flying_cards + lost_kingdoms_2_jumping_cards + ["God of Destruction"] + ["Stone Golem"]
-    cards = list(set(cards) - set(excluded_cards))
+    cards = sorted(list(set(cards) - set(excluded_cards)))
 
     for x in range(12):
         weights = get_card_weights(cards, ctx.slot_data.get("randomize_starting_deck", 0) == 1, 1)
-        logger.debug(weights)
         card_name = random.choices(cards, weights=weights, k=1)[0]
         cards.remove(card_name)
         write_memory(STARTING_DECK_ADDRESS + x * 2,int(lost_kingdoms_2_cards[card_name]["hexCode"],16))
 
 def randomize_bonus_draws(ctx):
     random.seed(ctx.slot_data.get("Seed", -1)+2)
-    cards = list(lost_kingdoms_2_cards.keys())
+    cards = sorted(list(lost_kingdoms_2_cards.keys()))
     excluded_cards = lost_kingdoms_2_flying_cards + lost_kingdoms_2_jumping_cards + ["God of Destruction"] + ["Stone Golem"]
-    cards = list(set(cards) - set(excluded_cards))
+    cards = sorted(list(set(cards) - set(excluded_cards)))
     group_dict = {}
 
     for key in lost_kingdoms_2_bonus_draws:
@@ -659,7 +788,7 @@ def randomize_bonus_draws(ctx):
 
 def randomize_magic_stone_costs(ctx):
     random.seed(ctx.slot_data.get("Seed", -1) + 3)
-    for card_name in lost_kingdoms_2_cards:
+    for card_name in sorted(lost_kingdoms_2_cards):
         new_mana_cost = random.randint(1,15)
         write_memory(CARD_INFO_TABLE_ADDRESS + 22 * 16 * lost_kingdoms_2_cards[card_name]["orderInMemory"] + 194 + 32, new_mana_cost,  1)
         lost_kingdoms_2_cards[card_name]["mana_cost"] = new_mana_cost
@@ -695,14 +824,12 @@ async def check_victory_conditions(ctx: LK2Context):
                     }])
                     HAS_GOALED = True
             case 2:
-                for key in lost_kingdoms_2_cards:
-                    if read_memory(lost_kingdoms_2_cards[key]) <= 0:
-                        return
-                await ctx.send_msgs([{
-                    "cmd": "StatusUpdate",
-                    "status": ClientStatus.CLIENT_GOAL
-                }])
-                HAS_GOALED = True
+                if read_memory(RED_FAIRY_COUNT_ADDRESS,1) + read_memory(RED_FAIRY_COUNT_ADDRESS+1,1) == ctx.slot_data.get("collect_red_fairies_amount", 50):
+                    await ctx.send_msgs([{
+                        "cmd": "StatusUpdate",
+                        "status": ClientStatus.CLIENT_GOAL
+                    }])
+                    HAS_GOALED = True
 
 async def save_data(ctx: LK2Context):
     logger.debug("Saving data")
@@ -779,7 +906,7 @@ def check_regular_location(ctx: LK2Context, location: str) -> bool:
                 if (location == "Temple of Sharacia - help valkyrie") | (location == "Temple of Sharacia - help ashura"):
                     if read_memory(Valkyrie_Ashura_ADDRESS) != 256:
                         return False
-                elif "FH - collect" in location:
+                elif "Fairy House - collect" in location:
                     memory_value = read_memory(int(lost_kingdoms_2_locations[location]["RAMAddress"], 16),1)
                     return memory_value >= lost_kingdoms_2_locations[location]["bitOffset"]
                 memory_value = read_memory(int(lost_kingdoms_2_locations[location]["RAMAddress"], 16))
@@ -845,7 +972,7 @@ async def check_death(ctx: LK2Context) -> None:
 
     :return: `True` if the player is dead, otherwise `False`.
     """
-    if ctx.slot is not None and check_ingame():
+    if ctx.slot is not None and is_in_level() and read_memory(LEVEL_ID_ADDRESS, 1) != 1:
         cur_health = read_memory(CURR_HEALTH_ADDR)
         if cur_health <= 0:
             if not ctx.has_send_death and time.time() >= ctx.last_death_link + 10:
@@ -857,12 +984,11 @@ async def check_death(ctx: LK2Context) -> None:
 
 def check_ingame() -> bool:
     """
-    Check if the player is currently in-game.
-
+    Check if the player is currently in-game, and not the main menu.
     :return: `True` if the player is in-game, otherwise `False`.
     """
     try:
-        return read_memory(IS_IN_GAME_ADDR) != 0
+        return read_memory(IS_IN_GAME_ADDR,4) != 0
     except:
         return False
 
@@ -936,8 +1062,9 @@ async def dolphin_sync_task_main_task(ctx: LK2Context):
 
         try:
             if dolphin_memory_engine.is_hooked() and ctx.dolphin_status == CONNECTION_CONNECTED_STATUS:
-                if (not ONE_TIME_MODIFIERS_MAIN_MENU) and ctx.slot_data and check_cards_loaded():
+                if (not ONE_TIME_MODIFIERS_MAIN_MENU) and ctx.slot_data and not check_ingame():
                     logger.debug("Seed is " + str(ctx.slot_data["Seed"]))
+                    logger.debug("Triggering one time main menu modifiers")
                     #This prevents saves from other playthroughs being loaded.
                     replace_game_id(ctx)
                     if ctx.slot_data.get("randomize_magic_stone_costs", 0):
@@ -949,7 +1076,9 @@ async def dolphin_sync_task_main_task(ctx: LK2Context):
                     if ctx.slot_data.get("randomize_bonus_draws", 0):
                         randomize_bonus_draws(ctx)
                     ONE_TIME_MODIFIERS_MAIN_MENU = True
+                    ONE_TIME_MODIFIERS_IN_GAME = False
                 if (not ONE_TIME_MODIFIERS_IN_GAME) and ctx.slot_data and check_ingame():
+                    logger.debug("Triggering one time in game modifiers")
                     modify_code(ctx)
                     logger.debug("Slot data:" + str(ctx.slot_data))
                     if ctx.slot_data.get("open_world", 0):
@@ -958,13 +1087,14 @@ async def dolphin_sync_task_main_task(ctx: LK2Context):
                         pass
                         #set_shop_contents_to_AP()
                     ONE_TIME_MODIFIERS_IN_GAME = True
+                    ONE_TIME_MODIFIERS_MAIN_MENU = False
                 if ctx.slot is not None :
                     if check_ingame():
                         if "DeathLink" in ctx.tags:
                             await check_death(ctx)
                         #if ctx.slot_data.get("shopsanity", 0) & check_inshop():
                             #await track_shop_purchases()
-                        level_modifications()
+                        level_modifications(ctx)
                         await check_victory_conditions(ctx)
                         await give_items(ctx)
                         await check_locations(ctx)
@@ -985,7 +1115,7 @@ async def dolphin_sync_task_main_task(ctx: LK2Context):
                 logger.info("Attempting to connect to Dolphin...")
                 dolphin_memory_engine.hook()
                 if dolphin_memory_engine.is_hooked():
-                    if dolphin_memory_engine.read_bytes(0x80000000, 6) != b"GR2E52":
+                    if dolphin_memory_engine.read_bytes(0x80000000, 6) == 0:
                         logger.info(dolphin_memory_engine.read_bytes(0x80000000, 6))
                         logger.info(CONNECTION_REFUSED_GAME_STATUS)
                         ctx.dolphin_status = CONNECTION_REFUSED_GAME_STATUS

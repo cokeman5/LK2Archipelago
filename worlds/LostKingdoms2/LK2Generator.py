@@ -1,6 +1,7 @@
 import json, os
 import random
 import shutil
+import struct
 from random import Random
 
 import Utils
@@ -19,12 +20,12 @@ STARTING_DECK_ADDRESS = 0x16D641
 
 
 class LK2Randomizer:
-    def __init__(self, clean_iso_path: str, randomized_output_file_path: str, ap_output_data: bytes, debug_flag=False):
+    def __init__(self, clean_iso_path: str, randomized_output_file_path: str, ap_output_data: bytes, cardback_gtx: bytes = None, debug_flag=False):
         # Takes note of the provided Randomized Folder path and if files should be exported instead of making an ISO.
         self.debug = debug_flag
         self.clean_iso_path = clean_iso_path
         self.randomized_output_file_path = randomized_output_file_path
-
+        self.cardback_gtx = cardback_gtx
         self.output_data = json.loads(ap_output_data.decode('utf-8'))
 
         # Set the random's seed for uses in other files.
@@ -62,10 +63,75 @@ class LK2Randomizer:
                 if location["isoAddress"] != "":
                     iso_file.seek(int(location["isoAddress"],16))
                     iso_file.write((int("0", 16).to_bytes(1, byteorder='big')))
+            self.patch_sp_tex_entry(iso_file)
 
         self.write_string(iso,0x1E000,0x00000100,0x80003100,0x80003DA0,self.output_data["Name"])
 
         logger.info("Rom modified")
+
+    import os
+
+    import struct
+    import os
+
+    import struct
+    import os
+
+    def patch_sp_tex_entry(self, iso_file, entry_index=62):
+        # The signature we confirmed at 0x41D04E0
+        iso_tex_header_signature = b'\x00\x0c\x2d\xc0\x00\x00\x00\x41\x00\x00\x01\x20\x00\x00\x2a\x80'
+
+        search_start = 0x41D0000
+        iso_file.seek(search_start)
+        chunk = iso_file.read(4096)
+        header_pos = chunk.find(iso_tex_header_signature)
+
+        if header_pos == -1:
+            logger.error("Could not find the .TEX container signature.")
+            return
+
+        sp_tex_iso_offset = search_start + header_pos
+
+        # 1. Locate Entry 62 in the offset table
+        iso_file.seek(sp_tex_iso_offset + 0x08 + (entry_index * 4))
+        entry_offset = struct.unpack('>I', iso_file.read(4))[0]
+        next_offset = struct.unpack('>I', iso_file.read(4))[0]
+
+        original_total_size = next_offset - entry_offset
+        target_address = sp_tex_iso_offset + entry_offset
+
+        # 2. SURGICAL STEP: Read the original entry's header (first 32 bytes)
+        # This contains the format, width, height, and mipmap data the game expects.
+        iso_file.seek(target_address)
+        original_gtx_header = iso_file.read(32)
+
+        # 3. PREPARE PAYLOAD: Use your new pixels but skip its own header
+        # We assume your cardback_gtx has its own 32-byte header we want to discard.
+        new_pixel_data = self.cardback_gtx[32:]
+
+        # Reconstruct the entry: Original Header + New Pixels
+        final_patch = original_gtx_header + new_pixel_data
+
+        # 4. STRICT SIZE ENFORCEMENT
+        # We MUST stay within the original byte-count of Entry 62.
+        if len(final_patch) > original_total_size:
+            logger.warning("Patch too large; truncating to match original entry size.")
+            final_patch = final_patch[:original_total_size]
+        elif len(final_patch) < original_total_size:
+            padding_needed = original_total_size - len(final_patch)
+            final_patch += b'\x00' * padding_needed
+
+        # 5. WRITE & VERIFY
+        iso_file.seek(target_address)
+        iso_file.write(final_patch)
+        iso_file.flush()
+
+        iso_file.seek(target_address)
+        verification = iso_file.read(4)
+        if verification == original_gtx_header[:4]:  # Should still start with 'GTX1'
+            logger.info(f"SUCCESS: Surgical patch applied to Entry {entry_index} at {hex(target_address)}")
+        else:
+            logger.error("FAILURE: Write verification failed.")
 
     def randomize_starting_deck(self, iso_file):
         cards = list(lost_kingdoms_2_cards.values())

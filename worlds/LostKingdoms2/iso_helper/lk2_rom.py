@@ -45,6 +45,15 @@ class LK2PlayerContainer(APPlayerContainer):
 
     def write_contents(self, opened_zipfile: zipfile.ZipFile) -> None:
         opened_zipfile.writestr("patch.aplk2", json.dumps(self.output_data, indent=4, default=convert_to_base_types))
+
+        apworld_path = __file__
+        while not apworld_path.endswith(".apworld"):
+            apworld_path = os.path.dirname(apworld_path)
+
+        with zipfile.ZipFile(apworld_path, "r") as apworld_zip:
+            cardback_data = apworld_zip.read("LostKingdoms2/images/AP_Cardback.gtx")
+        opened_zipfile.writestr("AP_Cardback.gtx", cardback_data)
+
         super().write_contents(opened_zipfile)
 
 
@@ -94,8 +103,10 @@ class LK2USAAPPatch(APPatch, metaclass=AutoPatchRegister):
             # Use our randomize function to patch the file into an ISO.
             from ..LK2Generator import LK2Randomizer
             with zipfile.ZipFile(aplk2_patch, "r") as zf:
-               aplk2_bytes = zf.read("patch.aplk2")
-            LK2Randomizer(lk2_clean_iso, output_file, aplk2_bytes)
+                aplk2_bytes = zf.read("patch.aplk2")
+                cardback_gtx = zf.read("AP_Cardback.gtx")
+            LK2Randomizer(lk2_clean_iso, output_file, aplk2_bytes, cardback_gtx)
+
         except ImportError:
             logger.error(ImportError)
         return output_file
@@ -130,6 +141,7 @@ class LK2USAAPPatch(APPatch, metaclass=AutoPatchRegister):
 
         # Verify that the file has the right has first, as the wrong file could have been loaded.
         md5_conv = int(base_md5.hexdigest(), 16)
+
         if md5_conv != LK2_USA_MD5:
             raise InvalidCleanISOError(f"Invalid vanilla {RANDOMIZER_NAME} ISO.\nYour ISO may be corrupted or your " +
                 f"MD5 hashes do not match.\nCorrect ISO MD5 hash: {LK2_USA_MD5:x}\nYour ISO's MD5 hash: {md5_conv}")
@@ -144,5 +156,6 @@ class LK2USAAPPatch(APPatch, metaclass=AutoPatchRegister):
         # Use our randomize function to patch the file into an ISO.
         with zipfile.ZipFile(patch_file_path, "r") as zf:
             aplk2_bytes = zf.read("patch.aplk2")
-        LK2Randomizer(vanilla_iso_path, output_iso_path, aplk2_bytes)
+            cardback_gtx = zf.read("AP_Cardback.gtx")
+        LK2Randomizer(vanilla_iso_path, output_iso_path, aplk2_bytes, cardback_gtx)
 

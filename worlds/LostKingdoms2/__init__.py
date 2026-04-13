@@ -27,6 +27,8 @@ logger = logging.getLogger(__name__)
 location_name_to_id = {}
 item_name_to_id = {}
 
+rng_seed = None
+
 def run_client(*args):
     from .LK2Client import main  # lazy import
     launch_subprocess(main, name="LK2Client", args=args)
@@ -127,8 +129,8 @@ class LostKingdoms2World(World):
                 self.multiworld.get_location("Defeat the God of Harmony",self.player,).place_locked_item(LK2Item("Victory", ItemClassification.progression, None, self.player))
             case 1:
                 self.multiworld.get_location("Defeat the Emperor", self.player, ).place_locked_item(LK2Item("Victory", ItemClassification.progression, None, self.player))
-            case _:
-                self.multiworld.get_location("Win", self.player, ).place_locked_item(LK2Item("Victory", ItemClassification.progression, None, self.player))
+            case 2:
+                self.multiworld.get_location("Collect "+str(self.options.collect_red_fairies_amount.value)+" Red Fairies", self.player, ).place_locked_item(LK2Item("Victory", ItemClassification.progression, None, self.player))
         self.multiworld.completion_condition[self.player] = lambda state: state.has("Victory", self.player)
 
         #ensure GoD, stone golem, and all flyers/jumpers are in the pool
@@ -174,7 +176,14 @@ class LostKingdoms2World(World):
             return True
 
     def generate_early(self) -> None:
-        pass
+        re_gen_passthrough = getattr(self.multiworld, "re_gen_passthrough", {})
+        logger.debug(f"re_gen_passthrough contents: {re_gen_passthrough}")
+        logger.debug(f"self.game = {self.game!r}")
+        if re_gen_passthrough and self.game in re_gen_passthrough:
+            slot_data: dict[str, typing.Any] = re_gen_passthrough[self.game]
+            global rng_seed
+            rng_seed = slot_data["Seed"]
+            logger.debug("Setting Universal Tracking seed to: " + str(rng_seed))
 
     def create_regions(self):
         menu_region = Region("Menu", self.player, self.multiworld)
@@ -201,97 +210,153 @@ class LostKingdoms2World(World):
                 location.progress_type = LocationProgressType.EXCLUDED
             region.locations.append(location)
 
-        victory_location = LK2Location(self.player, "Defeat the God of Harmony",self.multiworld.get_region("Royal Tower, Upper", self.player), None)
-        self.multiworld.get_region("Royal Tower, Upper", self.player).locations.append(victory_location)
+        match self.options.win_condition.value:
+            case 0:
+                victory_location = LK2Location(self.player, "Defeat the God of Harmony",self.multiworld.get_region("Royal Tower, Upper", self.player), None)
+                self.multiworld.get_region("Royal Tower, Upper", self.player).locations.append(victory_location)
+            case 1:
+                victory_location = LK2Location(self.player, "Defeat the Emperor",self.multiworld.get_region("Proving Grounds", self.player), None)
+                self.multiworld.get_region("Proving Grounds", self.player).locations.append(victory_location)
+            case 2:
+                victory_location = LK2Location(self.player, "Collect "+str(self.options.collect_red_fairies_amount.value)+" Red Fairies",self.multiworld.get_region("Proving Grounds", self.player), None)
+                self.multiworld.get_region("Menu", self.player).locations.append(victory_location)
+                victory_location.access_rule = lambda state: state.has("Red Fairy", self.player,self.options.collect_red_fairies_amount.value)
+
 
     def set_rules(self) -> None:
+
+        exit_rules = {
+                "Nobleman's Residence Exit 2": lambda state: state.has("Mysterious Key", self.player),
+                "Bhashea High Road Exit 3": lambda state: state.has_any(lost_kingdoms_2_flying_cards, self.player),
+                "Gromtull Desert Exit 1": lambda state: state.has("Black Liquid", self.player),
+                "Kendarie Fortress Exit 1": lambda state: state.has("Red Key", self.player) and state.has("Blue Key",self.player),
+                "Runestone Caverns - Upper Chambers Exit 1": lambda state: state.has("Stone Golem", self.player),
+                "Krasheen Mountains Exit 1": lambda state: state.has_any(lost_kingdoms_2_flying_cards, self.player),
+                "Fossil Boneyard Exit 1": lambda state: state.has_any(lost_kingdoms_2_jumping_cards,self.player) and state.has("Magic Boosters",self.player),
+                "Plains of Rowahl Exit 1": lambda state: state.has("Castle Gate Key", self.player),
+                "Holzogh Town Exit 2": lambda state: state.can_reach_region("Royal Tower, Lower", self.player)
+            }
+
+        if self.options.randomize_levels.value:
+            global rng_seed
+            if rng_seed is None:
+                rng_seed = self.multiworld.seed
+            random.seed(rng_seed + 4)
+            level_ordering = randomize_exits()
+            logger.debug("Level ordering is: " + str(level_ordering))
+            inverted_ordering = {dest: exit_key for exit_key, dest in level_ordering.items()}
+        else:
+            inverted_ordering = {dest: exit_key for exit_key, dest in lost_kingdoms_2_region_exits.items()}
+
         for region_name in lost_kingdoms_2_regions:
-            region = self.multiworld.get_region(region_name,self.player)
+            region = self.multiworld.get_region(region_name, self.player)
             match region_name:
                 case "Nobleman's Residence":
                     previous_region = self.multiworld.get_region("Menu", self.player)
-                    previous_region.connect(region, "Menu/Hub -> Nobleman's Residence")
+                    previous_region.connect(region, "Nobleman's Residence")
                 case "Bhashea High Road":
-                    previous_region = self.multiworld.get_region("Nobleman's Residence",self.player)
-                    previous_region.connect(region, previous_region.name + " -> " + region.name)
-                case "Kadishu":
-                    previous_region = self.multiworld.get_region("Bhashea High Road", self.player)
-                    previous_region.connect(region, previous_region.name + " -> " + region.name)
-                case "Kadishu Shop":
-                    previous_region = self.multiworld.get_region("Kadishu", self.player)
-                    previous_region.connect(region, previous_region.name + " -> " + region.name)
-                case "Fairy House":
-                    previous_region = self.multiworld.get_region("Gromtull Desert", self.player)
-                    previous_region.connect(region, previous_region.name + " -> " + region.name, lambda state: state.has("Black Liquid", self.player))
-                case "Bhashea Castle":
-                    previous_region = self.multiworld.get_region("Bhashea High Road", self.player)
-                    previous_region.connect(region, previous_region.name + " -> " + region.name, lambda state: state.has_any(lost_kingdoms_2_flying_cards, self.player))
-                case "Gromtull Desert":
-                    previous_region = self.multiworld.get_region("Kadishu", self.player)
-                    previous_region.connect(region, previous_region.name + " -> " + region.name)
+                    exit_key = inverted_ordering[region_name]
+                    previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
+                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
+                case "Isamat Urbur":
+                    exit_key = inverted_ordering[region_name]
+                    previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
+                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
                 case "Kendarie Fortress":
-                    previous_region = self.multiworld.get_region("Bhashea High Road", self.player)
-                    previous_region.connect(region, previous_region.name + " -> " + region.name)
+                    exit_key = inverted_ordering[region_name]
+                    previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
+                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
+                case "Kadishu":
+                    exit_key = inverted_ordering[region_name]
+                    previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
+                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
+                case "Bhashea Castle":
+                    exit_key = inverted_ordering[region_name]
+                    previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
+                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
+                case "Kadishu Shop":
+                    exit_key = inverted_ordering[region_name]
+                    previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
+                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
+                case "Fairy House":
+                    exit_key = inverted_ordering[region_name]
+                    previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
+                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
+                case "Gromtull Desert":
+                    exit_key = inverted_ordering[region_name]
+                    previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
+                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
                 case "Runestone Caverns - Upper Chambers":
-                    previous_region = self.multiworld.get_region("Kendarie Fortress", self.player)
-                    previous_region.connect(region, previous_region.name + " -> " + region.name, lambda state: state.has("Red Key", self.player) and state.has("Blue Key", self.player))
+                    exit_key = inverted_ordering[region_name]
+                    previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
+                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
                 case "Runestone Caverns - Lower Chambers":
-                    previous_region = self.multiworld.get_region("Runestone Caverns - Upper Chambers", self.player)
-                    previous_region.connect(region, previous_region.name + " -> " + region.name, lambda state: state.has("Stone Golem", self.player))
+                    exit_key = inverted_ordering[region_name]
+                    previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
+                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
                 case "Ruldo Forest":
-                    previous_region = self.multiworld.get_region("Runestone Caverns - Lower Chambers", self.player)
-                    previous_region.connect(region, previous_region.name + " -> " + region.name)
+                    exit_key = inverted_ordering[region_name]
+                    previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
+                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
                 case "Sacred Battle Arena 1":
-                    previous_region = self.multiworld.get_region("Ruldo Forest", self.player)
-                    previous_region.connect(region, previous_region.name + " -> " + region.name)
+                    exit_key = inverted_ordering[region_name]
+                    previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
+                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
                 case "Sacred Battle Arena 2":
                     previous_region = self.multiworld.get_region("Sacred Battle Arena 1", self.player)
-                    previous_region.connect(region, previous_region.name + " -> " + region.name)
+                    previous_region.connect(region, f"{region.name}")
                 case "Fossil Boneyard":
-                    previous_region = self.multiworld.get_region("Ruldo Forest", self.player)
-                    previous_region.connect(region, previous_region.name + " -> " + region.name)
+                    exit_key = inverted_ordering[region_name]
+                    previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
+                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
                 case "Sarvan":
-                    previous_region = self.multiworld.get_region("Fossil Boneyard", self.player)
-                    previous_region.connect(region, previous_region.name + " -> " + region.name,lambda state: state.has_any(lost_kingdoms_2_flying_cards, self.player) and state.has("Magic Boosters", self.player))
+                    exit_key = inverted_ordering[region_name]
+                    previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
+                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
                 case "Holzogh Town":
-                    previous_region = self.multiworld.get_region("Sarvan", self.player)
-                    previous_region.connect(region, previous_region.name + " -> " + region.name)
+                    exit_key = inverted_ordering[region_name]
+                    previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
+                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
                 case "Plains of Rowahl":
-                    previous_region = self.multiworld.get_region("Holzogh Town", self.player)
-                    previous_region.connect(region, previous_region.name + " -> " + region.name)
+                    exit_key = inverted_ordering[region_name]
+                    previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
+                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
                 case "Alanjeh Castle":
-                    previous_region = self.multiworld.get_region("Plains of Rowahl", self.player)
-                    previous_region.connect(region, previous_region.name + " -> " + region.name,lambda state: state.has("Castle Gate Key", self.player))
+                    exit_key = inverted_ordering[region_name]
+                    previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
+                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
+                case "Krasheen Mountains":
+                    exit_key = inverted_ordering[region_name]
+                    previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
+                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
+                case "Obenoix Gorge":
+                    exit_key = inverted_ordering[region_name]
+                    previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
+                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
+                case "Grenfoel Cathedral":
+                    exit_key = inverted_ordering[region_name]
+                    previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
+                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
+                case "Temple of Sharacia":
+                    exit_key = inverted_ordering[region_name]
+                    previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
+                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
+                case "Grenfoel Cathedral Shop":
+                    exit_key = inverted_ordering[region_name]
+                    previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
+                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
                 case "Royal Tower, Lower":
                     previous_region = self.multiworld.get_region("Alanjeh Castle", self.player)
-                    previous_region.connect(region, previous_region.name + " -> " + region.name)
+                    previous_region.connect(region, f"{region.name}")
                 case "Royal Tower, Middle":
                     previous_region = self.multiworld.get_region("Royal Tower, Lower", self.player)
-                    previous_region.connect(region, previous_region.name + " -> " + region.name,lambda state: state.has("God of Destruction", self.player))
+                    previous_region.connect(region, f"{region.name}", lambda state: state.has("God of Destruction", self.player))
                 case "Royal Tower, Upper":
                     previous_region = self.multiworld.get_region("Royal Tower, Middle", self.player)
-                    previous_region.connect(region, previous_region.name + " -> " + region.name)
-                case "Krasheen Mountains":
-                    previous_region = self.multiworld.get_region("Royal Tower, Lower", self.player)
-                    previous_region.connect(region, previous_region.name + " -> " + region.name)
-                case "Grenfoel Cathedral":
-                    previous_region = self.multiworld.get_region("Krasheen Mountains", self.player)
-                    previous_region.connect(region, previous_region.name + " -> " + region.name)
-                case "Temple of Sharacia":
-                    previous_region = self.multiworld.get_region("Grenfoel Cathedral", self.player)
-                    previous_region.connect(region, previous_region.name + " -> " + region.name)
-                case "Grenfoel Cathedral Shop":
-                    previous_region = self.multiworld.get_region("Grenfoel Cathedral", self.player)
-                    previous_region.connect(region, previous_region.name + " -> " + region.name)
-                case "Isamat Urbur":
-                    previous_region = self.multiworld.get_region("Nobleman's Residence", self.player)
-                    previous_region.connect(region, previous_region.name + " -> " + region.name, lambda state: state.has("Mysterious Key", self.player))
-                case "Obenoix Gorge":
-                    previous_region = self.multiworld.get_region("Holzogh Town", self.player)
-                    previous_region.connect(region, previous_region.name + " -> " + region.name)
+                    previous_region.connect(region, f"{region.name}")
                 case "Proving Grounds":
                     previous_region = self.multiworld.get_region("Royal Tower, Upper", self.player)
-                    previous_region.connect(region, previous_region.name + " -> " + region.name)
+                    previous_region.connect(region, f"{region.name}")
 
 
         for location in self.multiworld.get_locations(self.player):
@@ -301,14 +366,20 @@ class LostKingdoms2World(World):
                     add_rule(location,lambda state: state.has_any(lost_kingdoms_2_jumping_cards, self.player) or state.has_any(lost_kingdoms_2_flying_cards, self.player))
                 case "Bhashea High Road - flight chest" | "Gromtull Desert - flight chest" | "Kendarie Fortress - flight chest" | "Runestone Caverns:Lower Chambers - high water chest flight"\
                     | "Plains of Rowahl - flight chest" | "Plains of Rowahl - flight chest 2" | "Alanjeh Castle - flight chest"\
-                    | "Royal Tower, Lower - flight chest 1" | "Royal Tower, Lower - flight chest 2" | "Krasheen Mountains - black dragon's card" | "Temple of Sharacia - flight chest"\
+                    | "Krasheen Mountains - black dragon's card" | "Temple of Sharacia - flight chest"\
                     | "Obenoix Gorge - flight chest 1" | "Obenoix Gorge - flight chest 2" | "Obenoix Gorge - flight chest 3" | "Bhashea High Road - Red Fairy across bridge"\
-                    | "Kendarie Fortress - Red Fairy fly across" | "Royal Tower, Lower - Red Fairy flight" | "Krasheen Mountains - Red Fairy cave 1" | "Krasheen Mountains - Red Fairy broken bridge 1"\
+                    | "Kendarie Fortress - Red Fairy fly across" | "Krasheen Mountains - Red Fairy cave 1" | "Krasheen Mountains - Red Fairy broken bridge 1"\
                     | "Krasheen Mountains - Red Fairy broken bridge 2":
                     add_rule(location, lambda state: state.has_any(lost_kingdoms_2_flying_cards,self.player))
+                case "Runestone Caverns:Lower Chambers - low water chest" | "Runestone Caverns:Lower Chambers - Red Fairy low water":
+                    add_rule(location, lambda state: state.can_reach_region("Runestone Caverns - Upper Chambers", self.player))
+                case "Royal Tower, Lower - flight chest 1" | "Royal Tower, Lower - flight chest 2" | "Royal Tower, Lower - Red Fairy flight":
+                    add_rule(location, lambda state: state.has_any(lost_kingdoms_2_flying_cards, self.player) and state.has("God of Destruction", self.player))
+                case "Royal Tower, Lower - jump chest 1" | "Royal Tower, Lower - jump chest 2":
+                    add_rule(location, lambda state: state.has("Hell Hound", self.player) and state.has("God of Destruction", self.player))
                 case "Bhashea Castle - east jump chest" | "Ruldo Forest - jump chest" | "Fossil Boneyard - Red Fairy jumping" | "Fossil Boneyard - chest behind cultist" | "Fossil Boneyard - chest 3"\
                     | "Fossil Boneyard - Red Fairy near booster" | "Fossil Boneyard - chest 4" | "Fossil Boneyard - chest 5" | "Fossil Boneyard - chest 6" | "Fossil Boneyard - chest 7" | "Sarvan - jump chest"\
-                    | "Royal Tower, Lower - jump chest 1" | "Royal Tower, Lower - jump chest 2" | "Krasheen Mountains - chest 1" | "Krasheen Mountains - chest 2" | "Krasheen Mountains - chest 3"\
+                    | "Krasheen Mountains - chest 1" | "Krasheen Mountains - chest 2" | "Krasheen Mountains - chest 3"\
                     | "Krasheen Mountains - chest 4" | "Krasheen Mountains - chest 5" | "Krasheen Mountains - chest 6" | "Alanjeh Castle - Red Fairy jump"\
                     | "Fossil Boneyard - Fossil Head Pickup" | "Fossil Boneyard - Fossil Tail Pickup" | "Fossil Boneyard - Fossil Rt Wing Pickup" | "Fossil Boneyard - Fossil Lt Wing Pickup" | "Fossil Boneyard - Fossil Rt Arm Pickup"\
                     | "Fossil Boneyard - Fossil Lt Arm Pickup" | "Fossil Boneyard - Fossil Lt Leg Pickup" | "Fossil Boneyard - Stranger":
@@ -411,7 +482,8 @@ class LostKingdoms2World(World):
                     add_rule(location, lambda state: state.has("Carbuncle", self.player))
                     add_rule(location, lambda state: state.has("Decoy Pillar", self.player))
                 case "Combo - Rocky Forecast":
-                    add_rule(location, lambda state: state.has("Stone Head", self.player, 3))
+                    add_rule(location, lambda state: state.has("Stone Head", self.player)) #3
+                    add_rule(location, lambda state: state.can_reach_region("Kadishu Shop", self.player) or state.can_reach_region("Grenfoel Cathedral Shop", self.player))
                 case "Combo - Sir Spear-A-Lot":
                     add_rule(location, lambda state: state.has("Ghost Armor", self.player))
                     add_rule(location, lambda state: state.has("Chaos Knight", self.player))
@@ -426,8 +498,9 @@ class LostKingdoms2World(World):
                     add_rule(location, lambda state: state.has("Juggernaut", self.player))
                     add_rule(location, lambda state: state.has("Whip Worm", self.player))
                 case "Combo - Crystal Rage":
-                    add_rule(location, lambda state: state.has("Dragon Knight", self.player, 2))
-                    add_rule(location, lambda state: state.has("Crystal Rose", self.player))
+                    add_rule(location, lambda state: state.has("Dragon Knight", self.player))
+                    add_rule(location, lambda state: state.has("Crystal Rose", self.player)) #2
+                    add_rule(location, lambda state: state.can_reach_region("Kadishu Shop", self.player) or state.can_reach_region("Grenfoel Cathedral Shop", self.player))
                 case "Combo - Mandragora Mixer":
                     add_rule(location, lambda state: state.has("Mandragora", self.player))
                     add_rule(location, lambda state: state.has("Mandra Dancer", self.player))
@@ -439,14 +512,16 @@ class LostKingdoms2World(World):
                     add_rule(location, lambda state: state.has("Panther Mage", self.player))
                     add_rule(location, lambda state: state.has("Tiger Mage", self.player))
                 case "Combo - Just Visiting":
-                    add_rule(location, lambda state: state.has("Doppelganger", self.player, 2))
+                    add_rule(location, lambda state: state.has("Doppelganger", self.player)) #2
+                    add_rule(location, lambda state: state.can_reach_region("Kadishu Shop", self.player) or state.can_reach_region("Grenfoel Cathedral Shop", self.player))
                 case "Combo - Djinn and Bear It":
                     add_rule(location, lambda state: state.has("Efreet", self.player))
                     add_rule(location, lambda state: state.has("Dao", self.player))
                     add_rule(location, lambda state: state.has("Marid", self.player))
                 case "Combo - Triple Kamikaze":
                     add_rule(location, lambda state: state.has("Flying Ray", self.player))
-                    add_rule(location, lambda state: state.has("Dark Raven", self.player, 2))
+                    add_rule(location, lambda state: state.has("Dark Raven", self.player)) #2
+                    add_rule(location, lambda state: state.can_reach_region("Kadishu Shop", self.player) or state.can_reach_region("Grenfoel Cathedral Shop", self.player))
                 case "Combo - One Way Ticket":
                     add_rule(location, lambda state: state.has("Valkyrie", self.player))
                     add_rule(location, lambda state: state.has("Thanatos", self.player))
@@ -482,7 +557,8 @@ class LostKingdoms2World(World):
                     add_rule(location, lambda state: state.has("Skeleton", self.player))
                 case "Combo - Stone Cold Sniper":
                     add_rule(location, lambda state: state.has("Stone Golem", self.player))
-                    add_rule(location, lambda state: state.has("Archer Tree", self.player, 2))
+                    add_rule(location, lambda state: state.has("Archer Tree", self.player)) #2
+                    add_rule(location, lambda state: state.can_reach_region("Kadishu Shop", self.player) or state.can_reach_region("Grenfoel Cathedral Shop", self.player))
                 case "Combo - Mega Tremor":
                     add_rule(location, lambda state: state.has("Elephant", self.player))
                     add_rule(location, lambda state: state.has("Elephant King", self.player))
@@ -499,7 +575,8 @@ class LostKingdoms2World(World):
                     add_rule(location, lambda state: state.has("Wood Elemental", self.player))
                 case "Combo - Air Raid":
                     add_rule(location, lambda state: state.has("Treant", self.player))
-                    add_rule(location, lambda state: state.has("Dark Raven", self.player, 2))
+                    add_rule(location, lambda state: state.has("Dark Raven", self.player)) #2
+                    add_rule(location, lambda state: state.can_reach_region("Kadishu Shop", self.player) or state.can_reach_region("Grenfoel Cathedral Shop", self.player))
                 case "Combo - Tech Support!":
                     add_rule(location, lambda state: state.has("Acid Cloud", self.player))
                     add_rule(location, lambda state: state.has("Gold Butterfly", self.player))
@@ -508,9 +585,11 @@ class LostKingdoms2World(World):
                     add_rule(location, lambda state: state.has("Siren", self.player))
                 case "Combo - Hearing Aid":
                     add_rule(location, lambda state: state.has("Sphinx", self.player))
-                    add_rule(location, lambda state: state.has("Mummy", self.player, 2))
+                    add_rule(location, lambda state: state.has("Mummy", self.player)) #2
+                    add_rule(location, lambda state: state.can_reach_region("Kadishu Shop", self.player) or state.can_reach_region("Grenfoel Cathedral Shop", self.player))
                 case "Combo - Uber Vampire Root":
-                    add_rule(location, lambda state: state.has("Vampire Bush", self.player, 2))
+                    add_rule(location, lambda state: state.has("Vampire Bush", self.player)) #2
+                    add_rule(location, lambda state: state.can_reach_region("Kadishu Shop", self.player) or state.can_reach_region("Grenfoel Cathedral Shop", self.player))
                 case "Combo - Mo Better Moray":
                     add_rule(location, lambda state: state.has("Fire Moray", self.player))
                     add_rule(location, lambda state: state.has("Water Moray", self.player))
@@ -519,9 +598,11 @@ class LostKingdoms2World(World):
                     add_rule(location, lambda state: state.has("Sea Monk", self.player))
                     add_rule(location, lambda state: state.has("Mind Flayer", self.player))
                 case "Combo - Hawging the Action":
-                    add_rule(location, lambda state: state.has("Orc", self.player, 4))
+                    add_rule(location, lambda state: state.has("Orc", self.player)) #4
+                    add_rule(location, lambda state: state.can_reach_region("Kadishu Shop", self.player) or state.can_reach_region("Grenfoel Cathedral Shop", self.player))
                 case "Combo - Stone All Around":
-                    add_rule(location, lambda state: state.has("Cockatrice", self.player, 2))
+                    add_rule(location, lambda state: state.has("Cockatrice", self.player)) #2
+                    add_rule(location, lambda state: state.can_reach_region("Kadishu Shop", self.player) or state.can_reach_region("Grenfoel Cathedral Shop", self.player))
                 case "Combo - Tender Mercy":
                     add_rule(location, lambda state: state.has("Fairy", self.player))
                     add_rule(location, lambda state: state.has("Rheebus", self.player))
@@ -541,6 +622,7 @@ class LostKingdoms2World(World):
             "Slot": self.player,
             "Name": self.player_name,
             "win_condition": self.options.win_condition.value,
+            "collect_red_fairies_amount": self.options.collect_red_fairies_amount.value,
             "fairysanity": self.options.fairysanity.value,
             "shopsanity": self.options.shopsanity.value,
             "combosanity": self.options.combosanity.value,
@@ -551,7 +633,14 @@ class LostKingdoms2World(World):
             "randomize_shop_contents": self.options.randomize_shop_contents.value,
             "randomize_bonus_draws": self.options.randomize_bonus_draws.value,
             "randomize_magic_stone_costs": self.options.randomize_magic_stone_costs.value,
+            "randomize_levels": self.options.randomize_levels.value
         }
+
+    #This function exists for universal tracker to align the rng
+    @staticmethod
+    def interpret_slot_data(slot_data: dict[str, typing.Any]) -> dict[str, typing.Any]:
+        # Trigger a regen in UT
+        return slot_data
 
     def debug_regions(self):
         state = CollectionState(self.multiworld)
@@ -602,3 +691,100 @@ class LostKingdoms2World(World):
         lk2_container.write()
 
 
+EXCLUDED_REGIONS = {
+    "Royal Tower, Lower",
+    "Royal Tower, Middle",
+    "Royal Tower, Upper",
+    "Proving Grounds",
+    "Sacred Battle Arena 2"
+}
+
+def source_of(exit_key: str) -> str:
+    return exit_key.rsplit(" Exit ", 1)[0]
+
+
+def randomize_exits(start_region: str = "Nobleman's Residence") -> dict:
+    logger.info(f"Starting Level Randomization from {start_region}...")
+
+    # 1. SETUP - Locked Sorts
+    exits_by_source = {}
+    # Sort keys first to ensure we process sources in a fixed order
+    for ek in sorted(lost_kingdoms_2_region_exits.keys()):
+        source = source_of(ek)
+        if source not in exits_by_source:
+            exits_by_source[source] = []
+        exits_by_source[source].append(ek)
+
+    # Sort the lists within the dictionary so exit indices are always identical
+    for source in exits_by_source:
+        exits_by_source[source].sort()
+
+    all_regions = set(lost_kingdoms_2_regions.keys())
+    # Ensure regions_to_place is a strictly sorted list from the start
+    regions_to_place = sorted(list(all_regions - {start_region} - EXCLUDED_REGIONS))
+
+    # Initialize available_exits and sort immediately
+    available_exits = sorted(exits_by_source.get(start_region, []))
+    result = {}
+
+    def get_provided_exits(r: str) -> list[str]:
+        # Always return a sorted list of exits
+        if r == "Alanjeh Castle":
+            return sorted(exits_by_source.get("Royal Tower, Lower", []))
+        return sorted(exits_by_source.get(r, []))
+
+    # 2. PLACEMENT LOOP
+    while regions_to_place:
+        if not available_exits:
+            logger.error(f"CRITICAL: No available exits left! Remaining regions: {regions_to_place}")
+            raise IndexError(f"Map generation failed: Out of exits with {len(regions_to_place)} left.")
+
+        # Re-sort before every choice to ensure index selection is stable
+        available_exits.sort()
+        exit_choice = random.choice(available_exits)
+        available_exits.remove(exit_choice)
+
+        # Build candidates from the already-sorted regions_to_place
+        valid_candidates = [r for r in regions_to_place]
+
+        # --- RULE 1: THE HOLZOGH DEAD-END RULE ---
+        if exit_choice == "Holzogh Town Exit 2":
+            dead_ends = [r for r in valid_candidates if len(get_provided_exits(r)) == 0]
+            if dead_ends:
+                # No extra sort needed (they are filtered from a sorted list), but safety first
+                dead_ends.sort()
+                valid_candidates = dead_ends
+                logger.info("Logic: Forcing Dead-End behind Holzogh Exit 2.")
+
+        # --- RULE 2: FRONTIER HEALTH ---
+        if len(available_exits) <= 1 and len(regions_to_place) > 1:
+            hubs = [r for r in valid_candidates if len(get_provided_exits(r)) >= 1]
+            if hubs:
+                hubs.sort()
+                valid_candidates = hubs
+                logger.info(f"Logic: Frontier low ({len(available_exits)}), forcing branching region.")
+
+        # --- RULE 3: BURY ALANJEH ---
+        if "Alanjeh Castle" in valid_candidates and len(valid_candidates) > 1:
+            valid_candidates = [r for r in valid_candidates if r != "Alanjeh Castle"]
+
+        # --- EXECUTION ---
+        if not valid_candidates:
+            valid_candidates = regions_to_place
+
+        # Final safety sort before random selection
+        valid_candidates.sort()
+        region = random.choice(valid_candidates)
+
+        result[exit_choice] = region
+        regions_to_place.remove(region)
+
+        # Extend with sorted exits
+        new_exits = get_provided_exits(region)
+        available_exits.extend(new_exits)
+        available_exits.sort()  # Ensure next iteration's choice is based on a sorted pool
+
+        logger.debug(f"Placed: {exit_choice} -> {region}")
+
+    logger.info("Level Randomization Complete.")
+    return result

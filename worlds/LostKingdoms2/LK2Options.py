@@ -10,8 +10,16 @@ class WinConditionOption(Choice):
     display_name = "Win Condition"
     option_defeat_god_of_harmony = 0
     option_defeat_emperor = 1
-    #option_collect_all_cards = 2
+    option_collect_red_fairies = 2
+    #option_collect_all_cards = 3
     default = 0
+
+class CollectRedFariesAmount(Range):
+    """Only relevant if your goal is collecting red fairies"""
+    display_name = "Collect Red Fairies Amount"
+    range_start = 1
+    range_end = 97
+    default = 50
 
 class FairysanityConditionOption(Toggle):
     """Choose whether Red Fairies are added to the pool"""
@@ -84,10 +92,19 @@ class RandomizeMagicCosts(Toggle):
     display_name = "Randomize Magic Costs"
     default = 0
 
+class LevelRandomization(Toggle):
+    """Randomize which levels unlock when you would normally unlock a level.
+    Note: Alenjah Castle still always leads to all the towers in order, and
+    the sacred battle arena still leads to sacred battle arena 2."""
+
+    display_name = "Level Randomization"
+    default = 0
+
 
 @dataclass
 class LostKingdoms2Options(PerGameCommonOptions):
     win_condition : WinConditionOption
+    collect_red_fairies_amount : CollectRedFariesAmount
     fairysanity : FairysanityConditionOption
     shopsanity: ShopsanityConditionOption
     combosanity: CombosanityConditionOption
@@ -98,3 +115,4 @@ class LostKingdoms2Options(PerGameCommonOptions):
     randomize_shop_contents : RandomizeShopContents
     randomize_bonus_draws : RandomizeBonusDraws
     randomize_magic_stone_costs : RandomizeMagicCosts
+    randomize_levels : LevelRandomization
