@@ -42,6 +42,11 @@ class ProgressiveLevelingOption(Toggle):
     display_name = "Progressive Leveling"
     default = 0
 
+class ProgressiveAttributeProficienciesOption(Toggle):
+    """Choose whether to have character levels as a progressive item. You will no longer be able to level up normally."""
+    display_name = "Progressive Leveling"
+    default = 0
+
 class OpenWorldConditionOption(Toggle):
     """Choose whether all levels are unlocked from the start."""
     visibility = Visibility.none
@@ -122,3 +127,4 @@ class LostKingdoms2Options(PerGameCommonOptions):
     randomize_magic_stone_costs : RandomizeMagicCosts
     randomize_levels : LevelRandomization
     progressive_leveling: ProgressiveLevelingOption
+    progressive_attribute_proficiencies: ProgressiveAttributeProficienciesOption

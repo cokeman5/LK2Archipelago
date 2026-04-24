@@ -7,7 +7,6 @@ from ..Helper_Functions import StringByteFunction as sbf
 if TYPE_CHECKING:
     from ..LK2Generator import LostKingdoms2Randomizer
 
-CUSTOM_CODE_OFFSET_START = 0x39FA20
 LK2_PLAYER_NAME_BYTE_LENGTH = 64
 
 # Updates the main DOL file, which is the main file used for GC and Wii games. This section includes some custom code

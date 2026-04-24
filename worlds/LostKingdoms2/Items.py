@@ -303,18 +303,12 @@ for key in lost_kingdoms_2_key_items:
     lost_kingdoms_2_items[key]["id"] = key_item_id
     key_item_id+=1
 
-lost_kingdoms_2_items["Magic Boosters"] = {}
-lost_kingdoms_2_items["Magic Boosters"]["Type"] = "Magic Boosters"
-lost_kingdoms_2_items["Magic Boosters"]["Amount"] = 1
-lost_kingdoms_2_items["Magic Boosters"]["id"] = 2000
-
-#Add 100 red fairies into the pool
-lost_kingdoms_2_items["Red Fairy"] = {}
-lost_kingdoms_2_items["Red Fairy"]["Type"] = "Red Fairy"
-lost_kingdoms_2_items["Red Fairy"]["Amount"] = 100
-lost_kingdoms_2_items["Red Fairy"]["id"] = 3000
-
-lost_kingdoms_2_items["Progressive Player Level"] = {}
-lost_kingdoms_2_items["Progressive Player Level"]["Type"] = "Progressive Player Level"
-lost_kingdoms_2_items["Progressive Player Level"]["Amount"] = 19
-lost_kingdoms_2_items["Progressive Player Level"]["id"] = 4000
+lost_kingdoms_2_items["Magic Boosters"] = {"Type": "Magic Boosters", "Amount": 1, "id": 2000}
+lost_kingdoms_2_items["Red Fairy"] = {"Type": "Red Fairy", "Amount": 100, "id": 3000}
+lost_kingdoms_2_items["Progressive Player Level"] = {"Type": "Progressive Player Level", "Amount": 19, "id": 4000}
+lost_kingdoms_2_items["Progressive Attribute Proficiency: Fire"] = {"Type": "Progressive Attribute Proficiency", "Amount": 5, "id": 5000}
+lost_kingdoms_2_items["Progressive Attribute Proficiency: Water"] = {"Type": "Progressive Attribute Proficiency", "Amount": 5, "id": 5001}
+lost_kingdoms_2_items["Progressive Attribute Proficiency: Earth"] = {"Type": "Progressive Attribute Proficiency", "Amount": 5, "id": 5002}
+lost_kingdoms_2_items["Progressive Attribute Proficiency: Wood"] = {"Type": "Progressive Attribute Proficiency", "Amount": 5, "id": 5003}
+lost_kingdoms_2_items["Progressive Attribute Proficiency: Neutral"] = {"Type": "Progressive Attribute Proficiency", "Amount": 7, "id": 5004}
+lost_kingdoms_2_items["Progressive Attribute Proficiency: Mech"] = {"Type": "Progressive Attribute Proficiency", "Amount": 7, "id": 5005}
