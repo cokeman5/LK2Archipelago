@@ -185,6 +185,10 @@ class LostKingdoms2World(World):
             return True
         elif item in lost_kingdoms_2_key_items:
             return True
+        elif self.options.exclude_sacred_battle_arena_checks.value == 0 and lost_kingdoms_2_items[item]["Type"] == "Progressive Attribute Proficiency":
+            return True
+        else:
+            return False
 
     def generate_early(self) -> None:
         re_gen_passthrough = getattr(self.multiworld, "re_gen_passthrough", {})
@@ -317,7 +321,14 @@ class LostKingdoms2World(World):
                     previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
                 case "Sacred Battle Arena 2":
                     previous_region = self.multiworld.get_region("Sacred Battle Arena 1", self.player)
-                    previous_region.connect(region, f"{region.name}")
+                    if self.options.progressive_attribute_proficiencies.value:
+                        previous_region.connect(region, f"{region.name}", lambda state:
+                                                state.has("Progressive Attribute Proficiency: Earth",3, self.player) and
+                                                state.has("Progressive Attribute Proficiency: Water",3, self.player) and
+                                                state.has("Progressive Attribute Proficiency: Fire",3, self.player) and
+                                                state.has("Progressive Attribute Proficiency: Wood",3, self.player))
+                    else:
+                        previous_region.connect(region, f"{region.name}")
                 case "Fossil Boneyard":
                     exit_key = inverted_ordering[region_name]
                     previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
@@ -385,6 +396,33 @@ class LostKingdoms2World(World):
                 location.progress_type = LocationProgressType.EXCLUDED
 
             match location.name:
+                case "Sacred Battle Arena 1 - defeat Lich":
+                    if self.options.progressive_attribute_proficiencies.value:
+                        add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Earth", 3, self.player))
+                case "Sacred Battle Arena 1 - defeat Nueh":
+                    if self.options.progressive_attribute_proficiencies.value:
+                        add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Wood", 3, self.player))
+                case "Sacred Battle Arena 1 - defeat Gemini":
+                    if self.options.progressive_attribute_proficiencies.value:
+                        add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Fire", 3, self.player))
+                case "Sacred Battle Arena 1 - defeat Kraken":
+                    if self.options.progressive_attribute_proficiencies.value:
+                        add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Water", 3, self.player))
+                case "Sacred Battle Arena 2 - defeat Rabandos" | "Sacred Battle Arena 2 - defeat Helena":
+                    if self.options.progressive_attribute_proficiencies.value:
+                        add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Neutral",5, self.player))
+                case "Sacred Battle Arena 2 - defeat AstroBot" | "Sacred Battle Arena 2 - Red Fairy machines":
+                    if self.options.progressive_attribute_proficiencies.value:
+                        add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Mech", 5, self.player))
+                case "Sacred Battle Arena 2 - defeat Leod":
+                    add_rule(location,lambda state: state.can_reach_region("Royal Tower, Upper"))
+                    if self.options.progressive_attribute_proficiencies.value:
+                        add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Mech", 5, self.player))
+                case "Sacred Battle Arena 2 - defeat Thalnos" | "Sacred Battle Arena 2 - defeat Katia" | "Sacred Battle Arena 2 - Red Fairy Queen Katia":
+                    add_rule(location, lambda state: state.can_reach_region("Royal Tower, Upper"))
+                    if self.options.progressive_attribute_proficiencies.value:
+                        add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Mech", 5, self.player))
+                        add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Neutral", 5, self.player))
                 case "Combo - Triple Hagan":
                     add_rule(location, lambda state: state.has("Rock Hagan", self.player))
                     add_rule(location, lambda state: state.has("Bum Hagan", self.player))
@@ -777,6 +815,12 @@ lost_kingdoms_2_logic = {
     "zombie_dragon": lambda state, p: state.has_all(["Fossil Head", "Fossil Torso", "Fossil Tail",
         "Fossil Rt Wing", "Fossil Lt Wing", "Fossil Rt Arm",
         "Fossil Lt Arm", "Fossil Rt Leg", "Fossil Lt Leg"], p),
+
+    #Sacred Battle Arena Logic
+    "earth_proficiency": lambda state, p: state.has("Progressive Attribute Proficiency: Earth",3),
+    "fire_proficiency": lambda state, p: state.has("Progressive Attribute Proficiency: Fire",3),
+    "water_proficiency": lambda state, p: state.has("Progressive Attribute Proficiency: Water",3),
+    "wood_proficiency": lambda state, p: state.has("Progressive Attribute Proficiency: Wood",3),
 
     # Fairy Progression
     "fairy_1": lambda state, p: state.has("Red Fairy", p, 1),
