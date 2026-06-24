@@ -121,6 +121,7 @@ class LK2Context(CommonContext):
     game: str = "Lost Kingdoms II"
     items_handling: int = 0b111  # full remote
     slot: str
+    level_id: int = 0
 
     def __init__(self, server_address: Optional[str], password: Optional[str]) -> None:
         """
@@ -733,7 +734,7 @@ def is_level_unlocked(level: str) -> bool:
     return read_memory(int(lost_kingdoms_2_regions[level]["RAMAddress"],16), 1) == 128
 
 def is_in_level() -> bool:
-    return read_memory(IS_IN_LEVEL_ADDRESS) != 255
+    return read_memory(IS_IN_LEVEL_ADDRESS, 1) == 1
 
 def set_shop_contents_to_AP():
     for x in range(40):
@@ -1030,6 +1031,30 @@ async def check_death(ctx: LK2Context) -> None:
             ctx.has_send_death = False
 
 
+async def check_map(ctx: LK2Context) -> None:
+    """
+    Check if the player's current map has changed.
+    If the player is in a new map then send a bounce packet to the AP server with level ID.
+    """
+    if ctx.slot is None:
+        return
+
+    level_id = 0  # overworld menu
+    if is_in_level():
+        level_id = read_memory(LEVEL_ID_ADDRESS, 1)
+    if level_id == ctx.level_id:
+        return
+
+    logger.debug(f"Sending bounce packet for map update to level_id {level_id}")
+    await ctx.send_msgs([{
+        "cmd": "Bounce",
+        "slots": [ctx.slot],
+        "data": {
+            "level_id": level_id
+        }
+    }])
+    ctx.level_id = level_id
+
 def check_ingame() -> bool:
     """
     Check if the player is currently in-game, and not the main menu.
@@ -1139,6 +1164,7 @@ async def dolphin_sync_task_main_task(ctx: LK2Context):
                         await give_items(ctx)
                         await check_locations(ctx)
                         await give_progressive_attribute_proficiency(ctx)
+                        await check_map(ctx)
                 else:
                     HAS_GOALED = False
                     if not ctx.auth:
