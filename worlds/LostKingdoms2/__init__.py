@@ -825,6 +825,7 @@ lost_kingdoms_2_logic = {
     "jump_or_flight_or_unicorn": lambda state, p: state.has_any(lost_kingdoms_2_jumping_cards, p) or state.has_any(lost_kingdoms_2_flying_cards, p) or state.has("Unicorn", p),
     "flight_only": lambda state, p: state.has_any(lost_kingdoms_2_flying_cards, p),
     "jumping_only": lambda state, p: state.has_any(lost_kingdoms_2_jumping_cards, p),
+    "jumping_or_unicorn": lambda state, p: state.has_any(lost_kingdoms_2_jumping_cards, p) or state.has("Unicorn", p),
     "jump_and_boosters": lambda state, p: state.has_any(lost_kingdoms_2_jumping_cards, p) and state.has("Magic Boosters", p),
     "jump_boost_flight": lambda state, p: state.has_any(lost_kingdoms_2_jumping_cards, p) and state.has("Magic Boosters", p) and state.has_any(lost_kingdoms_2_flying_cards, p),
 
@@ -843,7 +844,7 @@ lost_kingdoms_2_logic = {
     "hellhound_and_boosters": lambda state, p: state.has("Hell Hound", p) and state.has("Magic Boosters", p),
     "golem_only": lambda state, p: state.has("Stone Golem", p),
     "golem_and_boosters": lambda state, p: state.has("Stone Golem", p) and state.has("Magic Boosters", p),
-    "black_liquid_logic": lambda state, p: state.has_any(lost_kingdoms_2_jumping_cards, p) and state.has("Black Liquid", p),
+    "black_liquid_logic": lambda state, p: (state.has_any(lost_kingdoms_2_jumping_cards, p) or state.has("Unicorn", p)) and state.has("Black Liquid", p),
     "black_liquid_only": lambda state, p: state.has("Black Liquid", p),
     "bottle_only": lambda state, p: state.has("Bottle", p),
 
