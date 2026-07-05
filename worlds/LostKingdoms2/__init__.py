@@ -233,10 +233,10 @@ class LostKingdoms2World(World):
                 victory_location = LK2Location(self.player, "Defeat the God of Harmony",self.multiworld.get_region("Royal Tower, Upper", self.player), None)
                 self.multiworld.get_region("Royal Tower, Upper", self.player).locations.append(victory_location)
             case 1:
-                victory_location = LK2Location(self.player, "Defeat the Emperor",self.multiworld.get_region("Proving Grounds", self.player), None)
-                self.multiworld.get_region("Proving Grounds", self.player).locations.append(victory_location)
+                victory_location = LK2Location(self.player, "Defeat the Emperor",self.multiworld.get_region("Proving Grounds F20", self.player), None)
+                self.multiworld.get_region("Proving Grounds F20", self.player).locations.append(victory_location)
             case 2:
-                victory_location = LK2Location(self.player, "Collect "+str(self.options.collect_red_fairies_amount.value)+" Red Fairies",self.multiworld.get_region("Proving Grounds", self.player), None)
+                victory_location = LK2Location(self.player, "Collect "+str(self.options.collect_red_fairies_amount.value)+" Red Fairies",self.multiworld.get_region("Menu", self.player), None)
                 self.multiworld.get_region("Menu", self.player).locations.append(victory_location)
                 victory_location.access_rule = lambda state: state.has("Red Fairy", self.player,self.options.collect_red_fairies_amount.value)
 
