@@ -837,6 +837,7 @@ lost_kingdoms_2_logic = {
 
     # Specific Card/Item Logic
     "flight_and_god": lambda state, p: state.has_any(lost_kingdoms_2_flying_cards, p) and state.has("God of Destruction", p),
+    "god": lambda state, p: state.has("God of Destruction", p),
     "hellhound_or_unicorn_and_god": lambda state, p: (state.has("Hell Hound", p) or state.has("Unicorn", p)) and state.has("God of Destruction", p),
     "hellhound_or_unicorn": lambda state, p: state.has("Hell Hound", p) or state.has("Unicorn", p),
     "hellhound_only": lambda state, p: state.has("Hell Hound", p),

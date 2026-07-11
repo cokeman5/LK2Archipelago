@@ -46,7 +46,7 @@ class EnemysanityConditionOption(Choice):
     Be warned that spawn triggers in this game are very unintuitive, hidden, and
     once a level is beaten it will have new enemy spawns. Please report any issue you encounter.
     Enemysanity Plus includes all the enemies in the Proving Grounds.
-    +540 locations. Enemysanity Plus: additional +405"""
+    +547 locations. Enemysanity Plus: additional +405"""
     display_name = "Enemysanity"
     option_disabled = 0
     option_enemysanity = 1

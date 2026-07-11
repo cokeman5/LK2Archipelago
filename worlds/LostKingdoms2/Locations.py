@@ -671,10 +671,10 @@ lost_kingdoms_2_enemies = {
     "Nobleman's Residence - Enemysanity - Dark Raven #4" : {"level" : "Nobleman's Residence","RAMAddress" : "80224728", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 11},
 
     #Require Mysterious Key
-    "Nobleman's Residence - Enemysanity - Hell Hound #2" : {"level" : "Nobleman's Residence","RAMAddress" : "80224c78", "type" : "Enemysanity", 'missable': 0, 'rule': "mysterious_key", "currentState": 0, "group": 6},
-    "Nobleman's Residence - Enemysanity - Incubus #2" : {"level" : "Nobleman's Residence","RAMAddress" : "802254f8", "type" : "Enemysanity", 'missable': 0, 'rule': "mysterious_key", "currentState": 0, "group": 6},
-    "Nobleman's Residence - Enemysanity - Hell Hound #3" : {"level" : "Nobleman's Residence","RAMAddress" : "802254f8", "type" : "Enemysanity", 'missable': 0, 'rule': "mysterious_key", "currentState": 0, "group": 6},
-    "Nobleman's Residence - Enemysanity - Succubus #2" : {"level" : "Nobleman's Residence","RAMAddress" : "802254f8", "type" : "Enemysanity", 'missable': 0, 'rule': "mysterious_key", "currentState": 0, "group": 6},
+    "Nobleman's Residence - Enemysanity - Hell Hound #2" : {"level" : "Nobleman's Residence","RAMAddress" : "80224c78", "type" : "Enemysanity", 'missable': 1, 'rule': "mysterious_key", "currentState": 0, "group": 6},
+    "Nobleman's Residence - Enemysanity - Incubus #2" : {"level" : "Nobleman's Residence","RAMAddress" : "802254f8", "type" : "Enemysanity", 'missable': 1, 'rule': "mysterious_key", "currentState": 0, "group": 6},
+    "Nobleman's Residence - Enemysanity - Hell Hound #3" : {"level" : "Nobleman's Residence","RAMAddress" : "802254f8", "type" : "Enemysanity", 'missable': 1, 'rule': "mysterious_key", "currentState": 0, "group": 6},
+    "Nobleman's Residence - Enemysanity - Succubus #2" : {"level" : "Nobleman's Residence","RAMAddress" : "802254f8", "type" : "Enemysanity", 'missable': 1, 'rule': "mysterious_key", "currentState": 0, "group": 6},
     "Nobleman's Residence - Enemysanity - Incubus #3" : {"level" : "Nobleman's Residence","RAMAddress" : "802251c8", "type" : "Enemysanity", 'missable': 0, 'rule': "mysterious_key", "currentState": 0, "group": 3},
     "Nobleman's Residence - Enemysanity - Succubus #3" : {"level" : "Nobleman's Residence","RAMAddress" : "80224fa8", "type" : "Enemysanity", 'missable': 0, 'rule': "mysterious_key", "currentState": 0, "group": 7},
     "Nobleman's Residence - Enemysanity - Incubus #4" : {"level" : "Nobleman's Residence","RAMAddress" : "802250b8", "type" : "Enemysanity", 'missable': 0, 'rule': "mysterious_key", "currentState": 0, "group": 7},
@@ -749,9 +749,9 @@ lost_kingdoms_2_enemies = {
     "Runestone Caverns - Upper Chambers - Enemysanity - Crystal Rose #8" : {"level" : "Runestone Caverns - Upper Chambers","RAMAddress" : "80226928", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 14},
 
     #Requires Stone Golem
-    "Runestone Caverns - Upper Chambers - Enemysanity - UberBomberBot #1" : {"level" : "Runestone Caverns - Upper Chambers","RAMAddress" : "80224728", "type" : "Enemysanity", 'missable': 0, 'rule': "golem_only", "currentState": 0, "group": 16},
+    "Runestone Caverns - Upper Chambers - Enemysanity - UberBomberBot #1" : {"level" : "Runestone Caverns - Upper Chambers","RAMAddress" : "80224618", "type" : "Enemysanity", 'missable': 0, 'rule': "golem_only", "currentState": 0, "group": 16},
     "Runestone Caverns - Upper Chambers - Enemysanity - UberBomberBot #2" : {"level" : "Runestone Caverns - Upper Chambers","RAMAddress" : "802242e8", "type" : "Enemysanity", 'missable': 0, 'rule': "golem_only", "currentState": 0, "group": 16},
-    "Runestone Caverns - Upper Chambers - Enemysanity - UberBomberBot #3" : {"level" : "Runestone Caverns - Upper Chambers","RAMAddress" : "80224618", "type" : "Enemysanity", 'missable': 0, 'rule': "golem_only", "currentState": 0, "group": 3},
+    "Runestone Caverns - Upper Chambers - Enemysanity - UberBomberBot #3" : {"level" : "Runestone Caverns - Upper Chambers","RAMAddress" : "80224728", "type" : "Enemysanity", 'missable': 0, 'rule': "golem_only", "currentState": 0, "group": 3},
     "Runestone Caverns - Upper Chambers - Enemysanity - Land Shark #10" : {"level" : "Runestone Caverns - Upper Chambers","RAMAddress" : "80224b68", "type" : "Enemysanity", 'missable': 0, 'rule': "golem_only", "currentState": 0, "group": 12},
     "Runestone Caverns - Upper Chambers - Enemysanity - Land Shark #11" : {"level" : "Runestone Caverns - Upper Chambers","RAMAddress" : "80224c78", "type" : "Enemysanity", 'missable': 0, 'rule': "golem_only", "currentState": 0, "group": 12},
     "Runestone Caverns - Upper Chambers - Enemysanity - Land Shark #12" : {"level" : "Runestone Caverns - Upper Chambers","RAMAddress" : "802265f8", "type" : "Enemysanity", 'missable': 0, 'rule': "golem_only", "currentState": 0, "group": 7},
@@ -779,7 +779,7 @@ lost_kingdoms_2_enemies = {
     "Runestone Caverns - Lower Chambers - Enemysanity - Flayer Spawn #6" : {"level" : "Runestone Caverns - Lower Chambers","RAMAddress" : "80228198", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 8},
     "Runestone Caverns - Lower Chambers - Enemysanity - Flayer Spawn #7" : {"level" : "Runestone Caverns - Lower Chambers","RAMAddress" : "802253e8", "type" : "Enemysanity", 'missable': 1, "currentState": 0, "group": 13},
     "Runestone Caverns - Lower Chambers - Enemysanity - Flayer Spawn #8" : {"level" : "Runestone Caverns - Lower Chambers","RAMAddress" : "802254f8", "type" : "Enemysanity", 'missable': 1, "currentState": 0, "group": 14},
-    "Runestone Caverns - Lower Chambers - Enemysanity - Body of the God #1" : {"level" : "Runestone Caverns - Lower Chambers","RAMAddress" : "80223ea8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 15},
+    #"Runestone Caverns - Lower Chambers - Enemysanity - Body of the God #1" : {"level" : "Runestone Caverns - Lower Chambers","RAMAddress" : "80223ea8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 15},
 
     "Runestone Caverns - Lower Chambers - Enemysanity - Flayer Spawn #9" : {"level" : "Runestone Caverns - Lower Chambers","RAMAddress" : "802261b8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 12},
     "Runestone Caverns - Lower Chambers - Enemysanity - Water Reaper #2" : {"level" : "Runestone Caverns - Lower Chambers","RAMAddress" : "802262c8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 12},
@@ -798,6 +798,15 @@ lost_kingdoms_2_enemies = {
     "Runestone Caverns - Lower Chambers - Enemysanity - Water Reaper #7" : {"level" : "Runestone Caverns - Lower Chambers","RAMAddress" : "80227f78", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 7},
     "Runestone Caverns - Lower Chambers - Enemysanity - Yowie #13" : {"level" : "Runestone Caverns - Lower Chambers","RAMAddress" : "802252d8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 11},
     "Runestone Caverns - Lower Chambers - Enemysanity - Flayer Spawn #12" : {"level" : "Runestone Caverns - Lower Chambers","RAMAddress" : "80225828", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 11},
+    "Runestone Caverns - Lower Chambers - Enemysanity - Flayer Spawn #13" : {"level" : "Runestone Caverns - Lower Chambers","RAMAddress" : "80224c78", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 16},
+    "Runestone Caverns - Lower Chambers - Enemysanity - Water Reaper #8" : {"level" : "Runestone Caverns - Lower Chambers","RAMAddress" : "80224a58", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 16},
+    "Runestone Caverns - Lower Chambers - Enemysanity - Water Reaper #9" : {"level" : "Runestone Caverns - Lower Chambers","RAMAddress" : "80224b68", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 16},
+    "Runestone Caverns - Lower Chambers - Enemysanity - Yowie #14" : {"level" : "Runestone Caverns - Lower Chambers","RAMAddress" : "802264e8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 17},
+    "Runestone Caverns - Lower Chambers - Enemysanity - Yowie #15" : {"level" : "Runestone Caverns - Lower Chambers","RAMAddress" : "802265f8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 17},
+    "Runestone Caverns - Lower Chambers - Enemysanity - Yowie #16" : {"level" : "Runestone Caverns - Lower Chambers","RAMAddress" : "80226708", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 17},
+    "Runestone Caverns - Lower Chambers - Enemysanity - Yowie #17" : {"level" : "Runestone Caverns - Lower Chambers","RAMAddress" : "80226818", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 17},
+    "Runestone Caverns - Lower Chambers - Enemysanity - Yowie #18" : {"level" : "Runestone Caverns - Lower Chambers","RAMAddress" : "80226928", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 17},
+
 
     "Ruldo Forest - Enemysanity - Elf #1" : {"level" : "Ruldo Forest","RAMAddress" : "80224508", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 1},
     "Ruldo Forest - Enemysanity - Elf #2" : {"level" : "Ruldo Forest","RAMAddress" : "802243f8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 1},
@@ -816,6 +825,7 @@ lost_kingdoms_2_enemies = {
     "Ruldo Forest - Enemysanity - Myconid #1" : {"level" : "Ruldo Forest","RAMAddress" : "80224c78", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 8},
     "Ruldo Forest - Enemysanity - Demon Hound #9" : {"level" : "Ruldo Forest","RAMAddress" : "802253e8", "type" : "Enemysanity", 'missable': 1, "currentState": 0, "group": 13},
     "Ruldo Forest - Enemysanity - Demon Hound #10" : {"level" : "Ruldo Forest","RAMAddress" : "802254f8", "type" : "Enemysanity", 'missable': 1, "currentState": 0, "group": 13},
+    "Ruldo Forest - Enemysanity - Elf #8" : {"level" : "Ruldo Forest","RAMAddress" : "80225608", "type" : "Enemysanity", 'missable': 1, "currentState": 0, "group": 13},
 
     "Ruldo Forest - Enemysanity - Cockatrice #1" : {"level" : "Ruldo Forest","RAMAddress" : "80223fb8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 10},
     "Ruldo Forest - Enemysanity - Cockatrice #2" : {"level" : "Ruldo Forest","RAMAddress" : "802240c8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 10},
@@ -854,8 +864,8 @@ lost_kingdoms_2_enemies = {
     "Fossil Boneyard - Enemysanity - Baby Dragon #5" : {"level" : "Fossil Boneyard","RAMAddress" : "802242e8", "type" : "Enemysanity", 'missable': 0, 'rule': "jump_and_boosters", "currentState": 0, "group": 9},
     "Fossil Boneyard - Enemysanity - Baby Dragon #6" : {"level" : "Fossil Boneyard","RAMAddress" : "80224508", "type" : "Enemysanity", 'missable': 0, 'rule': "jump_and_boosters", "currentState": 0, "group": 9},
     "Fossil Boneyard - Enemysanity - Baby Dragon #7" : {"level" : "Fossil Boneyard","RAMAddress" : "802243f8", "type" : "Enemysanity", 'missable': 0, 'rule': "jump_and_boosters", "currentState": 0, "group": 13},
-    "Fossil Boneyard - Enemysanity - Baby Dragon #8" : {"level" : "Fossil Boneyard","RAMAddress" : "80224618", "type" : "Enemysanity", 'missable': 0, 'rule': "jump_and_boosters", "currentState": 0, "group": 13},
-    "Fossil Boneyard - Enemysanity - Baby Dragon #9" : {"level" : "Fossil Boneyard","RAMAddress" : "80224728", "type" : "Enemysanity", 'missable': 0, 'rule': "jump_and_boosters", "currentState": 0, "group": 13},
+    "Fossil Boneyard - Enemysanity - Baby Dragon #8" : {"level" : "Fossil Boneyard","RAMAddress" : "80224618", "type" : "Enemysanity", 'missable': 0, 'rule': "jump_and_boosters", "currentState": 0, "group": 17},
+    "Fossil Boneyard - Enemysanity - Baby Dragon #9" : {"level" : "Fossil Boneyard","RAMAddress" : "80224728", "type" : "Enemysanity", 'missable': 0, 'rule': "jump_and_boosters", "currentState": 0, "group": 18},
     "Fossil Boneyard - Enemysanity - Amber Dragon #1" : {"level" : "Fossil Boneyard","RAMAddress" : "80224a58", "type" : "Enemysanity", 'missable': 0, 'rule': "jump_and_boosters", "currentState": 0, "group": 14},
     "Fossil Boneyard - Enemysanity - Gnome #5" : {"level" : "Fossil Boneyard","RAMAddress" : "80225d78", "type" : "Enemysanity", 'missable': 1, 'rule': "jump_and_boosters", "currentState": 0, "group": 11},
 
@@ -863,7 +873,7 @@ lost_kingdoms_2_enemies = {
 
     #Requires Hell Hound
     "Fossil Boneyard - Enemysanity - Gnome #6" : {"level" : "Fossil Boneyard","RAMAddress" : "80225608", "type" : "Enemysanity", 'missable': 0, 'rule': "hellhound_or_unicorn_and_booster_and_jumper", "currentState": 0, "group": 12},
-    "Fossil Boneyard - Enemysanity - Catoblepas #3" : {"level" : "Fossil Boneyard","RAMAddress" : "80225e88", "type" : "Enemysanity", 'missable': 0, 'rule': "hellhound_or_unicorn_and_booster_and_jumper", "currentState": 0, "group": 11},
+    "Fossil Boneyard - Enemysanity - Catoblepas #3" : {"level" : "Fossil Boneyard","RAMAddress" : "80225e88", "type" : "Enemysanity", 'missable': 0, 'rule': "hellhound_or_unicorn_and_booster_and_jumper", "currentState": 0, "group": 17},
 
     "Sarvan - Enemysanity - Evil Eye #1" : {"level" : "Sarvan","RAMAddress" : "80224618", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 1},
     "Sarvan - Enemysanity - Jade Giant #1" : {"level" : "Sarvan","RAMAddress" : "802242e8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 2},
@@ -886,9 +896,9 @@ lost_kingdoms_2_enemies = {
     "Sarvan - Enemysanity - Jade Giant #9" : {"level" : "Sarvan","RAMAddress" : "802241d8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 11},
     "Sarvan - Enemysanity - Chimera #1" : {"level" : "Sarvan","RAMAddress" : "80223fb8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 11},
 
-    "Sarvan - Enemysanity - Jade Giant #10" : {"level" : "Sarvan","RAMAddress" : "80225b58", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 10},
-    "Sarvan - Enemysanity - Gold Butterfly #3" : {"level" : "Sarvan","RAMAddress" : "80225a48", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 10},
-    "Sarvan - Enemysanity - Siren #4" : {"level" : "Sarvan","RAMAddress" : "80225938", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 10},
+    "Sarvan - Enemysanity - Jade Giant #10" : {"level" : "Sarvan","RAMAddress" : "80225b58", "type" : "Enemysanity", 'missable': 1, "currentState": 0, "group": 10},
+    "Sarvan - Enemysanity - Gold Butterfly #3" : {"level" : "Sarvan","RAMAddress" : "80225a48", "type" : "Enemysanity", 'missable': 1, "currentState": 0, "group": 10},
+    "Sarvan - Enemysanity - Siren #4" : {"level" : "Sarvan","RAMAddress" : "80225938", "type" : "Enemysanity", 'missable': 1, "currentState": 0, "group": 10},
 
     "Holzogh Town - Enemysanity - Aggressor DX5 #1" : {"level" : "Holzogh Town","RAMAddress" : "80224948", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 7},
     "Holzogh Town - Enemysanity - Aggressor DX5 #2" : {"level" : "Holzogh Town","RAMAddress" : "80224838", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 7},
@@ -903,6 +913,8 @@ lost_kingdoms_2_enemies = {
     "Holzogh Town - Enemysanity - TriBlaster #1" : {"level" : "Holzogh Town","RAMAddress" : "80223ea8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 10},
     "Holzogh Town - Enemysanity - TriBlaster #2" : {"level" : "Holzogh Town","RAMAddress" : "80223fb8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 10},
     "Holzogh Town - Enemysanity - LazerBug 39K #1" : {"level" : "Holzogh Town","RAMAddress" : "802240c8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 10},
+    "Holzogh Town - Enemysanity - Aggressor DX5 #15" : {"level" : "Holzogh Town","RAMAddress" : "80224e98", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 11},
+    "Holzogh Town - Enemysanity - TriBlaster #4" : {"level" : "Holzogh Town","RAMAddress" : "80224d88", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 11},
 
     "Holzogh Town - Enemysanity - Aggressor DX5 #9" : {"level" : "Holzogh Town","RAMAddress" : "80224b68", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 1},
     "Holzogh Town - Enemysanity - Super Scrubber #1" : {"level" : "Holzogh Town","RAMAddress" : "80224a58", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 1},
@@ -986,13 +998,13 @@ lost_kingdoms_2_enemies = {
     "Royal Tower, Lower - Enemysanity - LazerBug 39K #1" : {"level" : "Royal Tower, Lower","RAMAddress" : "80223ea8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 1},
     "Royal Tower, Lower - Enemysanity - LazerBug 39K #2" : {"level" : "Royal Tower, Lower","RAMAddress" : "80223fb8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 1},
 
-    "Royal Tower, Lower - Enemysanity - LazerBug 39K #3" : {"level" : "Royal Tower, Lower","RAMAddress" : "802240c8", "type" : "Enemysanity", 'missable': 1, "currentState": 0, "group": 2},
-    "Royal Tower, Lower - Enemysanity - Aggressor DX5 #1" : {"level" : "Royal Tower, Lower","RAMAddress" : "80224fa8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 3},
-    "Royal Tower, Lower - Enemysanity - Aggressor DX5 #2" : {"level" : "Royal Tower, Lower","RAMAddress" : "802250b8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 3},
-    "Royal Tower, Lower - Enemysanity - LazerBug 39K #4" : {"level" : "Royal Tower, Lower","RAMAddress" : "80224e98", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 4},
-    "Royal Tower, Lower - Enemysanity - Aggressor DX5 #3" : {"level" : "Royal Tower, Lower","RAMAddress" : "80224c78", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 4},
-    "Royal Tower, Lower - Enemysanity - Aggressor DX5 #4" : {"level" : "Royal Tower, Lower","RAMAddress" : "80224d88", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 4},
-    "Royal Tower, Lower - Enemysanity - LazerBug 39K #5" : {"level" : "Royal Tower, Lower","RAMAddress" : "80225828", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 5},
+    "Royal Tower, Lower - Enemysanity - LazerBug 39K #3" : {"level" : "Royal Tower, Lower","RAMAddress" : "802240c8", "type" : "Enemysanity", 'missable': 1,'rule': "god", "currentState": 0, "group": 2},
+    "Royal Tower, Lower - Enemysanity - Aggressor DX5 #1" : {"level" : "Royal Tower, Lower","RAMAddress" : "80224fa8", "type" : "Enemysanity", 'missable': 0,'rule': "god", "currentState": 0, "group": 3},
+    "Royal Tower, Lower - Enemysanity - Aggressor DX5 #2" : {"level" : "Royal Tower, Lower","RAMAddress" : "802250b8", "type" : "Enemysanity", 'missable': 0,'rule': "god", "currentState": 0, "group": 3},
+    "Royal Tower, Lower - Enemysanity - LazerBug 39K #4" : {"level" : "Royal Tower, Lower","RAMAddress" : "80224e98", "type" : "Enemysanity", 'missable': 0,'rule': "flight_and_god", "currentState": 0, "group": 4},
+    "Royal Tower, Lower - Enemysanity - Aggressor DX5 #3" : {"level" : "Royal Tower, Lower","RAMAddress" : "80224c78", "type" : "Enemysanity", 'missable': 0,'rule': "flight_and_god", "currentState": 0, "group": 4},
+    "Royal Tower, Lower - Enemysanity - Aggressor DX5 #4" : {"level" : "Royal Tower, Lower","RAMAddress" : "80224d88", "type" : "Enemysanity", 'missable': 0,'rule': "flight_and_god", "currentState": 0, "group": 4},
+    "Royal Tower, Lower - Enemysanity - LazerBug 39K #5" : {"level" : "Royal Tower, Lower","RAMAddress" : "80225828", "type" : "Enemysanity", 'missable': 0,'rule': "god", "currentState": 0, "group": 5},
 
     #Does not require flying
     "Krasheen Mountains - Enemysanity - Gargoyle #1" : {"level" : "Krasheen Mountains","RAMAddress" : "802242e8", "type" : "Enemysanity", 'missable': 1, "currentState": 0, "group": 1},
@@ -1045,7 +1057,7 @@ lost_kingdoms_2_enemies = {
     "Temple of Sharacia - Enemysanity - Fire Gargoyle #2" : {"level" : "Temple of Sharacia","RAMAddress" : "80224838", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 2},
     "Temple of Sharacia - Enemysanity - Cerberus #1" : {"level" : "Temple of Sharacia","RAMAddress" : "80224a58", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 3},
     "Temple of Sharacia - Enemysanity - Cerberus #2" : {"level" : "Temple of Sharacia","RAMAddress" : "80224e98", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 3},
-    "Temple of Sharacia - Enemysanity - Fire Elemental #1" : {"level" : "Temple of Sharacia","RAMAddress" : "802254f8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 7},
+    "Temple of Sharacia - Enemysanity - Fire Elemental #1" : {"level" : "Temple of Sharacia","RAMAddress" : "802254f8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 16},
     "Temple of Sharacia - Enemysanity - Efreet #3" : {"level" : "Temple of Sharacia","RAMAddress" : "80224c78", "type" : "Enemysanity", 'missable': 1, "currentState": 0, "group": 4},
     "Temple of Sharacia - Enemysanity - Efreet #4" : {"level" : "Temple of Sharacia","RAMAddress" : "80224d88", "type" : "Enemysanity", 'missable': 1, "currentState": 0, "group": 4},
     "Temple of Sharacia - Enemysanity - Red Dragon #1" : {"level" : "Temple of Sharacia","RAMAddress" : "80224b68", "type" : "Enemysanity", 'missable': 1, "currentState": 0, "group": 4},
@@ -1134,6 +1146,7 @@ lost_kingdoms_2_enemies = {
     "Isamat Urbur - Enemysanity - Devata #4" : {"level" : "Isamat Urbur","RAMAddress" : "80225608", "type" : "Enemysanity", 'missable': 0, 'rule': "all_runestones", "currentState": 0, "group": 8},
     "Isamat Urbur - Enemysanity - Juggernaut #4" : {"level" : "Isamat Urbur","RAMAddress" : "80224d88", "type" : "Enemysanity", 'missable': 0, 'rule': "all_runestones", "currentState": 0, "group": 9},
     "Isamat Urbur - Enemysanity - Juggernaut #5" : {"level" : "Isamat Urbur","RAMAddress" : "80224e98", "type" : "Enemysanity", 'missable': 0, 'rule': "all_runestones", "currentState": 0, "group": 9},
+    "Isamat Urbur - Enemysanity - Puppet Master #6" : {"level" : "Isamat Urbur","RAMAddress" : "80224c78", "type" : "Enemysanity", 'missable': 0, 'rule': "all_runestones", "currentState": 0, "group": 9},
     "Isamat Urbur - Enemysanity - Devata #5" : {"level" : "Isamat Urbur","RAMAddress" : "802252d8", "type" : "Enemysanity", 'missable': 0, 'rule': "all_runestones", "currentState": 0, "group": 3},
     "Isamat Urbur - Enemysanity - Devata #6" : {"level" : "Isamat Urbur","RAMAddress" : "802251c8", "type" : "Enemysanity", 'missable': 0, 'rule': "all_runestones", "currentState": 0, "group": 7},
     "Isamat Urbur - Enemysanity - Devata #7" : {"level" : "Isamat Urbur","RAMAddress" : "802250b8", "type" : "Enemysanity", 'missable': 0, 'rule': "all_runestones", "currentState": 0, "group": 7},
@@ -1161,8 +1174,8 @@ lost_kingdoms_2_enemies = {
     "Gromtull Desert - Enemysanity - Pixie #1" : {"level" : "Gromtull Desert","RAMAddress" : "80224508", "type" : "Enemysanity", 'missable': 1, "currentState": 0, "group": 11},
     "Gromtull Desert - Enemysanity - Mummy #6" : {"level" : "Gromtull Desert","RAMAddress" : "80224618", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 9},
     "Gromtull Desert - Enemysanity - Mummy #7" : {"level" : "Gromtull Desert","RAMAddress" : "80224728", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 9},
-    "Gromtull Desert - Enemysanity - Mummy #8" : {"level" : "Gromtull Desert","RAMAddress" : "80224948", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 9},
-    "Gromtull Desert - Enemysanity - Mummy #9" : {"level" : "Gromtull Desert","RAMAddress" : "80224a58", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 9},
+    "Gromtull Desert - Enemysanity - Mummy #8" : {"level" : "Gromtull Desert","RAMAddress" : "80224948", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 14},
+    "Gromtull Desert - Enemysanity - Mummy #9" : {"level" : "Gromtull Desert","RAMAddress" : "80224a58", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 14},
 
     #Needs black liquid
     "Gromtull Desert - Enemysanity - Sand Beetle #4" : {"level" : "Gromtull Desert","RAMAddress" : "80223ea8", "type" : "Enemysanity", 'missable': 0, 'rule': "black_liquid_only", "currentState": 0, "group": 1},
@@ -1170,6 +1183,10 @@ lost_kingdoms_2_enemies = {
     "Gromtull Desert - Enemysanity - Sand Beetle #5" : {"level" : "Gromtull Desert","RAMAddress" : "80223fb8", "type" : "Enemysanity", 'missable': 0, 'rule': "black_liquid_only", "currentState": 0, "group": 12},
     "Gromtull Desert - Enemysanity - Pixie #2" : {"level" : "Gromtull Desert","RAMAddress" : "802240c8", "type" : "Enemysanity", 'missable': 0, 'rule': "black_liquid_only", "currentState": 0, "group": 12},
     "Gromtull Desert - Enemysanity - Sand Worm #1" : {"level" : "Gromtull Desert","RAMAddress" : "802251c8", "type" : "Enemysanity", 'missable': 0, 'rule': "black_liquid_only", "currentState": 0, "group": 13},
+    "Gromtull Desert - Enemysanity - Mummy #10" : {"level" : "Gromtull Desert","RAMAddress" : "802260a8", "type" : "Enemysanity", 'missable': 0, 'rule': "black_liquid_only", "currentState": 0, "group": 15},
+    "Gromtull Desert - Enemysanity - Mummy #11" : {"level" : "Gromtull Desert","RAMAddress" : "802261b8", "type" : "Enemysanity", 'missable': 0, 'rule': "black_liquid_only", "currentState": 0, "group": 15},
+    "Gromtull Desert - Enemysanity - Sand Beetle #6" : {"level" : "Gromtull Desert","RAMAddress" : "80224b68", "type" : "Enemysanity", 'missable': 0, 'rule': "black_liquid_only", "currentState": 0, "group": 16},
+    "Gromtull Desert - Enemysanity - Pixie #3" : {"level" : "Gromtull Desert","RAMAddress" : "802254f8", "type" : "Enemysanity", 'missable': 0, 'rule': "black_liquid_only", "currentState": 0, "group": 16},
 
     "Obenoix Gorge - Enemysanity - Vodianoi #1" : {"level" : "Obenoix Gorge","RAMAddress" : "80224508", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 1},
     "Obenoix Gorge - Enemysanity - Vodianoi #2" : {"level" : "Obenoix Gorge","RAMAddress" : "80224618", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 1},
@@ -1205,13 +1222,13 @@ lost_kingdoms_2_enemies = {
     #Need flight
     "Obenoix Gorge - Enemysanity - Water Elemental #3" : {"level" : "Obenoix Gorge","RAMAddress" : "80226928", "type" : "Enemysanity", 'missable': 0, 'rule': "flight_only", "currentState": 0, "group": 11},
 
-    "Royal Tower, Middle - Enemysanity - Ice Golem #1" : {"level" : "Royal Tower, Middle","RAMAddress" : "80224728", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 1},
-    "Royal Tower, Middle - Enemysanity - Demon Fox #1" : {"level" : "Royal Tower, Middle","RAMAddress" : "80223fb8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 2},
+    "Royal Tower, Middle - Enemysanity - Ice Golem #1" : {"level" : "Royal Tower, Middle","RAMAddress" : "80224728", "type" : "Enemysanity", 'missable': 1, "currentState": 0, "group": 1},
+    "Royal Tower, Middle - Enemysanity - Demon Fox #1" : {"level" : "Royal Tower, Middle","RAMAddress" : "80223fb8", "type" : "Enemysanity", 'missable': 1, "currentState": 0, "group": 2},
     "Royal Tower, Middle - Enemysanity - Aggressor DX5 #1" : {"level" : "Royal Tower, Middle","RAMAddress" : "802240c8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 3},
     "Royal Tower, Middle - Enemysanity - Aggressor DX5 #2" : {"level" : "Royal Tower, Middle","RAMAddress" : "802241d8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 3},
     "Royal Tower, Middle - Enemysanity - Aggressor DX5 #3" : {"level" : "Royal Tower, Middle","RAMAddress" : "802242e8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 3},
     "Royal Tower, Middle - Enemysanity - Beelzebub #1" : {"level" : "Royal Tower, Middle","RAMAddress" : "802243f8", "type" : "Enemysanity", 'missable': 1, "currentState": 0, "group": 4},
-    "Royal Tower, Middle - Enemysanity - Behemoth #1" : {"level" : "Royal Tower, Middle","RAMAddress" : "80224508", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 5},
+    "Royal Tower, Middle - Enemysanity - Behemoth #1" : {"level" : "Royal Tower, Middle","RAMAddress" : "80224508", "type" : "Enemysanity", 'missable': 1, "currentState": 0, "group": 5},
     "Royal Tower, Middle - Enemysanity - Fenril #1" : {"level" : "Royal Tower, Middle","RAMAddress" : "80224618", "type" : "Enemysanity", 'missable': 1, "currentState": 0, "group": 6},
     "Royal Tower, Middle - Enemysanity - Leod VIII #1" : {"level" : "Royal Tower, Middle","RAMAddress" : "80223ea8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 7},
 
@@ -1233,24 +1250,16 @@ lost_kingdoms_2_enemies = {
     "Royal Tower, Middle - Enemysanity - Aggressor DX5 #19" : {"level" : "Royal Tower, Middle","RAMAddress" : "802250b8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 12},
 
     "Royal Tower, Upper - Enemysanity - Sphinx #1" : {"level" : "Royal Tower, Upper","RAMAddress" : "80223fb8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 1},
-    "Royal Tower, Upper - Enemysanity - Tentacle #1" : {"level" : "Royal Tower, Upper","RAMAddress" : "80224508", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 2},
-    "Royal Tower, Upper - Enemysanity - Tentacle #2" : {"level" : "Royal Tower, Upper","RAMAddress" : "80224618", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 2},
     "Royal Tower, Upper - Enemysanity - Wyvern #1" : {"level" : "Royal Tower, Upper","RAMAddress" : "80224948", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 2},
-    "Royal Tower, Upper - Enemysanity - Tentacle #3" : {"level" : "Royal Tower, Upper","RAMAddress" : "80224728", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 3},
     "Royal Tower, Upper - Enemysanity - Wyvern #2" : {"level" : "Royal Tower, Upper","RAMAddress" : "80224a58", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 3},
     "Royal Tower, Upper - Enemysanity - Wyvern #3" : {"level" : "Royal Tower, Upper","RAMAddress" : "80224b68", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 3},
-    "Royal Tower, Upper - Enemysanity - Tentacle #4" : {"level" : "Royal Tower, Upper","RAMAddress" : "80224838", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 3},
-    "Royal Tower, Upper - Enemysanity - Tentacle #5" : {"level" : "Royal Tower, Upper","RAMAddress" : "802240c8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 4},
-    "Royal Tower, Upper - Enemysanity - Tentacle #6" : {"level" : "Royal Tower, Upper","RAMAddress" : "802242e8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 4},
-    "Royal Tower, Upper - Enemysanity - Tentacle #7" : {"level" : "Royal Tower, Upper","RAMAddress" : "802243f8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 4},
-    "Royal Tower, Upper - Enemysanity - Tentacle #8" : {"level" : "Royal Tower, Upper","RAMAddress" : "802241d8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 4},
     "Royal Tower, Upper - Enemysanity - God of Harmony #1" : {"level" : "Royal Tower, Upper","RAMAddress" : "80223ea8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 4},
 
     "Proving Grounds F1 - Enemysanity - Berserker #1" : {"level" : "Proving Grounds F1","RAMAddress" : "80224a58", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 1},
     "Proving Grounds F1  - Enemysanity - Berserker #2" : {"level" : "Proving Grounds F1","RAMAddress" : "80224b68", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 1},
     "Proving Grounds F1  - Enemysanity - Scythe Beast #1" : {"level" : "Proving Grounds F1","RAMAddress" : "80224e98", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 1},
     "Proving Grounds F1  - Enemysanity - Will 'o wisp #1" : {"level" : "Proving Grounds F1","RAMAddress" : "80224c78", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 1},
-    "Proving Grounds F1  - Enemysanity - Manta Ray #1" : {"level" : "Proving Grounds F1","RAMAddress" : "80224fa8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 1},
+    "Proving Grounds F1  - Enemysanity - Flying Ray #1" : {"level" : "Proving Grounds F1","RAMAddress" : "80224fa8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 1},
     "Proving Grounds F1  - Enemysanity - Scythe Beast #2" : {"level" : "Proving Grounds F1","RAMAddress" : "802250b8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 2},
     "Proving Grounds F1  - Enemysanity - Scythe Beast #3" : {"level" : "Proving Grounds F1","RAMAddress" : "802251c8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 2},
     "Proving Grounds F1  - Enemysanity - Berserk Master #1" : {"level" : "Proving Grounds F1","RAMAddress" : "802253e8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 3},
@@ -1266,7 +1275,7 @@ lost_kingdoms_2_enemies = {
     "Proving Grounds F1  - Enemysanity - Berserk Master #4" : {"level" : "Proving Grounds F1","RAMAddress" : "80223fb8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 7},
     "Proving Grounds F1  - Enemysanity - Berserker #5" : {"level" : "Proving Grounds F1","RAMAddress" : "80224508", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 8},
     "Proving Grounds F1  - Enemysanity - Scythe Beast #5" : {"level" : "Proving Grounds F1","RAMAddress" : "80224618", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 8},
-    "Proving Grounds F1  - Enemysanity - Manta Ray #2" : {"level" : "Proving Grounds F1","RAMAddress" : "80225608", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 9},
+    "Proving Grounds F1  - Enemysanity - Flying Ray #2" : {"level" : "Proving Grounds F1","RAMAddress" : "80225608", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 9},
     "Proving Grounds F1  - Enemysanity - Scythe Beast #4" : {"level" : "Proving Grounds F1","RAMAddress" : "802252d8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 9},
 
     "Proving Grounds F2  - Enemysanity - Treant #1" : {"level" : "Proving Grounds F2","RAMAddress" : "80224508", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 1},
@@ -1425,7 +1434,7 @@ lost_kingdoms_2_enemies = {
     "Proving Grounds F9  - Enemysanity - Caterpoker #1" : {"level" : "Proving Grounds F9","RAMAddress" : "80223ea8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 1},
     "Proving Grounds F9  - Enemysanity - Carbuncle #1" : {"level" : "Proving Grounds F9","RAMAddress" : "80223fb8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 1},
     "Proving Grounds F9  - Enemysanity - Acid Cloud #1" : {"level" : "Proving Grounds F9","RAMAddress" : "802240c8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 1},
-    "Proving Grounds F9  - Enemysanity - CircaSaurus #1" : {"level" : "Proving Grounds F9","RAMAddress" : "802241d8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 1},
+    "Proving Grounds F9  - Enemysanity - Circasaurus #1" : {"level" : "Proving Grounds F9","RAMAddress" : "802241d8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 1},
     "Proving Grounds F9  - Enemysanity - Carbuncle #2" : {"level" : "Proving Grounds F9","RAMAddress" : "80224508", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 2},
     "Proving Grounds F9  - Enemysanity - Acid Cloud #2" : {"level" : "Proving Grounds F9","RAMAddress" : "80224618", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 2},
     "Proving Grounds F9  - Enemysanity - Goblin Lord #1" : {"level" : "Proving Grounds F9","RAMAddress" : "80224728", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 2},
@@ -1433,12 +1442,12 @@ lost_kingdoms_2_enemies = {
     "Proving Grounds F9  - Enemysanity - Goblin Lord #2" : {"level" : "Proving Grounds F9","RAMAddress" : "80224d88", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 3},
     "Proving Grounds F9  - Enemysanity - Caterpoker #2" : {"level" : "Proving Grounds F9","RAMAddress" : "80224948", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 4},
     "Proving Grounds F9  - Enemysanity - Acid Cloud #3" : {"level" : "Proving Grounds F9","RAMAddress" : "80224a58", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 4},
-    "Proving Grounds F9  - Enemysanity - CircaSaurus #2" : {"level" : "Proving Grounds F9","RAMAddress" : "80224b68", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 4},
+    "Proving Grounds F9  - Enemysanity - Circasaurus #2" : {"level" : "Proving Grounds F9","RAMAddress" : "80224b68", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 4},
     "Proving Grounds F9  - Enemysanity - Carbuncle #4" : {"level" : "Proving Grounds F9","RAMAddress" : "80224fa8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 5},
     "Proving Grounds F9  - Enemysanity - Acid Cloud #4" : {"level" : "Proving Grounds F9","RAMAddress" : "802250b8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 5},
     "Proving Grounds F9  - Enemysanity - Caterpoker #3" : {"level" : "Proving Grounds F9","RAMAddress" : "802253e8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 6},
     "Proving Grounds F9  - Enemysanity - Goblin Lord #3" : {"level" : "Proving Grounds F9","RAMAddress" : "802251c8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 7},
-    "Proving Grounds F9  - Enemysanity - CircaSaurus #3" : {"level" : "Proving Grounds F9","RAMAddress" : "802252d8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 7},
+    "Proving Grounds F9  - Enemysanity - Circasaurus #3" : {"level" : "Proving Grounds F9","RAMAddress" : "802252d8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 7},
 
     "Proving Grounds F10  - Enemysanity - Panther Mage #1" : {"level" : "Proving Grounds F10","RAMAddress" : "80223ea8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 1},
     "Proving Grounds F10  - Enemysanity - Elf Lord #1" : {"level" : "Proving Grounds F10","RAMAddress" : "80223fb8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 1},

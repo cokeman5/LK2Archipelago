@@ -288,7 +288,7 @@ lost_kingdoms_2_jumping_cards = ["Hell Hound", "Cerberus", "Centaur"]
 #                                    "Kitty Trap", "Will 'o wisp", "Great Turtle", "Global Bust", "Super Pumper",
 #                                    "AcidBot", "Claws-R-Us", "Earth Elemental", "Fire Moray", "Water Moray", "Earth Moray"]
 
-#Adds 176 cards randomly to the pool, matching the amount of chest locations in the game.
+
 for key in lost_kingdoms_2_cards:
     lost_kingdoms_2_items[key] = {}
     lost_kingdoms_2_items[key]["Type"] = "Card"

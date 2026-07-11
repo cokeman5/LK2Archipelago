@@ -1,6 +1,6 @@
 """ Collection of commonly used constants for Lost Kingdoms 2. """
 
-CLIENT_VERSION = "V0.1.11"
+CLIENT_VERSION = "V0.1.12"
 CLIENT_NAME = "Lost Kingdoms 2 Client"
 
 AP_LOGGER_NAME = "Client"
