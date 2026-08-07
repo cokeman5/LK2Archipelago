@@ -1,15 +1,10 @@
 import os
-import random
-import threading
-import time
 import typing
-from dataclasses import fields
-from typing import Optional
+import random
 
-from worlds.generic.Rules import add_rule, set_rule, forbid_item, add_item_rule
+from worlds.generic.Rules import add_rule
 
 from BaseClasses import MultiWorld, LocationProgressType, CollectionState
-import logging
 from worlds.AutoWorld import WebWorld, World
 from .client.constants import AP_WORLD_VERSION_NAME, CLIENT_VERSION
 from .client.lostkingdoms2_settings import LostKingdoms2Settings
@@ -18,7 +13,11 @@ from ..LauncherComponents import launch_subprocess, components, Component, Suffi
 from .Items import *
 from .Locations import *
 from .LK2Options import *
-from .iso_helper.lk2_rom import LK2PlayerContainer
+from worlds.LostKingdoms2.lk2_rom import LK2PlayerContainer
+
+from .Patch_Mechanics import monster_database as db
+from .Patch_Mechanics.mechanic_cross_level_monster_loadingscreen import SWAPS, build_random_donor_mapping
+from .Locations import lost_kingdoms_2_enemies
 
 import logging
 
@@ -63,15 +62,13 @@ class LostKingdoms2World(World):
     item_name_to_id = {}
     for key in lost_kingdoms_2_items:
         if item_name_to_id.get(key, None) is None:
-            item_name_to_id[key] = lost_kingdoms_2_items[key]["id"]
-    globals()['item_name_to_id'] = location_name_to_id
+            item_name_to_id[key] = lost_kingdoms_2_items[key]["item_id"]
+    globals()['item_name_to_id'] = item_name_to_id
 
     location_name_to_id = {}
-    location_id = 1
-    for location in lost_kingdoms_2_locations:
-        if location_name_to_id.get(location, None) is None:
-            location_name_to_id[location] = location_id
-            location_id += 1
+    for key in lost_kingdoms_2_locations:
+        if location_name_to_id.get(key, None) is None:
+            location_name_to_id[key] = lost_kingdoms_2_locations[key]["location_id"]
     globals()['location_name_to_id'] = location_name_to_id
 
     def __init__(self, multiworld: MultiWorld, player: int):
@@ -121,6 +118,12 @@ class LostKingdoms2World(World):
         # Which items are added to the pool may depend on player options, e.g. custom win condition like triforce hunt.
         # Having an item in the start inventory won't remove it from the pool.
         # If you want to do that, use start_inventory_from_pool
+
+        for key in lost_kingdoms_2_items:
+            if item_name_to_id.get(key, None) is None:
+                item_name_to_id[key] = lost_kingdoms_2_items[key]["item_id"]
+        globals()['item_name_to_id'] = item_name_to_id
+
         match self.options.win_condition.value:
             case 0:
                 self.multiworld.get_location("Defeat the God of Harmony",self.player,).place_locked_item(LK2Item("Victory", ItemClassification.progression, None, self.player))
@@ -190,6 +193,7 @@ class LostKingdoms2World(World):
             return False
 
     def generate_early(self) -> None:
+
         re_gen_passthrough = getattr(self.multiworld, "re_gen_passthrough", {})
         logger.debug(f"re_gen_passthrough contents: {re_gen_passthrough}")
         logger.debug(f"self.game = {self.game!r}")
@@ -654,7 +658,10 @@ class LostKingdoms2World(World):
             "randomize_levels": self.options.randomize_levels.value,
             "progressive_leveling": self.options.progressive_leveling.value,
             "progressive_attribute_proficiencies":self.options.progressive_attribute_proficiencies.value,
-            "level_randomization_mapping": level_ordering
+            "level_randomization_mapping": level_ordering,
+            "character_model": self.options.character_model.value,
+            "randomize_enemies": self.options.randomize_enemies.value,
+            "randomize_level_music": self.options.randomize_level_music.value,
         }
 
     #This function exists for universal tracker to align the rng
@@ -714,6 +721,9 @@ class LostKingdoms2World(World):
             "randomize_levels": self.options.randomize_levels.value,
             "progressive_leveling": self.options.progressive_leveling.value,
             "progressive_attribute_proficiencies":self.options.progressive_attribute_proficiencies.value,
+            "character_model":self.options.character_model.value,
+            "randomize_enemies":self.options.randomize_enemies.value,
+            "randomize_level_music":self.options.randomize_level_music.value,
             AP_WORLD_VERSION_NAME: CLIENT_VERSION
         }
 
@@ -728,7 +738,6 @@ class LostKingdoms2World(World):
 
 def source_of(exit_key: str) -> str:
     return exit_key.rsplit(" Exit ", 1)[0]
-
 
 def randomize_exits(start_region: str = "Nobleman's Residence") -> dict:
     logger.info(f"Starting Level Randomization from {start_region}...")
@@ -818,6 +827,7 @@ def randomize_exits(start_region: str = "Nobleman's Residence") -> dict:
 
     logger.info("Level Randomization Complete.")
     return result
+
 
 lost_kingdoms_2_logic = {
     # Movement Logic

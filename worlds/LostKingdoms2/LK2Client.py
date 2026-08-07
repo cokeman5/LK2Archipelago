@@ -1,12 +1,9 @@
 import asyncio
 import hashlib
-import logging
-import random
 import sys
 import time
 import traceback
-from typing import TYPE_CHECKING, Any, Optional
-from unittest import case
+from typing import TYPE_CHECKING, Any
 
 import dolphin_memory_engine
 
@@ -15,9 +12,8 @@ from .client.constants import *
 
 import Utils
 from CommonClient import ClientCommandProcessor, CommonContext, get_base_parser, gui_enabled, logger, server_loop
-from .iso_helper.lk2_rom import LK2USAAPPatch
+from worlds.LostKingdoms2.lk2_rom import LK2USAAPPatch
 
-from .Locations import *
 from worlds.LostKingdoms2 import *
 
 if TYPE_CHECKING:
@@ -35,24 +31,27 @@ CONNECTION_LOST_STATUS = (
 CONNECTION_CONNECTED_STATUS = "Dolphin connected successfully."
 CONNECTION_INITIAL_STATUS = "Dolphin connection has not been initiated."
 
-SLOT_NAME_ADDR = 0x80003DA0
-IS_IN_GAME_ADDR = 0x80a98aa8
-IS_IN_LEVEL_ADDRESS = 0x80223c88
+SLOT_NAME_ADDR = 0x800033fc
 
-RED_FAIRY_COUNT_ADDRESS = 0x8025d032
-KEY_ITEM_ITEM_ADDRESS = 0x8025d068
-KEY_ITEM_LOCATION_ADDRESS = 0x8025d010
+CURRENT_MENU_ADDR = 0x8020926a
+"""
+0	In level
+2	Paused
+3	Main menu
+4	World map
+7	Dialogue-related
+8	Card reward screen
+9	NPC dialogue/interaction
+10 VS mode
+11 Unknown
+13 Unknown
+20, 21 Game over sequence
+"""
+
 MAGIC_BOOSTER_LOCATION_ADDRESS = 0x8025dd90
 MAGIC_BOOSTER_ITEM_ADDRESS = 0x8025d014
-ITEM_INDEX_ADDRESS = 0x8025d016
 Valkyrie_Ashura_ADDRESS = 0x8025e28c
-God_of_Harmony_Health_ADDRESS = 0x80223eb8
-God_of_Harmony_ID_ADDRESS = 0x80223e5c # = 2164498496
-Emperor_Health_ADDRESS = 0x80223fc8
-Emperor_ID_ADDRESS = 0x80223f6c # = 8153e580
-Emperor_Status = 0
 TEMP_DECK_ADDRESS = 0x80257ada
-COMBO_LOCATION_ADDRESS = 0x8025d070
 KADISHU_SHOP_1_AND_2_ADDRESS = 0x8123cdc0
 KADISHU_SHOP_3_ADDRESS = 0x8124aa60
 CATHEDRAL_SHOP_ADDRESS = 0x812b2880
@@ -63,29 +62,64 @@ SHOP_SUB_UI_FLAG = 0x80275c58
 THIRD_SHOP_UNLOCK_FLAG = 0x8025e04c
 SHOP_MENU_ADDRESS = 0x80275c58
 LEVEL_ID_ADDRESS = 0x80209262
-PLAYER_GOLD_ADDRESS = 0x8025d022
-PLAYER_LEVEL_ADDRESS = 0x8025d02c
 CURR_HEALTH_ADDR = 0x80223c98
-SHOP_LOCATION_ADDRESS = 0x8025d018
 CARDS_LOADED = 0x80732bd4
-CUSTOM_CODE_JUMP_1 = 0x8007b724
-CUSTOM_CODE_RETURN_1 = 0x80005FE4
-CUSTOM_CODE_ADDRESS_1 = 0x80001850
-CUSTOM_CODE_JUMP_2 = 0x80091274
-CUSTOM_CODE_RETURN_2 = 0x800F7F04
-CUSTOM_CODE_ADDRESS_2 = CUSTOM_CODE_ADDRESS_1+60
-CUSTOM_LEVEL_UP_CODE = CUSTOM_CODE_ADDRESS_2+108
-CUSTOM_ATTRIBUTE_UP_CODE = CUSTOM_LEVEL_UP_CODE+80
-CUSTOM_ATTRIBUTE_UP_TRIGGER = 0x8025d01c
-INVALIDATE_ADDRESS = 0x800f31dc
-PROGRESSIVE_LEVELING_ADDRESS = 0X8025d01d
 
+God_of_Harmony_Health_ADDRESS = 0x80223eb8
+God_of_Harmony_ID_ADDRESS = 0x80223e5c # = 2164498496
+Emperor_Health_ADDRESS = 0x80223fc8
+Emperor_ID_ADDRESS = 0x80223f6c # = 8153e580
+Emperor_Status = 0
+
+#Stored/Trigger values 0x8025e650-0x8025e68b
+STORAGE_ADDRESSES = {
+    'item_index':              {'address': 0x8025e650, 'size': 2},
+    'key_item_location':      {'address': 0x8025e652, 'size': 4},
+    'progressive_leveling':   {'address': 0x8025e656, 'size': 1},
+    'progressive_fire_attribute': {'address': 0x8025e657, 'size': 1},
+    'progressive_water_attribute': {'address': 0x8025e658, 'size': 1},
+    'progressive_earth_attribute': {'address': 0x8025e659, 'size': 1},
+    'progressive_wood_attribute': {'address': 0x8025e65a, 'size': 1},
+    'progressive_neutral_attribute': {'address': 0x8025e65b, 'size': 1},
+    'progressive_mech_attribute': {'address': 0x8025e65c, 'size': 1},
+    'shop_location':           {'address': 0x8025e65d, 'size': 5},
+}
+
+PLAYER1_META_ADDRESSES = {
+    'unused_buffer':                {'address': 0x8025d00c, 'size': 20},
+    'player_gold':                  {'address': 0x8025d020, 'size': 4},
+    'total_playtime':               {'address': 0x8025d024, 'size': 4},
+    'unknown_1':                    {'address': 0x8025d028, 'size': 4},
+    'player_level':                 {'address': 0x8025d02c, 'size': 1},
+    'title_rank':                   {'address': 0x8025d02d, 'size': 1},
+    'rumble_enabled':               {'address': 0x8025d02e, 'size': 1},
+    'unknown_setting_flag':         {'address': 0x8025d02f, 'size': 1},
+    'vs_win_loss_count_packed':     {'address': 0x8025d030, 'size': 2},
+    'red_fairies_count':            {'address': 0x8025d032, 'size': 1},
+    'red_fairies_given_to_jarvi':   {'address': 0x8025d033, 'size': 1},
+    'vs_win_count':                 {'address': 0x8025d034, 'size': 4},
+    'vs_loss_count':                {'address': 0x8025d038, 'size': 4},
+    'vs_tie_count':                 {'address': 0x8025d03c, 'size': 4},
+    'vs_mode_level':                {'address': 0x8025d040, 'size': 1},
+    'vs_mode_selected_model':       {'address': 0x8025d041, 'size': 1},
+    'world_map_region':             {'address': 0x8025d042, 'size': 1},   # confirmed by you
+    'world_map_hovered_icon':       {'address': 0x8025d043, 'size': 1},  # confirmed by you
+    'exp_alt':                      {'address': 0x8025d044, 'size': 4},
+    'elemental_mastery_values':     {'address': 0x8025d048, 'size': 16},
+    'unknown_changing_value':       {'address': 0x8025d058, 'size': 8},  # confirmed to change, no code path found
+    'elemental_mastery_levels':     {'address': 0x8025d060, 'size': 6},
+    'difficulty_setting':           {'address': 0x8025d066, 'size': 1},
+    'vs_mode_model_unlock_bitmask': {'address': 0x8025d067, 'size': 1},  # likely - see reasoning above
+    'key_items_obtained_bitmask':   {'address': 0x8025d068, 'size': 4},
+    'combo_revealed_bitmask':       {'address': 0x8025d070, 'size': 8},
+}
 
 ONE_TIME_MODIFIERS_IN_GAME = False
 ONE_TIME_MODIFIERS_MAIN_MENU = False
 HAS_GOALED = False
 PLAYER_PREVIOUS_GOLD = 0
 
+randomized_monster_mapping = {}
 
 class LK2CommandProcessor(ClientCommandProcessor):
     """
@@ -190,11 +224,11 @@ class LK2Context(CommonContext):
             for key in keys:
                 if keys[key] is not None:
                     if key == f"lk2_{self.team}_{self.slot}_{self.auth}_key_items":
-                            write_memory(KEY_ITEM_LOCATION_ADDRESS, keys[key],4)
+                            write_memory(STORAGE_ADDRESSES["key_item_location"]["address"], keys[key],STORAGE_ADDRESSES["key_item_location"]["size"])
                     elif key == f"lk2_{self.team}_{self.slot}_{self.auth}_magic_booster":
                             write_memory(MAGIC_BOOSTER_ITEM_ADDRESS, keys[key])
                     elif key == f"lk2_{self.team}_{self.slot}_{self.auth}_item_index":
-                            write_memory(ITEM_INDEX_ADDRESS, keys[key])
+                            write_memory(STORAGE_ADDRESSES["item_index"]["address"], keys[key], STORAGE_ADDRESSES["item_index"]["size"])
 
 
     def on_deathlink(self, data: dict[str, Any]) -> None:
@@ -329,7 +363,7 @@ def _give_item(ctx: LK2Context, item_name: str) -> bool:
         case "Progressive Player Level":
             return give_progressive_level(ctx)
         case "Progressive Attribute Proficiency":
-            return add_to_progressive_attribute_proficiency_buffer(ctx, item_name)
+            return give_progressive_attribute_proficiency(ctx, item_name)
         case "Blue Fairy":
             return give_blue_fairy(ctx)
         case "Victory":
@@ -340,9 +374,9 @@ def _give_item(ctx: LK2Context, item_name: str) -> bool:
 def give_red_fairy(ctx) -> bool:
     logger.debug("Giving fairy")
     try:
-        memory_address = RED_FAIRY_COUNT_ADDRESS
-        current_amount_of_item = read_memory(memory_address, 1)
-        write_memory(memory_address, current_amount_of_item + 1,1)
+        red_fairies_count = PLAYER1_META_ADDRESSES["red_fairies_count"]
+        current_amount_of_item = read_memory(red_fairies_count["address"], red_fairies_count["size"])
+        write_memory(red_fairies_count['address'], current_amount_of_item + 1,red_fairies_count["size"])
         logger.debug("Red fairy amount = " + str(current_amount_of_item + 1))
 
         increment_item_index(ctx)
@@ -356,7 +390,7 @@ def give_card(ctx,card_name: str) -> bool:
 
     try:
         #add card to player's collection
-        if True: #read_memory(IS_IN_LEVEL_ADDRESS,1) != 1:
+        if True:
             memory_address = int(lost_kingdoms_2_cards[card_name]["DolphinAddress"], 16)
             current_amount_of_item = read_memory(memory_address)
             write_memory(memory_address, current_amount_of_item + 1)
@@ -397,8 +431,9 @@ def give_key_item(ctx,item_name: str) -> bool:
         offset = 1
         for key_item in lost_kingdoms_2_key_items:
             if key_item == item_name:
-                value = read_memory(KEY_ITEM_ITEM_ADDRESS,4)
-                write_memory(KEY_ITEM_ITEM_ADDRESS, value | (1 << offset), 4)
+                memory = PLAYER1_META_ADDRESSES["key_items_obtained_bitmask"]
+                value = read_memory(memory["address"],4)
+                write_memory(memory["address"], value | (1 << offset), 4)
                 increment_item_index(ctx)
                 return True
             else:
@@ -411,70 +446,41 @@ def give_key_item(ctx,item_name: str) -> bool:
 
 def give_progressive_level(ctx) -> bool:
     try:
-        current_player_level = read_memory(PLAYER_LEVEL_ADDRESS, 1)
-        if current_player_level < 20:
-                if is_in_level():
-                    # Game code will update current player level.
-                    write_memory(PROGRESSIVE_LEVELING_ADDRESS, current_player_level + 1, 1)
-                else:
-                    write_memory(PLAYER_LEVEL_ADDRESS, current_player_level + 1, 1)
-                    write_memory(PROGRESSIVE_LEVELING_ADDRESS, current_player_level + 1, 1)
-                increment_item_index(ctx)
-                return True
-        else:
-            logger.debug("Player is already max level. Level not granted")
-            return True
+        current_player_level = read_memory(PLAYER1_META_ADDRESSES["player_level"]["address"], PLAYER1_META_ADDRESSES["player_level"]["size"])
+        write_memory(STORAGE_ADDRESSES["progressive_leveling"]["address"], current_player_level + 1, STORAGE_ADDRESSES["progressive_leveling"]["size"])
+        increment_item_index(ctx)
+        return True
     except Exception as e:
         logger.error(e)
         return False
 
-progressive_attribute_proficiency_buffer = []
-def add_to_progressive_attribute_proficiency_buffer(ctx,item_name) -> bool:
-    global progressive_attribute_proficiency_buffer
-    progressive_attribute_proficiency_buffer.append(item_name)
-    increment_item_index(ctx)
-    logger.debug("Added " +str(item_name) + " to buffer")
-    return True
-
-async def give_progressive_attribute_proficiency(ctx):
+def give_progressive_attribute_proficiency(ctx, item_name: str) -> bool:
     try:
-        if len(progressive_attribute_proficiency_buffer)!=0 and read_memory(0x8025d01e,1)==0:
-            item_name = progressive_attribute_proficiency_buffer.pop(0)
-            attribute = 0
             match item_name:
                 case "Progressive Attribute Proficiency: Fire":
-                    attribute = 0
+                    prev = read_memory(STORAGE_ADDRESSES["progressive_fire_attribute"]["address"],STORAGE_ADDRESSES["progressive_fire_attribute"]["size"])
+                    write_memory(STORAGE_ADDRESSES["progressive_fire_attribute"]["address"],prev+1,STORAGE_ADDRESSES["progressive_fire_attribute"]["size"])
                 case "Progressive Attribute Proficiency: Water":
-                    attribute = 1
+                    prev = read_memory(STORAGE_ADDRESSES["progressive_water_attribute"]["address"],STORAGE_ADDRESSES["progressive_water_attribute"]["size"])
+                    write_memory(STORAGE_ADDRESSES["progressive_water_attribute"]["address"],prev+1,STORAGE_ADDRESSES["progressive_water_attribute"]["size"])
                 case "Progressive Attribute Proficiency: Earth":
-                    attribute = 2
+                    prev = read_memory(STORAGE_ADDRESSES["progressive_earth_attribute"]["address"],STORAGE_ADDRESSES["progressive_earth_attribute"]["size"])
+                    write_memory(STORAGE_ADDRESSES["progressive_earth_attribute"]["address"],prev+1,STORAGE_ADDRESSES["progressive_earth_attribute"]["size"])
                 case "Progressive Attribute Proficiency: Wood":
-                    attribute = 3
+                    prev = read_memory(STORAGE_ADDRESSES["progressive_wood_attribute"]["address"],STORAGE_ADDRESSES["progressive_wood_attribute"]["size"])
+                    write_memory(STORAGE_ADDRESSES["progressive_wood_attribute"]["address"],prev+1,STORAGE_ADDRESSES["progressive_wood_attribute"]["size"])
                 case "Progressive Attribute Proficiency: Neutral":
-                    attribute = 4
+                    prev = read_memory(STORAGE_ADDRESSES["progressive_neutral_attribute"]["address"],STORAGE_ADDRESSES["progressive_neutral_attribute"]["size"])
+                    write_memory(STORAGE_ADDRESSES["progressive_neutral_attribute"]["address"],prev+1,STORAGE_ADDRESSES["progressive_neutral_attribute"]["size"])
                 case "Progressive Attribute Proficiency: Mech":
-                    attribute = 5
-            write_memory(CUSTOM_CODE_ADDRESS_2 + 40,0x38800000+attribute,4)
-            current_attribute_level = read_memory(0x8025d060+attribute,1)
-            match current_attribute_level:
-                case 1:
-                    write_memory(0x8025d048+4*attribute,500,4)
-                case 2:
-                    write_memory(0x8025d048+4*attribute,1500,4)
-                case 3:
-                    write_memory(0x8025d048+4*attribute,3000,4)
-                case 4:
-                    write_memory(0x8025d048+4*attribute,5000,4)
-                case 5:
-                    write_memory(0x8025d048+4*attribute,7500,4)
-                case 6:
-                    write_memory(0x8025d048+4*attribute,10500,4)
-                case 7:
-                    write_memory(0x8025d048+4*attribute,14000,4)
+                    prev = read_memory(STORAGE_ADDRESSES["progressive_mech_attribute"]["address"],STORAGE_ADDRESSES["progressive_mech_attribute"]["size"])
+                    write_memory(STORAGE_ADDRESSES["progressive_mech_attribute"]["address"],prev+1,STORAGE_ADDRESSES["progressive_mech_attribute"]["size"])
 
-            write_memory(0x8025d01e,1,1)
+            increment_item_index(ctx)
+            return True
     except Exception as e:
         logger.error(e)
+        return False
 
 def give_blue_fairy(ctx) -> bool:
     try:
@@ -485,11 +491,10 @@ def give_blue_fairy(ctx) -> bool:
     except Exception as e:
         logger.error(e)
         return False
-    return False
 
 def increment_item_index(ctx):
-    index = read_memory(ITEM_INDEX_ADDRESS)
-    write_memory(ITEM_INDEX_ADDRESS, index + 1)
+    index = read_memory(STORAGE_ADDRESSES["item_index"]["address"],STORAGE_ADDRESSES["item_index"]["size"])
+    write_memory(STORAGE_ADDRESSES["item_index"]["address"],index + 1, STORAGE_ADDRESSES["item_index"]["size"])
 
 def activate_magic_boosters(ctx) -> bool:
     write_memory(MAGIC_BOOSTER_ITEM_ADDRESS, 8)
@@ -511,7 +516,7 @@ def randomize_levels(ctx):
     logger.debug("Level ordering is:" + str(level_ordering))
 
 def level_modifications(ctx):
-    item_memory = read_memory(KEY_ITEM_ITEM_ADDRESS, 4)
+    item_memory = read_memory(PLAYER1_META_ADDRESSES["key_items_obtained_bitmask"]["address"], PLAYER1_META_ADDRESSES["key_items_obtained_bitmask"]["size"])
     level_id = read_memory(LEVEL_ID_ADDRESS, 1)
     # Keep doors openable if they have key, otherwise, unopenable
     if level_id == lost_kingdoms_2_regions["Kendarie Fortress"]["levelID"]:
@@ -531,11 +536,6 @@ def level_modifications(ctx):
             write_memory(0x8025d8d7, 0, 1)
         else:
             write_memory(0x8025d8d7, 1, 1)
-        #Kill the final guard when he spawns to prevent crashing. Temporary.
-        if read_memory(0x802241d8) not in [255,7]:
-            write_memory(0x802241d8,7)
-        #Set his health to 0 for good measure
-            write_memory(0x802241e8, 0)
     #Let swords be placed in Bhashea Castle
     elif level_id == lost_kingdoms_2_regions["Bhashea Castle"]["levelID"]:
         #Blade of Skill placement
@@ -558,45 +558,6 @@ def level_modifications(ctx):
             write_memory(0x8025d947, 0, 1)
         else:
             write_memory(0x8025d947, 1, 1)
-
-    #Make the runestones placeable in Isamat Urbur
-    elif level_id == lost_kingdoms_2_regions["Isamat Urbur"]["levelID"]:
-        #Eno Runestone
-        if (item_memory >> 21) & 1:
-            write_memory(0x8025d870, 2149662488, 4)
-            write_memory(0x8025d867,0,1)
-        else:
-            write_memory(0x8025d870, 0, 4)
-        #Nebeth Runestone
-        if (item_memory >> 27) & 1:
-            write_memory(0x8025d860, 2149662216, 4)
-        else:
-            write_memory(0x8025d860, 0, 4)
-        #Olf Runestone
-        if (item_memory >> 24) & 1:
-            write_memory(0x8025d880, 2149662760, 4)
-        else:
-            write_memory(0x8025d880, 0, 4)
-        #Ebin Runestone
-        if (item_memory >> 25) & 1:
-            write_memory(0x8025d8a0, 2149663304, 4)
-        else:
-            write_memory(0x8025d8a0, 0, 4)
-        #Oht Runestone
-        if (item_memory >> 22) & 1:
-            write_memory(0x8025d890, 2149663032, 4)
-        else:
-            write_memory(0x8025d890, 0, 4)
-        #Elise Runestone
-        if (item_memory >> 23) & 1:
-            write_memory(0x8025d8c0, 2149663848, 4)
-        else:
-            write_memory(0x8025d8c0, 0, 4)
-        #Keil Runestone
-        if (item_memory >> 26) & 1:
-            write_memory(0x8025d8b0, 2149663576, 4)
-        else:
-            write_memory(0x8025d8b0, 0, 4)
     elif level_id == lost_kingdoms_2_regions["Gromtull Desert"]["levelID"]:
         #Black Liquid
         if ((item_memory >> 14) & 1) and read_memory(0x802e941e) == 55264:
@@ -639,68 +600,8 @@ def level_modifications(ctx):
             write_memory(0x8025dc91, read_memory(0x8025dc90,1), 1)
             write_memory(0x8025dc90, 0, 1)
 
-
-    #Ensure you can place the fossils in fossil boneyard, open the doors in Nobleman's Residence,
-    #the fountain in Holzogh Town and the gate in Plains of Rowahl
-    if ((level_id==lost_kingdoms_2_regions["Fossil Boneyard"]["levelID"] and read_memory(0x802e941e) == 55232) or
-            (level_id==lost_kingdoms_2_regions["Plains of Rowahl"]["levelID"] and read_memory(0x802e941e) in [55296,55344] and read_memory(0x802250c9)==0) or
-            (level_id==lost_kingdoms_2_regions["Holzogh Town"]["levelID"] and read_memory(0x802e941e) == 55264) or
-            (level_id==lost_kingdoms_2_regions["Nobleman's Residence"]["levelID"] and read_memory(0x802e941e) in [55296,55472,55456,55440,55488] and read_memory(0x8025dc0c,1)!=0)):
-        write_memory(0x8006e7c4, 0x8003005c, 4)
-    #Make it so the guard that opens up Krasheen Mountains always spawns, but not if they haven't finished the forced sequence(to ensure stone of sealing works)
-    elif level_id==lost_kingdoms_2_regions["Royal Tower, Lower"]["levelID"] and read_memory(0x8025e04c, 1) == 1:
-        write_memory(0x8006e7c4,0x38000001,4)
-    else:
-        write_memory(0x8006e7c4, 0x80030004, 4)
-
     if ctx.slot_data.get("randomize_levels", 0):
-        global level_ordering
-        if is_in_level():
-            if level_id == lost_kingdoms_2_regions["Nobleman's Residence"]["levelID"]:
-                write_memory(0x810879f8, lost_kingdoms_2_regions[level_ordering["Nobleman's Residence Exit 1"]]["levelID"], 4)
-                write_memory(0x81088290, lost_kingdoms_2_regions[level_ordering["Nobleman's Residence Exit 2"]]["levelID"], 4)
-            elif level_id == lost_kingdoms_2_regions["Bhashea High Road"]["levelID"]:
-                # Vanilla: Kendarie Fortress (Exit 2), Kadishu (Exit 1), Bhashea Castle (Exit 3)
-                write_memory(0x8113f89c, lost_kingdoms_2_regions[level_ordering["Bhashea High Road Exit 1"]]["levelID"], 4)
-                write_memory(0x8113fcfc, lost_kingdoms_2_regions[level_ordering["Bhashea High Road Exit 2"]]["levelID"], 4)
-                write_memory(0x8113ff08, lost_kingdoms_2_regions[level_ordering["Bhashea High Road Exit 3"]]["levelID"], 4)
-            elif level_id == lost_kingdoms_2_regions["Kadishu"]["levelID"]:
-                # Vanilla: Gromtull Desert (Exit 2), Kadishu Shop (Exit 1)
-                write_memory(0x810c99dc, lost_kingdoms_2_regions[level_ordering["Kadishu Exit 2"]]["levelID"], 4)
-                write_memory(0x810c9774, lost_kingdoms_2_regions[level_ordering["Kadishu Exit 1"]]["levelID"], 4)
-                write_memory(0x810c9780, lost_kingdoms_2_regions[level_ordering["Kadishu Exit 1"]]["levelID"], 4)
-            elif level_id == lost_kingdoms_2_regions["Gromtull Desert"]["levelID"]:
-                write_memory(0x8106dcac, lost_kingdoms_2_regions[level_ordering["Gromtull Desert Exit 1"]]["levelID"], 4)
-            elif level_id == lost_kingdoms_2_regions["Kendarie Fortress"]["levelID"]:
-                write_memory(0x81052dbc, lost_kingdoms_2_regions[level_ordering["Kendarie Fortress Exit 1"]]["levelID"], 4)
-            elif level_id == lost_kingdoms_2_regions["Runestone Caverns - Upper Chambers"]["levelID"]:
-                write_memory(0x80f91f04, lost_kingdoms_2_regions[level_ordering["Runestone Caverns - Upper Chambers Exit 1"]]["levelID"], 4)
-            elif level_id == lost_kingdoms_2_regions["Runestone Caverns - Lower Chambers"]["levelID"]:
-                write_memory(0x81053798, lost_kingdoms_2_regions[level_ordering["Runestone Caverns - Lower Chambers Exit 1"]]["levelID"], 4)
-            elif level_id == lost_kingdoms_2_regions["Ruldo Forest"]["levelID"]:
-                # Vanilla: Fossil Boneyard (Exit 1), Sacred Battle Arena 1 (Exit 2)
-                write_memory(0x80ffa518, lost_kingdoms_2_regions[level_ordering["Ruldo Forest Exit 1"]]["levelID"], 4)
-                write_memory(0x80ffacf8, lost_kingdoms_2_regions[level_ordering["Ruldo Forest Exit 2"]]["levelID"], 4)
-            elif level_id == lost_kingdoms_2_regions["Fossil Boneyard"]["levelID"]:
-                write_memory(0x8100f988, lost_kingdoms_2_regions[level_ordering["Fossil Boneyard Exit 1"]]["levelID"], 4)
-            elif level_id == lost_kingdoms_2_regions["Sarvan"]["levelID"]:
-                write_memory(0x8104b6c8, lost_kingdoms_2_regions[level_ordering["Sarvan Exit 1"]]["levelID"], 4)
-            elif level_id == lost_kingdoms_2_regions["Holzogh Town"]["levelID"]:
-                write_memory(0x81113dd8, lost_kingdoms_2_regions[level_ordering["Holzogh Town Exit 1"]]["levelID"], 4)
-                write_memory(0x8111488c, lost_kingdoms_2_regions[level_ordering["Holzogh Town Exit 2"]]["levelID"], 4)
-            elif level_id == lost_kingdoms_2_regions["Plains of Rowahl"]["levelID"]:
-                write_memory(0x81044b3c, lost_kingdoms_2_regions[level_ordering["Plains of Rowahl Exit 1"]]["levelID"], 4)
-            elif level_id == lost_kingdoms_2_regions["Royal Tower, Lower"]["levelID"]:
-                # Vanilla: Krasheen Mountains (Exit 1), Obenoix Gorge (Exit 2)
-                write_memory(0x810c1cf4, lost_kingdoms_2_regions[level_ordering["Royal Tower, Lower Exit 1"]]["levelID"], 4)
-            elif level_id == lost_kingdoms_2_regions["Krasheen Mountains"]["levelID"]:
-                write_memory(0x80f2743c, lost_kingdoms_2_regions[level_ordering["Krasheen Mountains Exit 1"]]["levelID"], 4)
-            elif level_id == lost_kingdoms_2_regions["Grenfoel Cathedral"]["levelID"]:
-                # Vanilla: Temple of Sharacia (Exit 1), Grenfoel Cathedral Shop (Exit 2)
-                write_memory(0x810ac678, lost_kingdoms_2_regions[level_ordering["Grenfoel Cathedral Exit 1"]]["levelID"], 4)
-                write_memory(0x810ac70c, lost_kingdoms_2_regions[level_ordering["Grenfoel Cathedral Exit 2"]]["levelID"], 4)
-                write_memory(0x810ac718, lost_kingdoms_2_regions[level_ordering["Grenfoel Cathedral Exit 2"]]["levelID"], 4)
-        else:
+        if not is_in_level():
             modify_default_level_selections()
 
 def modify_default_level_selections():
@@ -739,7 +640,7 @@ def is_level_unlocked(level: str) -> bool:
     return read_memory(int(lost_kingdoms_2_regions[level]["RAMAddress"],16), 1) == 128
 
 def is_in_level() -> bool:
-    return read_memory(IS_IN_LEVEL_ADDRESS, 1) == 1
+    return read_memory(CURRENT_MENU_ADDR, 1) in (0,2,8,9)
 
 def set_shop_contents_to_AP():
     for x in range(40):
@@ -780,45 +681,12 @@ async def check_victory_conditions(ctx: LK2Context):
                     }])
                     HAS_GOALED = True
             case 2:
-                if read_memory(RED_FAIRY_COUNT_ADDRESS,1) + read_memory(RED_FAIRY_COUNT_ADDRESS+1,1) >= ctx.slot_data.get("collect_red_fairies_amount", 50):
+                if read_memory(PLAYER1_META_ADDRESSES["red_fairies_count"]["address"],PLAYER1_META_ADDRESSES["red_fairies_count"]["size"]) + read_memory(PLAYER1_META_ADDRESSES["red_fairies_given_to_jarvi"]["address"],PLAYER1_META_ADDRESSES["red_fairies_given_to_jarvi"]["size"]) >= ctx.slot_data.get("collect_red_fairies_amount", 50):
                     await ctx.send_msgs([{
                         "cmd": "StatusUpdate",
                         "status": ClientStatus.CLIENT_GOAL
                     }])
                     HAS_GOALED = True
-
-async def save_data(ctx: LK2Context):
-    logger.debug("Saving data")
-    await ctx.send_msgs([{
-        "cmd": "Set",
-        "key": f"lk2_{ctx.team}_{ctx.slot}_{ctx.auth}_item_index",  # Unique key per player
-        "default": None,  # Default value if key doesn't exist
-        "want_reply": False,  # Set to True if you want confirmation
-        "operations": [{"operation": "replace", "value": read_memory(ITEM_INDEX_ADDRESS)}]
-    }])
-    await ctx.send_msgs([{
-        "cmd": "Set",
-        "key": f"lk2_{ctx.team}_{ctx.slot}_{ctx.auth}_magic_booster",  # Unique key per player
-        "default": None,  # Default value if key doesn't exist
-        "want_reply": False,  # Set to True if you want confirmation
-        "operations": [{"operation": "replace", "value": read_memory(MAGIC_BOOSTER_ITEM_ADDRESS)}]
-    }])
-    await ctx.send_msgs([{
-        "cmd": "Set",
-        "key": f"lk2_{ctx.team}_{ctx.slot}_{ctx.auth}_key_items",  # Unique key per player
-        "default": None,  # Default value if key doesn't exist
-        "want_reply": False,  # Set to True if you want confirmation
-        "operations": [{"operation": "replace", "value": read_memory(KEY_ITEM_LOCATION_ADDRESS,4)}]
-    }])
-
-    ctx.need_to_save = False
-
-async def load_data(ctx: LK2Context):
-    logger.debug("Loading data")
-    await ctx.send_msgs([{
-        "cmd": "Get",
-        "keys": [f"lk2_{ctx.team}_{ctx.slot}_{ctx.auth}_key_items",f"lk2_{ctx.team}_{ctx.slot}_{ctx.auth}_magic_booster",f"lk2_{ctx.team}_{ctx.slot}_{ctx.auth}_item_index"]
-    }])
 
 async def give_items(ctx: LK2Context) -> None:
     """
@@ -827,7 +695,7 @@ async def give_items(ctx: LK2Context) -> None:
     :param ctx: Lost Kingdoms 2 client context.
     """
     received_items = ctx.items_received
-    NUM_ITEMS_RECEIVED = read_memory(ITEM_INDEX_ADDRESS)
+    NUM_ITEMS_RECEIVED = read_memory(STORAGE_ADDRESSES["item_index"]["address"],STORAGE_ADDRESSES["item_index"]["size"])
     if len(received_items) <= NUM_ITEMS_RECEIVED:
         return
     pass
@@ -835,7 +703,7 @@ async def give_items(ctx: LK2Context) -> None:
     for x, item in enumerate(received_items[NUM_ITEMS_RECEIVED:], start=NUM_ITEMS_RECEIVED):
         item_name = None
         for lk2_item in lost_kingdoms_2_items:
-            if lost_kingdoms_2_items[lk2_item]["id"] == item.item:
+            if lost_kingdoms_2_items[lk2_item]["item_id"] == item.item:
                 item_name = lk2_item
                 break
         if item_name is not None:
@@ -877,19 +745,19 @@ def check_regular_location(ctx: LK2Context, location: str) -> bool:
                 else:
                     return False
             case "Key Item":
-                memory_value = read_memory(KEY_ITEM_LOCATION_ADDRESS,4)
+                memory_value = read_memory(STORAGE_ADDRESSES["key_item_location"]["address"],STORAGE_ADDRESSES["key_item_location"]["size"])
                 bit_value = (memory_value & (1 << lost_kingdoms_2_locations[location]["bitOffset"]))
                 return bit_value
             case "Combo":
-                memory_value = read_memory(COMBO_LOCATION_ADDRESS, 8)
+                memory_value = read_memory(PLAYER1_META_ADDRESSES["combo_revealed_bitmask"]["address"], PLAYER1_META_ADDRESSES["combo_revealed_bitmask"]["size"])
                 bit_value = (memory_value >> lost_kingdoms_2_combos[location]["bitOffset"]) & 1
                 return bit_value
             case "Enemysanity":
-                if is_in_level():
-                    return check_enemy_death(location)
+                if is_in_level() and ctx.slot_data.get("enemysanity", 0):
+                    return check_enemy_death(ctx,location)
                 return False
             case "Shop Purchase":
-                memory_value = read_memory(SHOP_LOCATION_ADDRESS, 5)
+                memory_value = read_memory(STORAGE_ADDRESSES["shop_location"]["address"], STORAGE_ADDRESSES["shop_location"]["size"])
                 bit_value = (memory_value >> lost_kingdoms_2_shop_purchases[location]["bitOffset"]) & 1
                 return bit_value
 
@@ -897,7 +765,7 @@ def check_regular_location(ctx: LK2Context, location: str) -> bool:
     else:
         return False
 
-def check_enemy_death(location: str) -> bool:
+def check_enemy_death(ctx: LK2Context,location: str) -> bool:
     # Helper to get all enemies in the same group for the current level
     def get_group_members(target_location):
         group_id = target_location["group"]
@@ -910,6 +778,9 @@ def check_enemy_death(location: str) -> bool:
     # Revised check logic
     current_loc_data = lost_kingdoms_2_locations[location]
     target_species = location.split(" - ")[-1].split(" #")[0]
+
+    if ctx.slot_data.get("randomize_enemies", 0) and len(randomized_monster_mapping)>0 and target_species in randomized_monster_mapping.keys():
+        target_species = randomized_monster_mapping[target_species]
 
     # If already sent, skip
     if current_loc_data["currentState"] == 2:
@@ -935,7 +806,6 @@ def check_enemy_death(location: str) -> bool:
 
     # 2. Check for Death (currentState 2)
     elif current_loc_data["currentState"] == 1:
-        target_species = location.split(" - ")[-1].split(" #")[0]
 
         # Count how many locations of this species in this group are already "Done" (State 2)
         already_killed_count = sum(
@@ -1066,7 +936,7 @@ def check_ingame() -> bool:
     :return: `True` if the player is in-game, otherwise `False`.
     """
     try:
-        return read_memory(IS_IN_GAME_ADDR,4) != 0
+        return read_memory(CURRENT_MENU_ADDR,4) not in (3,10)
     except:
         return False
 
@@ -1100,19 +970,30 @@ async def track_shop_purchases():
 
     if read_memory(SHOP_SUB_UI_FLAG) == 1:
         global PLAYER_PREVIOUS_GOLD
-        current_gold = read_memory(PLAYER_GOLD_ADDRESS)
+        current_gold = read_memory(PLAYER1_META_ADDRESSES["player_gold"]["address"],PLAYER1_META_ADDRESSES["player_gold"]["size"])
         if current_gold < PLAYER_PREVIOUS_GOLD:
             index = read_memory(ui_address) + 10*shop_id
             logger.debug("shop index" + str(index))
-            shop_location_data = read_memory(SHOP_LOCATION_ADDRESS, 5)
+            shop_location_data = read_memory(STORAGE_ADDRESSES["shop_location"]["address"], STORAGE_ADDRESSES["shop_location"]["size"])
             logger.debug("shop location data before: " + str(shop_location_data))
             if (shop_location_data >> index) & 1 == 0:
                 shop_location_data = shop_location_data | (1<<index)
                 logger.debug("shop location data after: " + str(shop_location_data))
-                write_memory(SHOP_LOCATION_ADDRESS, shop_location_data, 5)
+                write_memory(STORAGE_ADDRESSES["shop_location"]["address"], shop_location_data, STORAGE_ADDRESSES["shop_location"]["size"])
         PLAYER_PREVIOUS_GOLD = current_gold
 
 
+def get_randomized_monster_name_mapping(seed):
+    random.seed(seed)
+    donor_pool_card_ids = sorted(
+        cid for cid, m in db.MONSTERS.items() if m["native_levels"] and m["sound_id"] is not None)
+    distinct_native_card_ids = sorted(set(swap["native_card_id"] for swap in SWAPS))
+    donor_mapping = build_random_donor_mapping(distinct_native_card_ids, donor_pool_card_ids, random)
+
+    return {
+        db.get_monster(native_card_id)["name"]: db.get_monster(donor_card_id)["name"]
+        for native_card_id, donor_card_id in donor_mapping.items()
+    }
 
 
 async def dolphin_sync_task_main_task(ctx: LK2Context):
@@ -1151,6 +1032,10 @@ async def dolphin_sync_task_main_task(ctx: LK2Context):
                     logger.debug("Triggering one time in game modifiers")
                     randomize_levels(ctx)
                     logger.debug("Slot data:" + str(ctx.slot_data))
+                    if ctx.slot_data.get("randomize_enemies", 0):
+                        global randomized_monster_mapping
+                        randomized_monster_mapping = get_randomized_monster_name_mapping(ctx.slot_data.get("Seed", -1)+5)
+                        logger.debug("Randomized Monster Mapping complete")
                     if ctx.slot_data.get("open_world", 0):
                         open_world()
                     if ctx.slot_data.get("shopsanity", 0):
@@ -1168,12 +1053,11 @@ async def dolphin_sync_task_main_task(ctx: LK2Context):
                         await check_victory_conditions(ctx)
                         await give_items(ctx)
                         await check_locations(ctx)
-                        await give_progressive_attribute_proficiency(ctx)
                         await check_map(ctx)
                 else:
                     HAS_GOALED = False
                     if not ctx.auth:
-                        ctx.auth = read_string(SLOT_NAME_ADDR, 0x40)
+                        ctx.auth = read_string(SLOT_NAME_ADDR, 0x32)
                     if ctx.awaiting_rom:
                         await ctx.server_auth()
                 sleep_time = 0.1

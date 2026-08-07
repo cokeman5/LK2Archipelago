@@ -116,6 +116,12 @@ class RandomizeBonusDraws(Choice):
     option_fully_random = 2
     default = 1
 
+class RandomizeEnemies(Toggle):
+    """Choose to randomize every non-unique monster in the game. Every instance of monster X will become monster Y.
+    Still experimental, so play at your own risk."""
+    display_name = "Randomize Enemies"
+    default = 0
+
 class RandomizeMagicCosts(Toggle):
     """Choose to randomize the magic stone cost of every card to between 1-15. Warning: This can trivialize the game"""
     display_name = "Randomize Magic Costs"
@@ -127,6 +133,32 @@ class LevelRandomization(Toggle):
     the sacred battle arena still leads to sacred battle arena 2."""
 
     display_name = "Level Randomization"
+    default = 0
+
+class MusicRandomization(Toggle):
+    """Randomize the music that plays during levels"""
+    display_name = "Level Music Randomization"
+    default = 0
+
+class CharacterModel(Choice):
+    visibility = Visibility.none
+    display_name = "Character Model"
+    option_Tara = 0
+    option_Rashiannu = 1
+    option_Leod = 2
+    option_Katia = 3
+    option_Helena = 4
+    option_Thalnos = 5
+    option_Stranger = 6
+    option_Kendarie_Soldier = 7
+    option_Tara_Alt = 8
+    option_Rashiannu_Alt = 9
+    option_Leod_Alt = 10
+    option_Katia_Alt = 11
+    option_Helena_Alt = 12
+    option_Thalnos_Alt = 13
+    option_Stranger_Alt = 14
+    option_Kendarie_Soldier_Alt = 15
     default = 0
 
 
@@ -148,3 +180,6 @@ class LostKingdoms2Options(PerGameCommonOptions):
     randomize_levels : LevelRandomization
     progressive_leveling: ProgressiveLevelingOption
     progressive_attribute_proficiencies: ProgressiveAttributeProficienciesOption
+    character_model : CharacterModel
+    randomize_enemies : RandomizeEnemies
+    randomize_level_music : MusicRandomization

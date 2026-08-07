@@ -8,19 +8,16 @@ import Utils
 from hashlib import md5
 from typing import Any
 import json, logging, sys, os, zipfile, tempfile
-import requests, ssl, certifi, urllib.request
-
-from worlds.LostKingdoms2.LK2Generator import LK2Randomizer
 
 logger = logging.getLogger()
-MAIN_PKG_NAME = "worlds.lostkingdoms2.LK2Generator"
+MAIN_PKG_NAME = "worlds.lostkingdoms2.ISO_Patcher"
 
 RANDOMIZER_NAME = "Lost Kingdoms II"
 LK2_USA_MD5 = 0x37d3f930fd53334040f4dfcce94970c8
 
 class InvalidCleanISOError(Exception):
     """
-    Exception raised for when user has an issue with their provided Luigi's Mansion ISO.
+    Exception raised for when user has an issue with their provided Lost Kingdoms 2 ISO.
 
     Attributes:
         message -- Explanation of the error
@@ -84,31 +81,22 @@ class LK2USAAPPatch(APPatch, metaclass=AutoPatchRegister):
         return lib_path
 
     def __get_temp_folder_name(self) -> str:
-        from ..LK2Client import CLIENT_VERSION
+        from .LK2Client import CLIENT_VERSION
         temp_path = os.path.join(tempfile.gettempdir(), "lost_kingdoms_2", CLIENT_VERSION, "libs")
         return temp_path
 
     def patch(self, aplk2_patch: str) -> str:
-        # Get the AP Path for the base ROM
         lk2_clean_iso = self.get_base_rom_path()
         logger.info("Provided Lost Kingdoms 2 ISO Path was: " + lk2_clean_iso)
 
         base_path = os.path.splitext(aplk2_patch)[0]
         output_file = base_path + self.result_file_ending
 
-        try:
-            # Verify we have a clean rom of the game first
-            self.verify_base_rom(lk2_clean_iso, throw_on_missing_speedups=True)
+        self.verify_base_rom(lk2_clean_iso, throw_on_missing_speedups=True)
 
-            # Use our randomize function to patch the file into an ISO.
-            from ..LK2Generator import LK2Randomizer
-            with zipfile.ZipFile(aplk2_patch, "r") as zf:
-                aplk2_bytes = zf.read("patch.aplk2")
-                cardback_gtx = zf.read("AP_Cardback.gtx")
-            LK2Randomizer(lk2_clean_iso, output_file, aplk2_bytes, cardback_gtx)
+        from .ISO_Patcher import patch
+        patch(lk2_clean_iso, output_file, aplk2_patch)
 
-        except ImportError:
-            logger.error(ImportError)
         return output_file
 
     def read_contents(self, aplk2_patch: str) -> dict[str, Any]:
@@ -145,17 +133,4 @@ class LK2USAAPPatch(APPatch, metaclass=AutoPatchRegister):
         if md5_conv != LK2_USA_MD5:
             raise InvalidCleanISOError(f"Invalid vanilla {RANDOMIZER_NAME} ISO.\nYour ISO may be corrupted or your " +
                 f"MD5 hashes do not match.\nCorrect ISO MD5 hash: {LK2_USA_MD5:x}\nYour ISO's MD5 hash: {md5_conv}")
-
-    def create_iso(self, temp_dir_path: str, patch_file_path: str, output_iso_path: str, vanilla_iso_path: str):
-        logger.info(f"Appending the following to sys path to get dependencies correctly: {temp_dir_path}")
-        sys.path.insert(0, temp_dir_path)
-
-        # Verify we have a clean rom of the game first
-        self.verify_base_rom(vanilla_iso_path)
-
-        # Use our randomize function to patch the file into an ISO.
-        with zipfile.ZipFile(patch_file_path, "r") as zf:
-            aplk2_bytes = zf.read("patch.aplk2")
-            cardback_gtx = zf.read("AP_Cardback.gtx")
-        LK2Randomizer(vanilla_iso_path, output_iso_path, aplk2_bytes, cardback_gtx)
 
