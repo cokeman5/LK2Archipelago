@@ -25,6 +25,7 @@ own independent safety check.
 
 from ..Locations import lost_kingdoms_2_regions, lost_kingdoms_2_region_exits
 from .. import randomize_exits
+import random
 
 # NOPs whatever conditional normally hides the world map's own
 # region-connection arrows - with level connections randomized, the
@@ -54,6 +55,8 @@ def _write_checked(patcher, iso_addr, vanilla_level_id, new_level_id, label):
 
 
 def apply(patcher, output_data):
+    random.seed(output_data.get("Seed", -1) + 4)
+
     patcher.patch_word(ALWAYS_SHOW_ARROWS_ADDR, 0x60000000)
 
     level_ordering = randomize_exits()

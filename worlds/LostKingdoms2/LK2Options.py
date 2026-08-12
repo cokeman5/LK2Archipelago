@@ -3,8 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from Options import Choice, Option, PerGameCommonOptions, Range, DeathLink, Toggle, Visibility
 
-from typing import Dict
-
 class WinConditionOption(Choice):
     """Choose the win condition.
     Warning: Emperor win condition may be bugged right now.
@@ -118,7 +116,8 @@ class RandomizeBonusDraws(Choice):
 
 class RandomizeEnemies(Toggle):
     """Choose to randomize every non-unique monster in the game. Every instance of monster X will become monster Y.
-    Still experimental, so play at your own risk."""
+    Still very experimental, so play at your own risk. If the game crashes, lags, or becomes corrupted; please report
+    with logs."""
     display_name = "Randomize Enemies"
     default = 0
 
@@ -141,7 +140,9 @@ class MusicRandomization(Toggle):
     default = 0
 
 class CharacterModel(Choice):
-    visibility = Visibility.none
+    """Change your character model.
+    Note: Models other than Tara do not have injured animations, and therefor are mechanically better.
+    """
     display_name = "Character Model"
     option_Tara = 0
     option_Rashiannu = 1

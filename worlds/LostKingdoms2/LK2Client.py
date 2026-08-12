@@ -14,6 +14,8 @@ import Utils
 from CommonClient import ClientCommandProcessor, CommonContext, get_base_parser, gui_enabled, logger, server_loop
 from worlds.LostKingdoms2.lk2_rom import LK2USAAPPatch
 
+from .Patch_Mechanics import monster_database as db
+from .Patch_Mechanics.mechanic_randomize_monsters import SWAPS, build_random_donor_mapping
 from worlds.LostKingdoms2 import *
 
 if TYPE_CHECKING:
@@ -667,14 +669,14 @@ async def check_victory_conditions(ctx: LK2Context):
     if not HAS_GOALED:
         match ctx.slot_data.get("win_condition", -1):
             case 0:
-                if read_memory(God_of_Harmony_Health_ADDRESS) == 0 and read_memory(God_of_Harmony_ID_ADDRESS,4) == 2164498496:
+                if read_memory(God_of_Harmony_Health_ADDRESS) == 0 and read_memory(0x80223ea8,2) != 7 and lost_kingdoms_2_regions["Royal Tower, Upper"]["levelID"] == read_memory(LEVEL_ID_ADDRESS, 1):
                     await ctx.send_msgs([{
                         "cmd": "StatusUpdate",
                         "status": ClientStatus.CLIENT_GOAL
                     }])
                     HAS_GOALED = True
             case 1:
-                if read_memory(Emperor_Health_ADDRESS) == 0 and read_memory(Emperor_ID_ADDRESS,4) == 2169768032:
+                if read_memory(0x80223fb8,1) == 0 and read_memory(0x80223fb8,2) != 7 and lost_kingdoms_2_regions["Proving Grounds F20"]["levelID"] == read_memory(LEVEL_ID_ADDRESS, 1):
                     await ctx.send_msgs([{
                         "cmd": "StatusUpdate",
                         "status": ClientStatus.CLIENT_GOAL

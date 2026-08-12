@@ -1,8 +1,6 @@
 import random
 from typing import NamedTuple, Optional, List
 from BaseClasses import Location, Region
-from .Patch_Mechanics import monster_database as db
-from .Patch_Mechanics.mechanic_cross_level_monster_loadingscreen import SWAPS, build_random_donor_mapping
 
 
 class LK2LocationData(NamedTuple):
@@ -153,7 +151,7 @@ lost_kingdoms_2_chests = {
     "Royal Tower, Upper - chest 2": {'level': 'Royal Tower, Upper', 'cardName': 'Unicorn', 'isoAddress': 'B02D679', 'missable': 0, 'RAMAddress': '8025dfd2', 'type': 'Chest', 'bitOffset': 3, 'location_id': 130},
     "Royal Tower, Upper - chest 3": {'level': 'Royal Tower, Upper', 'cardName': 'Spartoi', 'isoAddress': 'B02D739', 'missable': 0, 'RAMAddress': '8025dfd2', 'type': 'Chest', 'bitOffset': 2, 'location_id': 131},
     "Krasheen Mountains - chest 1": {'level': 'Krasheen Mountains', 'cardName': 'Birdman', 'isoAddress': 'A25AED9', 'missable': 0, 'RAMAddress': '8025df12', 'type': 'Chest', 'bitOffset': 1, 'rule': "flight_only", 'location_id': 132},
-    "Krasheen Mountains - chest 2": {'level': 'Krasheen Mountains', 'cardName': 'Charadrius', 'isoAddress': 'A25B059', 'missable': 0, 'RAMAddress': '8025df12', 'type': 'Chest', 'bitOffset': 4, 'rule': "jump_or_flight_or_unicorn", 'location_id': 133},
+    "Krasheen Mountains - chest 2": {'level': 'Krasheen Mountains', 'cardName': 'Charadrius', 'isoAddress': 'A25B059', 'missable': 0, 'RAMAddress': '8025df12', 'type': 'Chest', 'bitOffset': 4, 'rule': "flight_only", 'location_id': 133},
     "Krasheen Mountains - chest 3": {'level': 'Krasheen Mountains', 'cardName': 'Birdman', 'isoAddress': 'A25AE19', 'missable': 0, 'RAMAddress': '8025df12', 'type': 'Chest', 'bitOffset': 2, 'rule': "jump_or_flight", 'location_id': 134},
     "Krasheen Mountains - chest 4": {'level': 'Krasheen Mountains', 'cardName': '', 'isoAddress': '', 'missable': 0, 'RAMAddress': '8025df12', 'type': 'Chest', 'bitOffset': 3, 'rule': "flight_only", 'location_id': 135},
     "Krasheen Mountains - chest 7": {'level': 'Krasheen Mountains', 'cardName': '', 'isoAddress': '', 'missable': 0, 'RAMAddress': '8025df12', 'type': 'Chest', 'bitOffset': 7, 'rule': "flight_only", 'location_id': 136},

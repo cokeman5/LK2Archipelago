@@ -560,8 +560,8 @@ def _apply_mechanics(patcher: ISOPatcher, output_data: dict, cardback_gtx: bytes
         mechanic_progressive_attributes.apply(patcher)
 
     if output_data.get("randomize_enemies", 0):
-        from .Patch_Mechanics import mechanic_cross_level_monster_loadingscreen
-        mechanic_cross_level_monster_loadingscreen.apply(patcher, output_data)
+        from .Patch_Mechanics import mechanic_randomize_monsters
+        mechanic_randomize_monsters.apply(patcher, output_data)
 
     if output_data.get("randomize_levels", 0):
         from .Patch_Mechanics import mechanic_randomize_level_unlocks

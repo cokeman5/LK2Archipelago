@@ -15,8 +15,6 @@ from .Locations import *
 from .LK2Options import *
 from worlds.LostKingdoms2.lk2_rom import LK2PlayerContainer
 
-from .Patch_Mechanics import monster_database as db
-from .Patch_Mechanics.mechanic_cross_level_monster_loadingscreen import SWAPS, build_random_donor_mapping
 from .Locations import lost_kingdoms_2_enemies
 
 import logging

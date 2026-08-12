@@ -41,7 +41,7 @@ END_ADDRESS = 0x0019709C
 
 
 def apply(patcher, output_data):
-    random.seed(output_data.get("Seed", -1))
+    random.seed(output_data.get("Seed", -1) + 6)
     shuffled_streams = random.sample(STREAMS_TO_SHUFFLE, len(STREAMS_TO_SHUFFLE))
     replacement_for = dict(zip(STREAMS_TO_SHUFFLE, shuffled_streams))
 
