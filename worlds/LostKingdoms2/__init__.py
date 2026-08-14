@@ -167,6 +167,8 @@ class LostKingdoms2World(World):
                 continue
             if (lost_kingdoms_2_items[key]["Type"] == "Progressive Attribute Proficiency") and (self.options.progressive_attribute_proficiencies.value != 1):
                 continue
+            if (lost_kingdoms_2_items[key]["Type"] == "Level Unlock") and (self.options.level_unlocks_as_items.value != 1):
+                continue
             for amount in range(lost_kingdoms_2_items[key]["Amount"]):
                 lk2_item = self.create_item(key)
                 self.multiworld.itempool.append(lk2_item)
@@ -186,6 +188,8 @@ class LostKingdoms2World(World):
         elif item in lost_kingdoms_2_key_items:
             return True
         elif lost_kingdoms_2_items[item]["Type"] == "Progressive Attribute Proficiency":
+            return True
+        elif lost_kingdoms_2_items[item]["Type"] == "Level Unlock":
             return True
         else:
             return False
@@ -210,54 +214,7 @@ class LostKingdoms2World(World):
             region = Region(region_name, self.player, self.multiworld)
             self.multiworld.regions.append(region)
 
-        for key in lost_kingdoms_2_locations:
-            if lost_kingdoms_2_locations[key]["type"] == "Red Fairy" and self.options.fairysanity.value==0:
-                continue
-            if lost_kingdoms_2_locations[key]["type"] == "Combo" and self.options.combosanity.value==0:
-                continue
-            if lost_kingdoms_2_locations[key]["type"] == "Bonus Draw":
-                continue
-            if lost_kingdoms_2_locations[key]["type"] == "Shop Purchase" and self.options.shopsanity.value==0:
-                continue
-            if lost_kingdoms_2_locations[key]["type"] == "Enemysanity" and self.options.enemysanity.value==0:
-                continue
-            if lost_kingdoms_2_locations[key]["type"] == "Enemysanity" and "Proving Grounds" in key and self.options.enemysanity.value!=2:
-                continue
-            region = self.multiworld.get_region(lost_kingdoms_2_locations[key]["level"], self.player)
-            location_data = LK2LocationData(self.location_name_to_id[key])
-            location = LK2Location(self.player,key, region, location_data)
-            if lost_kingdoms_2_locations[key].get("missable", 0) == 1:
-                location.progress_type = LocationProgressType.EXCLUDED
-            region.locations.append(location)
-
-        match self.options.win_condition.value:
-            case 0:
-                victory_location = LK2Location(self.player, "Defeat the God of Harmony",self.multiworld.get_region("Royal Tower, Upper", self.player), None)
-                self.multiworld.get_region("Royal Tower, Upper", self.player).locations.append(victory_location)
-            case 1:
-                victory_location = LK2Location(self.player, "Defeat the Emperor",self.multiworld.get_region("Proving Grounds F20", self.player), None)
-                self.multiworld.get_region("Proving Grounds F20", self.player).locations.append(victory_location)
-            case 2:
-                victory_location = LK2Location(self.player, "Collect "+str(self.options.collect_red_fairies_amount.value)+" Red Fairies",self.multiworld.get_region("Menu", self.player), None)
-                self.multiworld.get_region("Menu", self.player).locations.append(victory_location)
-                victory_location.access_rule = lambda state: state.has("Red Fairy", self.player,self.options.collect_red_fairies_amount.value)
-
-
-    def set_rules(self) -> None:
-
-        exit_rules = {
-            "Nobleman's Residence Exit 2": lambda state: lost_kingdoms_2_logic["mysterious_key"](state, self.player),
-            "Bhashea High Road Exit 3": lambda state: lost_kingdoms_2_logic["jump_or_flight_or_unicorn"](state,self.player),
-            "Gromtull Desert Exit 1": lambda state: lost_kingdoms_2_logic["black_liquid_only"](state, self.player),
-            "Kendarie Fortress Exit 1": lambda state: lost_kingdoms_2_logic["blue_and_red"](state, self.player),
-            "Runestone Caverns - Upper Chambers Exit 1": lambda state: lost_kingdoms_2_logic["golem_only"](state,self.player),
-            "Krasheen Mountains Exit 1": lambda state: lost_kingdoms_2_logic["flight_only"](state, self.player),
-            "Fossil Boneyard Exit 1": lambda state: lost_kingdoms_2_logic["jump_and_boosters"](state, self.player),
-            "Plains of Rowahl Exit 1": lambda state: lost_kingdoms_2_logic["castle_gate"](state, self.player),
-            "Holzogh Town Exit 2": lambda state: lost_kingdoms_2_logic["reach_royal_lower"](state, self.player)
-        }
-
-        if self.options.randomize_levels.value:
+        if self.options.randomize_levels.value and not self.options.level_unlocks_as_items.value:
             global rng_seed, level_ordering
             if rng_seed is None:
                 rng_seed = self.multiworld.seed
@@ -282,107 +239,100 @@ class LostKingdoms2World(World):
                 case "Bhashea High Road":
                     exit_key = inverted_ordering[region_name]
                     previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
-                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
+                    previous_region.connect(region, f"{region.name}")
                 case "Isamat Urbur":
                     exit_key = inverted_ordering[region_name]
                     previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
-                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
+                    previous_region.connect(region, f"{region.name}")
                 case "Kendarie Fortress":
                     exit_key = inverted_ordering[region_name]
                     previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
-                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
+                    previous_region.connect(region, f"{region.name}")
                 case "Kadishu":
                     exit_key = inverted_ordering[region_name]
                     previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
-                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
+                    previous_region.connect(region, f"{region.name}")
                 case "Bhashea Castle":
                     exit_key = inverted_ordering[region_name]
                     previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
-                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
+                    previous_region.connect(region, f"{region.name}")
                 case "Kadishu Shop":
                     exit_key = inverted_ordering[region_name]
                     previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
-                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
+                    previous_region.connect(region, f"{region.name}")
                 case "Fairy House":
                     exit_key = inverted_ordering[region_name]
                     previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
-                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
+                    previous_region.connect(region, f"{region.name}")
                 case "Gromtull Desert":
                     exit_key = inverted_ordering[region_name]
                     previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
-                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
+                    previous_region.connect(region, f"{region.name}")
                 case "Runestone Caverns - Upper Chambers":
                     exit_key = inverted_ordering[region_name]
                     previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
-                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
+                    previous_region.connect(region, f"{region.name}")
                 case "Runestone Caverns - Lower Chambers":
                     exit_key = inverted_ordering[region_name]
                     previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
-                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
+                    previous_region.connect(region, f"{region.name}")
                 case "Ruldo Forest":
                     exit_key = inverted_ordering[region_name]
                     previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
-                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
+                    previous_region.connect(region, f"{region.name}")
                 case "Sacred Battle Arena 1":
                     exit_key = inverted_ordering[region_name]
                     previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
-                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
+                    previous_region.connect(region, f"{region.name}")
                 case "Sacred Battle Arena 2":
                     previous_region = self.multiworld.get_region("Sacred Battle Arena 1", self.player)
-                    if self.options.progressive_attribute_proficiencies.value:
-                        previous_region.connect(region, f"{region.name}", lambda state:
-                                                state.has("Progressive Attribute Proficiency: Earth",self.player,3) and
-                                                state.has("Progressive Attribute Proficiency: Water",self.player,3) and
-                                                state.has("Progressive Attribute Proficiency: Fire",self.player,3) and
-                                                state.has("Progressive Attribute Proficiency: Wood",self.player,3))
-                    else:
-                        previous_region.connect(region, f"{region.name}")
+                    previous_region.connect(region, f"{region.name}")
                 case "Fossil Boneyard":
                     exit_key = inverted_ordering[region_name]
                     previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
-                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
+                    previous_region.connect(region, f"{region.name}")
                 case "Sarvan":
                     exit_key = inverted_ordering[region_name]
                     previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
-                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
+                    previous_region.connect(region, f"{region.name}")
                 case "Holzogh Town":
                     exit_key = inverted_ordering[region_name]
                     previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
-                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
+                    previous_region.connect(region, f"{region.name}")
                 case "Plains of Rowahl":
                     exit_key = inverted_ordering[region_name]
                     previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
-                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
+                    previous_region.connect(region, f"{region.name}")
                 case "Alanjeh Castle":
                     exit_key = inverted_ordering[region_name]
                     previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
-                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
+                    previous_region.connect(region, f"{region.name}")
                 case "Krasheen Mountains":
                     exit_key = inverted_ordering[region_name]
                     previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
-                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
+                    previous_region.connect(region, f"{region.name}")
                 case "Obenoix Gorge":
                     exit_key = inverted_ordering[region_name]
                     previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
-                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
+                    previous_region.connect(region, f"{region.name}")
                 case "Grenfoel Cathedral":
                     exit_key = inverted_ordering[region_name]
                     previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
-                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
+                    previous_region.connect(region, f"{region.name}")
                 case "Temple of Sharacia":
                     exit_key = inverted_ordering[region_name]
                     previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
-                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
+                    previous_region.connect(region, f"{region.name}")
                 case "Grenfoel Cathedral Shop":
                     exit_key = inverted_ordering[region_name]
                     previous_region = self.multiworld.get_region(source_of(exit_key), self.player)
-                    previous_region.connect(region, f"{region.name}", exit_rules.get(exit_key))
+                    previous_region.connect(region, f"{region.name}")
                 case "Royal Tower, Lower":
                     previous_region = self.multiworld.get_region("Alanjeh Castle", self.player)
                     previous_region.connect(region, f"{region.name}")
                 case "Royal Tower, Middle":
                     previous_region = self.multiworld.get_region("Royal Tower, Lower", self.player)
-                    previous_region.connect(region, f"{region.name}", lambda state: state.has("God of Destruction", self.player))
+                    previous_region.connect(region, f"{region.name}")
                 case "Royal Tower, Upper":
                     previous_region = self.multiworld.get_region("Royal Tower, Middle", self.player)
                     previous_region.connect(region, f"{region.name}")
@@ -446,6 +396,260 @@ class LostKingdoms2World(World):
                 case "Proving Grounds F20":
                     previous_region = self.multiworld.get_region("Proving Grounds F19", self.player)
                     previous_region.connect(region, f"{region.name}")
+
+        for key in lost_kingdoms_2_locations:
+            if lost_kingdoms_2_locations[key]["type"] == "Red Fairy" and self.options.fairysanity.value==0:
+                continue
+            if lost_kingdoms_2_locations[key]["type"] == "Combo" and self.options.combosanity.value==0:
+                continue
+            if lost_kingdoms_2_locations[key]["type"] == "Bonus Draw":
+                continue
+            if lost_kingdoms_2_locations[key]["type"] == "Shop Purchase" and self.options.shopsanity.value==0:
+                continue
+            if lost_kingdoms_2_locations[key]["type"] == "Enemysanity" and self.options.enemysanity.value==0:
+                continue
+            if lost_kingdoms_2_locations[key]["type"] == "Enemysanity" and "Proving Grounds" in key and self.options.enemysanity.value!=2:
+                continue
+            region = self.multiworld.get_region(lost_kingdoms_2_locations[key]["level"], self.player)
+            location_data = LK2LocationData(self.location_name_to_id[key])
+            location = LK2Location(self.player,key, region, location_data)
+            if lost_kingdoms_2_locations[key].get("missable", 0) == 1:
+                location.progress_type = LocationProgressType.EXCLUDED
+            region.locations.append(location)
+
+        match self.options.win_condition.value:
+            case 0:
+                victory_location = LK2Location(self.player, "Defeat the God of Harmony",self.multiworld.get_region("Royal Tower, Upper", self.player), None)
+                self.multiworld.get_region("Royal Tower, Upper", self.player).locations.append(victory_location)
+            case 1:
+                victory_location = LK2Location(self.player, "Defeat the Emperor",self.multiworld.get_region("Proving Grounds F20", self.player), None)
+                self.multiworld.get_region("Proving Grounds F20", self.player).locations.append(victory_location)
+            case 2:
+                victory_location = LK2Location(self.player, "Collect "+str(self.options.collect_red_fairies_amount.value)+" Red Fairies",self.multiworld.get_region("Menu", self.player), None)
+                self.multiworld.get_region("Menu", self.player).locations.append(victory_location)
+                victory_location.access_rule = lambda state: state.has("Red Fairy", self.player,self.options.collect_red_fairies_amount.value)
+
+
+    def set_rules(self) -> None:
+
+        exit_rules = {
+            "Nobleman's Residence Exit 2": lambda state: lost_kingdoms_2_logic["mysterious_key"](state, self.player),
+            "Bhashea High Road Exit 3": lambda state: lost_kingdoms_2_logic["jump_or_flight_or_unicorn"](state,self.player),
+            "Gromtull Desert Exit 1": lambda state: lost_kingdoms_2_logic["black_liquid_only"](state, self.player),
+            "Kendarie Fortress Exit 1": lambda state: lost_kingdoms_2_logic["blue_and_red"](state, self.player),
+            "Runestone Caverns - Upper Chambers Exit 1": lambda state: lost_kingdoms_2_logic["golem_only"](state,self.player),
+            "Krasheen Mountains Exit 1": lambda state: lost_kingdoms_2_logic["flight_only"](state, self.player),
+            "Fossil Boneyard Exit 1": lambda state: lost_kingdoms_2_logic["jump_and_boosters"](state, self.player),
+            "Plains of Rowahl Exit 1": lambda state: lost_kingdoms_2_logic["castle_gate"](state, self.player),
+            "Holzogh Town Exit 2": lambda state: lost_kingdoms_2_logic["reach_royal_lower"](state, self.player)
+        }
+
+        if self.options.randomize_levels.value and not self.options.level_unlocks_as_items.value:
+            global rng_seed, level_ordering
+            if rng_seed is None:
+                rng_seed = self.multiworld.seed
+            random.seed(rng_seed + 4)
+            level_ordering = randomize_exits()
+            logger.debug("Level ordering is: " + str(level_ordering))
+            inverted_ordering = {}
+            for exit_name in level_ordering.keys():
+                inverted_ordering[level_ordering[exit_name]] = exit_name
+        else:
+            level_ordering = lost_kingdoms_2_region_exits
+            inverted_ordering = {}
+            for exit_name in level_ordering.keys():
+                inverted_ordering[level_ordering[exit_name]["level"]] = exit_name
+
+        for region_name in lost_kingdoms_2_regions:
+            region = self.multiworld.get_region(region_name, self.player)
+            match region_name:
+                case "Bhashea High Road":
+                    entrance = self.multiworld.get_entrance("Bhashea High Road", self.player)
+                    if not self.options.level_unlocks_as_items.value:
+                        exit_key = inverted_ordering[region_name]
+                        if exit_rules.get(exit_key):
+                            add_rule(entrance, exit_rules.get(exit_key))
+                    else:
+                        add_rule(entrance, lambda state, region_name=region_name: state.has(region_name+" Unlock", self.player))
+                case "Isamat Urbur":
+                    entrance = self.multiworld.get_entrance(f"{region.name}", self.player)
+                    if not self.options.level_unlocks_as_items.value:
+                        exit_key = inverted_ordering[region_name]
+                        if exit_rules.get(exit_key):
+                            add_rule(entrance, exit_rules.get(exit_key))
+                    else:
+                        add_rule(entrance, lambda state, region_name=region_name: state.has(region_name+" Unlock", self.player))
+                case "Kendarie Fortress":
+                    entrance = self.multiworld.get_entrance(f"{region.name}", self.player)
+                    if not self.options.level_unlocks_as_items.value:
+                        exit_key = inverted_ordering[region_name]
+                        if exit_rules.get(exit_key):
+                            add_rule(entrance, exit_rules.get(exit_key))
+                    else:
+                        add_rule(entrance, lambda state, region_name=region_name: state.has(region_name+" Unlock", self.player))
+                case "Kadishu":
+                    entrance = self.multiworld.get_entrance(f"{region.name}", self.player)
+                    if not self.options.level_unlocks_as_items.value:
+                        exit_key = inverted_ordering[region_name]
+                        if exit_rules.get(exit_key):
+                            add_rule(entrance, exit_rules.get(exit_key))
+                    else:
+                        add_rule(entrance, lambda state, region_name=region_name: state.has(region_name+" Unlock", self.player))
+                case "Bhashea Castle":
+                    entrance = self.multiworld.get_entrance(f"{region.name}", self.player)
+                    if not self.options.level_unlocks_as_items.value:
+                        exit_key = inverted_ordering[region_name]
+                        if exit_rules.get(exit_key):
+                            add_rule(entrance, exit_rules.get(exit_key))
+                    else:
+                        add_rule(entrance, lambda state, region_name=region_name: state.has(region_name+" Unlock", self.player))
+                case "Kadishu Shop":
+                    entrance = self.multiworld.get_entrance(f"{region.name}", self.player)
+                    if not self.options.level_unlocks_as_items.value:
+                        exit_key = inverted_ordering[region_name]
+                        if exit_rules.get(exit_key):
+                            add_rule(entrance, exit_rules.get(exit_key))
+                    else:
+                        add_rule(entrance, lambda state, region_name=region_name: state.has(region_name+" Unlock", self.player))
+                case "Fairy House":
+                    entrance = self.multiworld.get_entrance(f"{region.name}", self.player)
+                    if not self.options.level_unlocks_as_items.value:
+                        exit_key = inverted_ordering[region_name]
+                        if exit_rules.get(exit_key):
+                            add_rule(entrance, exit_rules.get(exit_key))
+                    else:
+                        add_rule(entrance, lambda state, region_name=region_name: state.has(region_name+" Unlock", self.player))
+                case "Gromtull Desert":
+                    entrance = self.multiworld.get_entrance(f"{region.name}", self.player)
+                    if not self.options.level_unlocks_as_items.value:
+                        exit_key = inverted_ordering[region_name]
+                        if exit_rules.get(exit_key):
+                            add_rule(entrance, exit_rules.get(exit_key))
+                    else:
+                        add_rule(entrance, lambda state, region_name=region_name: state.has(region_name+" Unlock", self.player))
+                case "Runestone Caverns - Upper Chambers":
+                    entrance = self.multiworld.get_entrance(f"{region.name}", self.player)
+                    if not self.options.level_unlocks_as_items.value:
+                        exit_key = inverted_ordering[region_name]
+                        if exit_rules.get(exit_key):
+                            add_rule(entrance, exit_rules.get(exit_key))
+                    else:
+                        add_rule(entrance, lambda state, region_name=region_name: state.has(region_name+" Unlock", self.player))
+                case "Runestone Caverns - Lower Chambers":
+                    entrance = self.multiworld.get_entrance(f"{region.name}", self.player)
+                    if not self.options.level_unlocks_as_items.value:
+                        exit_key = inverted_ordering[region_name]
+                        if exit_rules.get(exit_key):
+                            add_rule(entrance, exit_rules.get(exit_key))
+                    else:
+                        add_rule(entrance, lambda state, region_name=region_name: state.has(region_name+" Unlock", self.player))
+                case "Ruldo Forest":
+                    entrance = self.multiworld.get_entrance(f"{region.name}", self.player)
+                    if not self.options.level_unlocks_as_items.value:
+                        exit_key = inverted_ordering[region_name]
+                        if exit_rules.get(exit_key):
+                            add_rule(entrance, exit_rules.get(exit_key))
+                    else:
+                        add_rule(entrance, lambda state, region_name=region_name: state.has(region_name+" Unlock", self.player))
+                case "Sacred Battle Arena 1":
+                    entrance = self.multiworld.get_entrance(f"{region.name}", self.player)
+                    if not self.options.level_unlocks_as_items.value:
+                        exit_key = inverted_ordering[region_name]
+                        if exit_rules.get(exit_key):
+                            add_rule(entrance, exit_rules.get(exit_key))
+                    else:
+                        add_rule(entrance, lambda state, region_name=region_name: state.has(region_name+" Unlock", self.player))
+                case "Sacred Battle Arena 2":
+                    if self.options.progressive_attribute_proficiencies.value:
+                        entrance = self.multiworld.get_entrance(f"{region.name}", self.player)
+                        add_rule(entrance, lambda state:
+                                                state.has("Progressive Attribute Proficiency: Earth",self.player,3) and
+                                                state.has("Progressive Attribute Proficiency: Water",self.player,3) and
+                                                state.has("Progressive Attribute Proficiency: Fire",self.player,3) and
+                                                state.has("Progressive Attribute Proficiency: Wood",self.player,3))
+                case "Fossil Boneyard":
+                    entrance = self.multiworld.get_entrance(f"{region.name}", self.player)
+                    if not self.options.level_unlocks_as_items.value:
+                        exit_key = inverted_ordering[region_name]
+                        if exit_rules.get(exit_key):
+                            add_rule(entrance, exit_rules.get(exit_key))
+                    else:
+                        add_rule(entrance, lambda state, region_name=region_name: state.has(region_name+" Unlock", self.player))
+                case "Sarvan":
+                    entrance = self.multiworld.get_entrance(f"{region.name}", self.player)
+                    if not self.options.level_unlocks_as_items.value:
+                        exit_key = inverted_ordering[region_name]
+                        if exit_rules.get(exit_key):
+                            add_rule(entrance, exit_rules.get(exit_key))
+                    else:
+                        add_rule(entrance, lambda state, region_name=region_name: state.has(region_name+" Unlock", self.player))
+                case "Holzogh Town":
+                    entrance = self.multiworld.get_entrance(f"{region.name}", self.player)
+                    if not self.options.level_unlocks_as_items.value:
+                        exit_key = inverted_ordering[region_name]
+                        if exit_rules.get(exit_key):
+                            add_rule(entrance, exit_rules.get(exit_key))
+                    else:
+                        add_rule(entrance, lambda state, region_name=region_name: state.has(region_name+" Unlock", self.player))
+                case "Plains of Rowahl":
+                    entrance = self.multiworld.get_entrance(f"{region.name}", self.player)
+                    if not self.options.level_unlocks_as_items.value:
+                        exit_key = inverted_ordering[region_name]
+                        if exit_rules.get(exit_key):
+                            add_rule(entrance, exit_rules.get(exit_key))
+                    else:
+                        add_rule(entrance, lambda state, region_name=region_name: state.has(region_name+" Unlock", self.player))
+                case "Alanjeh Castle":
+                    entrance = self.multiworld.get_entrance(f"{region.name}", self.player)
+                    if not self.options.level_unlocks_as_items.value:
+                        exit_key = inverted_ordering[region_name]
+                        if exit_rules.get(exit_key):
+                            add_rule(entrance, exit_rules.get(exit_key))
+                    else:
+                        add_rule(entrance, lambda state, region_name=region_name: state.has(region_name+" Unlock", self.player))
+                case "Krasheen Mountains":
+                    entrance = self.multiworld.get_entrance(f"{region.name}", self.player)
+                    if not self.options.level_unlocks_as_items.value:
+                        exit_key = inverted_ordering[region_name]
+                        if exit_rules.get(exit_key):
+                            add_rule(entrance, exit_rules.get(exit_key))
+                    else:
+                        add_rule(entrance, lambda state, region_name=region_name: state.has(region_name+" Unlock", self.player))
+                case "Obenoix Gorge":
+                    entrance = self.multiworld.get_entrance(f"{region.name}", self.player)
+                    if not self.options.level_unlocks_as_items.value:
+                        exit_key = inverted_ordering[region_name]
+                        if exit_rules.get(exit_key):
+                            add_rule(entrance, exit_rules.get(exit_key))
+                    else:
+                        add_rule(entrance, lambda state, region_name=region_name: state.has(region_name+" Unlock", self.player))
+                case "Grenfoel Cathedral":
+                    entrance = self.multiworld.get_entrance(f"{region.name}", self.player)
+                    if not self.options.level_unlocks_as_items.value:
+                        exit_key = inverted_ordering[region_name]
+                        if exit_rules.get(exit_key):
+                            add_rule(entrance, exit_rules.get(exit_key))
+                    else:
+                        add_rule(entrance, lambda state, region_name=region_name: state.has(region_name+" Unlock", self.player))
+                case "Temple of Sharacia":
+                    entrance = self.multiworld.get_entrance(f"{region.name}", self.player)
+                    if not self.options.level_unlocks_as_items.value:
+                        exit_key = inverted_ordering[region_name]
+                        if exit_rules.get(exit_key):
+                            add_rule(entrance, exit_rules.get(exit_key))
+                    else:
+                        add_rule(entrance, lambda state, region_name=region_name: state.has(region_name+" Unlock", self.player))
+                case "Grenfoel Cathedral Shop":
+                    entrance = self.multiworld.get_entrance(f"{region.name}", self.player)
+                    if not self.options.level_unlocks_as_items.value:
+                        exit_key = inverted_ordering[region_name]
+                        if exit_rules.get(exit_key):
+                            add_rule(entrance, exit_rules.get(exit_key))
+                    else:
+                        add_rule(entrance, lambda state, region_name=region_name: state.has(region_name+" Unlock", self.player))
+                case "Royal Tower, Middle":
+                    entrance = self.multiworld.get_entrance(f"{region.name}", self.player)
+                    add_rule(entrance, lambda state: state.has("God of Destruction", self.player))
 
 
         for location in self.multiworld.get_locations(self.player):
@@ -651,6 +855,7 @@ class LostKingdoms2World(World):
             "combosanity": self.options.combosanity.value,
             "enemysanity": self.options.enemysanity.value,
             "open_world": self.options.open_world.value,
+            "level_unlocks_as_items": self.options.level_unlocks_as_items.value,
             "exclude_sacred_battle_arena_checks": self.options.exclude_sacred_battle_arena_checks.value,
             "death_link": self.options.death_link.value,
             "randomize_starting_deck": self.options.randomize_starting_deck.value,
@@ -714,6 +919,7 @@ class LostKingdoms2World(World):
             "combosanity": self.options.combosanity.value,
             "enemysanity": self.options.enemysanity.value,
             "open_world": self.options.open_world.value,
+            "level_unlocks_as_items": self.options.level_unlocks_as_items.value,
             "exclude_sacred_battle_arena_checks": self.options.exclude_sacred_battle_arena_checks.value,
             "death_link": self.options.death_link.value,
             "randomize_starting_deck": self.options.randomize_starting_deck.value,

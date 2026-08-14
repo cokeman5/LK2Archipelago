@@ -367,6 +367,8 @@ def _give_item(ctx: LK2Context, item_name: str) -> bool:
             return give_progressive_attribute_proficiency(ctx, item_name)
         case "Blue Fairy":
             return give_blue_fairy(ctx)
+        case "Level Unlock":
+            return give_level_unlock(ctx,item_name)
         case "Victory":
             return True
         case _:
@@ -493,6 +495,15 @@ def give_blue_fairy(ctx) -> bool:
         logger.error(e)
         return False
 
+def give_level_unlock(ctx, level_unlock) -> bool:
+    try:
+        write_memory(int(lost_kingdoms_2_level_unlocks[level_unlock]["RAMAddress"], 16), 128,1)
+        increment_item_index(ctx)
+        return True
+    except Exception as e:
+        logger.error(e)
+        return False
+
 def increment_item_index(ctx):
     index = read_memory(STORAGE_ADDRESSES["item_index"]["address"],STORAGE_ADDRESSES["item_index"]["size"])
     write_memory(STORAGE_ADDRESSES["item_index"]["address"],index + 1, STORAGE_ADDRESSES["item_index"]["size"])
@@ -509,12 +520,6 @@ def make_bl(from_addr: int, to_addr: int) -> int:
 def make_b(from_addr: int, to_addr: int) -> int:
     offset = to_addr - from_addr
     return 0x48000000 | (offset & 0x3FFFFFC)
-
-def randomize_levels(ctx):
-    random.seed(ctx.slot_data.get("Seed", -1) + 4)
-    global level_ordering
-    level_ordering = randomize_exits()
-    logger.debug("Level ordering is:" + str(level_ordering))
 
 def level_modifications(ctx):
     item_memory = read_memory(PLAYER1_META_ADDRESSES["key_items_obtained_bitmask"]["address"], PLAYER1_META_ADDRESSES["key_items_obtained_bitmask"]["size"])
@@ -601,7 +606,7 @@ def level_modifications(ctx):
             write_memory(0x8025dc91, read_memory(0x8025dc90,1), 1)
             write_memory(0x8025dc90, 0, 1)
 
-    if ctx.slot_data.get("randomize_levels", 0):
+    if ctx.slot_data.get("randomize_levels", 0) or ctx.slot_data.get("level_unlocks_as_items", 0):
         if not is_in_level():
             modify_default_level_selections()
 
@@ -798,8 +803,6 @@ def check_enemy_death(ctx: LK2Context,location: str) -> bool:
             is_alive = read_memory(int(addr, 16), 1) == 1
 
             if is_alive:
-                logger.debug("target="+str(target_species))
-                logger.debug("species="+str(get_enemy_species(addr)))
                 # Check 2: Does the species in this active slot match our target?
                 if get_enemy_species(addr) == target_species:
                     # Record which specific address this location is currently 'using'
@@ -1020,7 +1023,6 @@ async def dolphin_sync_task_main_task(ctx: LK2Context):
                     ONE_TIME_MODIFIERS_IN_GAME = False
                 if (not ONE_TIME_MODIFIERS_IN_GAME) and ctx.slot_data and check_ingame():
                     logger.debug("Triggering one time in game modifiers")
-                    randomize_levels(ctx)
                     logger.debug("Slot data:" + str(ctx.slot_data))
                     if ctx.slot_data.get("randomize_enemies", 0):
                         global randomized_monster_mapping

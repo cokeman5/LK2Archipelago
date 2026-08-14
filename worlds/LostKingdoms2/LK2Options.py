@@ -75,6 +75,13 @@ class ExcludeSacredBattleArenaChecksOption(Toggle):
     display_name = "Exclude Sacred Battle Checks"
     default = 0
 
+class LevelUnlocksAsItems(Toggle):
+    """Whether to add level unlocks to the pool.
+    Instead of unlocking a level after beating a level, you must find the level unlocks as AP items
+    Takes precedence over Level randomization."""
+    display_name = "Level Unlocks as Items"
+    default = 0
+
 class RandomizeStartingDeck(Choice):
     """
     Choose whether to randomize your starting deck.
@@ -129,8 +136,10 @@ class RandomizeMagicCosts(Toggle):
 class LevelRandomization(Toggle):
     """Randomize which levels unlock when you would normally unlock a level.
     Note: Alenjah Castle still always leads to all the towers in order, and
-    the sacred battle arena still leads to sacred battle arena 2."""
-
+    the sacred battle arena still leads to sacred battle arena 2. Proving Grounds
+    is still unlocked only after beating the game. Nobleman's Residence is always
+    the starting level.
+    """
     display_name = "Level Randomization"
     default = 0
 
@@ -172,15 +181,16 @@ class LostKingdoms2Options(PerGameCommonOptions):
     combosanity: CombosanityConditionOption
     enemysanity: EnemysanityConditionOption
     open_world : OpenWorldConditionOption
+    level_unlocks_as_items : LevelUnlocksAsItems
     exclude_sacred_battle_arena_checks: ExcludeSacredBattleArenaChecksOption
+    progressive_leveling: ProgressiveLevelingOption
+    progressive_attribute_proficiencies: ProgressiveAttributeProficienciesOption
     death_link: DeathLink
     randomize_starting_deck : RandomizeStartingDeck
     randomize_shop_contents : RandomizeShopContents
     randomize_bonus_draws : RandomizeBonusDraws
     randomize_magic_stone_costs : RandomizeMagicCosts
     randomize_levels : LevelRandomization
-    progressive_leveling: ProgressiveLevelingOption
-    progressive_attribute_proficiencies: ProgressiveAttributeProficienciesOption
+    randomize_enemies: RandomizeEnemies
+    randomize_level_music: MusicRandomization
     character_model : CharacterModel
-    randomize_enemies : RandomizeEnemies
-    randomize_level_music : MusicRandomization

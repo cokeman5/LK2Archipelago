@@ -563,9 +563,13 @@ def _apply_mechanics(patcher: ISOPatcher, output_data: dict, cardback_gtx: bytes
         from .Patch_Mechanics import mechanic_randomize_monsters
         mechanic_randomize_monsters.apply(patcher, output_data)
 
-    if output_data.get("randomize_levels", 0):
+    if output_data.get("randomize_levels", 0) and not output_data.get("level_unlocks_as_items", 0):
         from .Patch_Mechanics import mechanic_randomize_level_unlocks
         mechanic_randomize_level_unlocks.apply(patcher, output_data)
+
+    if output_data.get("level_unlocks_as_items", 0):
+        from .Patch_Mechanics import mechanic_disable_level_unlocks
+        mechanic_disable_level_unlocks.apply(patcher, output_data)
 
     from .Patch_Mechanics import mechanic_disable_vanilla_chests
     mechanic_disable_vanilla_chests.apply(patcher)

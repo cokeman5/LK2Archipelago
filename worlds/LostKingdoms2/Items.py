@@ -336,4 +336,39 @@ lost_kingdoms_2_items["Progressive Attribute Proficiency: Earth"] = {"Type": "Pr
 lost_kingdoms_2_items["Progressive Attribute Proficiency: Wood"] = {"Type": "Progressive Attribute Proficiency", "Amount": 5, "item_id": 20007}
 lost_kingdoms_2_items["Progressive Attribute Proficiency: Neutral"] = {"Type": "Progressive Attribute Proficiency", "Amount": 7, "item_id": 20008}
 lost_kingdoms_2_items["Progressive Attribute Proficiency: Mech"] = {"Type": "Progressive Attribute Proficiency", "Amount": 7, "item_id": 20009}
-#lost_kingdoms_2_items["Blue Fairy"] = {"Type": "Blue Fairy", "Amount": 1, "id": 6000}
+
+lost_kingdoms_2_level_unlocks = {
+    "Nobleman's Residence Unlock": { "RAMAddress": "8025dc0e", "levelID": 1, "item_id": 30000},
+    "Bhashea High Road Unlock": { "RAMAddress": "8025dc4e", "levelID": 2, "item_id": 30001},
+    "Isamat Urbur Unlock": { "RAMAddress": "8025e0ce", "levelID": 20, "item_id": 30002},
+    "Kendarie Fortress Unlock": { "RAMAddress": "8025dcce", "levelID": 4, "item_id": 30003},
+    "Kadishu Unlock": { "RAMAddress": "8025dc8e", "levelID": 3, "item_id": 30004},
+    "Bhashea Castle Unlock": { "RAMAddress": "8025e10e", "levelID": 21, "item_id": 30005},
+    "Kadishu Shop Unlock": { "RAMAddress": "8025e60e", "levelID": 41, "item_id": 30006},
+    "Fairy House Unlock": { "RAMAddress": "8025e5ce", "levelID": 40, "item_id": 30007},
+    "Gromtull Desert Unlock": { "RAMAddress": "8025e14e", "levelID": 22, "item_id": 30008},
+    "Runestone Caverns - Upper Chambers Unlock": { "RAMAddress": "8025dd0e", "levelID": 5, "item_id": 30009},
+    "Runestone Caverns - Lower Chambers Unlock": { "RAMAddress": "8025dd4e", "levelID": 6, "item_id": 30010},
+    "Ruldo Forest Unlock": { "RAMAddress": "8025dd8e", "levelID": 7, "item_id": 30011},
+    "Sacred Battle Arena 1 Unlock": { "RAMAddress": "8025e18e", "levelID": 23, "item_id": 30012},
+    "Sacred Battle Arena 2 Unlock": { "RAMAddress": "8025e1ce", "levelID": 24, "item_id": 30013},
+    "Fossil Boneyard Unlock": { "RAMAddress": "8025e00e", "levelID": 17, "item_id": 30014},
+    "Sarvan Unlock": { "RAMAddress": "8025ddce", "levelID": 8, "item_id": 30015},
+    "Holzogh Town Unlock": { "RAMAddress": "8025de0e", "levelID": 9, "item_id": 30016},
+    "Plains of Rowahl Unlock": { "RAMAddress": "8025de4e", "levelID": 10, "item_id": 30017},
+    "Alanjeh Castle Unlock": { "RAMAddress": "8025de8e", "levelID": 11, "item_id": 30018},
+    "Royal Tower, Lower Unlock": { "RAMAddress": "8025dece", "levelID": 18, "item_id": 30019},
+    "Royal Tower, Middle Unlock": { "RAMAddress": "8025df8e", "levelID": 15, "item_id": 30020},
+    "Royal Tower, Upper Unlock": { "RAMAddress": "8025dfce", "levelID": 16, "item_id": 30021},
+    "Krasheen Mountains Unlock": { "RAMAddress": "8025df0e", "levelID": 13, "item_id": 30022},
+    "Grenfoel Cathedral Unlock": { "RAMAddress": "8025df4e", "levelID": 14, "item_id": 30023},
+    "Temple of Sharacia Unlock": { "RAMAddress": "8025e28e", "levelID": 27, "item_id": 30024},
+    "Grenfoel Cathedral Shop Unlock": { "RAMAddress": "8025e64e", "levelID": 42, "item_id": 30025},
+    "Obenoix Gorge Unlock": { "RAMAddress": "8025e20e", "levelID": 25, "item_id": 30026},
+}
+
+for key in lost_kingdoms_2_level_unlocks:
+    lost_kingdoms_2_items[key] = {}
+    lost_kingdoms_2_items[key]["Type"] = "Level Unlock"
+    lost_kingdoms_2_items[key]["Amount"] = 1
+    lost_kingdoms_2_items[key]["item_id"] = lost_kingdoms_2_level_unlocks[key]["item_id"]

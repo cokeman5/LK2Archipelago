@@ -382,7 +382,6 @@ lost_kingdoms_2_regions = {
     "Proving Grounds F18": { "RAMAddress": "8025e84e", "levelID": 67, "exclude_from_level_randomization": True},
     "Proving Grounds F19": { "RAMAddress": "8025e84e", "levelID": 68, "exclude_from_level_randomization": True},
     "Proving Grounds F20": { "RAMAddress": "8025e84e", "levelID": 69, "exclude_from_level_randomization": True},
-
 }
 
 lost_kingdoms_2_region_exits = {
