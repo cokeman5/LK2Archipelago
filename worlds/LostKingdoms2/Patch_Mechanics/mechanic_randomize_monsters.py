@@ -276,12 +276,15 @@ EXCLUDED_SLOTS = set()
 # Self-mapping avoids this entirely, since the donor's own file_offset/
 # size is then IDENTICAL to the native slot's, by construction.
 #
-# TEMPORARY - Gargoyle (0xca) and Horus (0xcf) excluded while
-# investigating an issue involving them, both native to s13.pds.
+# TEMPORARY - Gargoyle (0xca), Horus (0xcf), and Black Dragon (0x40)
+# excluded while investigating an issue involving them, all three
+# native to s13.pds (Black Dragon is also native to s68.pds - excluded
+# from randomization there too, since exclusion is per-card_id, not
+# per-level).
 # (Note: 0x4d is "Fire Gargoyle," a DIFFERENT monster native to
 # s27.pds - an earlier version of this set mistakenly used 0x4d
 # instead of the correct 0xca; corrected.)
-EXCLUDED_NATIVE_CARD_IDS = {0xca, 0xcf}
+EXCLUDED_NATIVE_CARD_IDS = {0xca, 0xcf, 0x40}
 
 
 def _build_swaps_from_native_slots():
@@ -1010,9 +1013,27 @@ def lo(addr):
 
 
 
-def apply(patcher, output_data):
-    # --- random donor assignment (unchanged from before) ---
-    random.seed(output_data.get("Seed", -1) + 5)
+def get_donor_mapping(seed):
+    """The single source of truth for random donor assignment - returns
+    a {native_card_id: donor_card_id} dict, including Gargoyle/Horus's
+    own self-mapping (see EXCLUDED_NATIVE_CARD_IDS's own comment on
+    apply(), below, for why they're self-mapped rather than omitted).
+
+    apply() itself calls this rather than duplicating this logic inline
+    - added specifically because an external caller (the AP client's
+    own enemy-death-detection code, which needs to know the SAME
+    mapping the actual ISO patch used, to correctly match randomized
+    donor species against live game state) previously reimplemented
+    this logic separately by hand, and drifted out of sync with it
+    (missed the EXCLUDED_NATIVE_CARD_IDS filtering on both the donor
+    pool AND the native list before the shuffle, which - since the
+    shuffle's own result depends on its exact input list - silently
+    produced a DIFFERENT mapping than the ISO's own, despite using the
+    identical seed). A single, shared function makes that class of
+    drift structurally impossible instead of relying on two, separately
+    maintained copies staying in sync by hand.
+    """
+    random.seed(seed)
 
     donor_pool_card_ids = sorted(
         cid for cid, m in db.MONSTERS.items()
@@ -1044,6 +1065,26 @@ def apply(patcher, output_data):
     for cid in EXCLUDED_NATIVE_CARD_IDS:
         if cid in distinct_native_card_ids:
             donor_mapping[cid] = cid
+
+    return donor_mapping
+
+
+def get_randomized_monster_name_mapping(seed):
+    """Thin wrapper around get_donor_mapping() for callers that want
+    names rather than card_ids directly (e.g. the AP client, matching
+    against get_enemy_species()'s own string output)."""
+    donor_mapping = get_donor_mapping(seed)
+    return {
+        db.get_monster(native_card_id)["name"]: db.get_monster(donor_card_id)["name"]
+        for native_card_id, donor_card_id in donor_mapping.items()
+    }
+
+
+def apply(patcher, output_data):
+    # --- random donor assignment (now via the single shared function
+    # above, so this and any external caller can never drift apart) ---
+    donor_mapping = get_donor_mapping(output_data.get("Seed", -1) + 5)
+    distinct_native_card_ids = sorted(donor_mapping.keys())
 
     # --- REVISION 28 (re-applying REVISION 27): build DONOR_TABLE
     # once, one entry per DISTINCT native species (== one entry per

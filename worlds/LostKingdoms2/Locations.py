@@ -1684,4 +1684,3 @@ lost_kingdoms_2_enemies = {
 
 lost_kingdoms_2_locations = lost_kingdoms_2_chests | lost_kingdoms_2_red_fairies | lost_kingdoms_2_key_locations | lost_kingdoms_2_combos | lost_kingdoms_2_bonus_draws | lost_kingdoms_2_shop_purchases | lost_kingdoms_2_enemies
 lost_kingdoms_2_locations["Magic Boosters Activation"] = magic_boosters_location
-

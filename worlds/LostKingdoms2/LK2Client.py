@@ -14,8 +14,7 @@ import Utils
 from CommonClient import ClientCommandProcessor, CommonContext, get_base_parser, gui_enabled, logger, server_loop
 from worlds.LostKingdoms2.lk2_rom import LK2USAAPPatch
 
-from .Patch_Mechanics import monster_database as db
-from .Patch_Mechanics.mechanic_randomize_monsters import SWAPS, build_random_donor_mapping
+from .Patch_Mechanics.mechanic_randomize_monsters import get_randomized_monster_name_mapping
 from worlds.LostKingdoms2 import *
 
 if TYPE_CHECKING:
@@ -799,6 +798,8 @@ def check_enemy_death(ctx: LK2Context,location: str) -> bool:
             is_alive = read_memory(int(addr, 16), 1) == 1
 
             if is_alive:
+                logger.debug("target="+str(target_species))
+                logger.debug("species="+str(get_enemy_species(addr)))
                 # Check 2: Does the species in this active slot match our target?
                 if get_enemy_species(addr) == target_species:
                     # Record which specific address this location is currently 'using'
@@ -985,19 +986,6 @@ async def track_shop_purchases():
         PLAYER_PREVIOUS_GOLD = current_gold
 
 
-def get_randomized_monster_name_mapping(seed):
-    random.seed(seed)
-    donor_pool_card_ids = sorted(
-        cid for cid, m in db.MONSTERS.items() if m["native_levels"] and m["sound_id"] is not None)
-    distinct_native_card_ids = sorted(set(swap["native_card_id"] for swap in SWAPS))
-    donor_mapping = build_random_donor_mapping(distinct_native_card_ids, donor_pool_card_ids, random)
-
-    return {
-        db.get_monster(native_card_id)["name"]: db.get_monster(donor_card_id)["name"]
-        for native_card_id, donor_card_id in donor_mapping.items()
-    }
-
-
 async def dolphin_sync_task_main_task(ctx: LK2Context):
     """
     The task loop for managing the connection to Dolphin.
@@ -1036,7 +1024,9 @@ async def dolphin_sync_task_main_task(ctx: LK2Context):
                     logger.debug("Slot data:" + str(ctx.slot_data))
                     if ctx.slot_data.get("randomize_enemies", 0):
                         global randomized_monster_mapping
-                        randomized_monster_mapping = get_randomized_monster_name_mapping(ctx.slot_data.get("Seed", -1)+5)
+                        randomized_monster_mapping = get_randomized_monster_name_mapping(
+                            ctx.slot_data.get("Seed", -1) + 5)
+                        logger.debug(randomized_monster_mapping)
                         logger.debug("Randomized Monster Mapping complete")
                     if ctx.slot_data.get("open_world", 0):
                         open_world()
@@ -1165,4 +1155,3 @@ def main(*launch_args: str):
 if __name__ == "__main__":
     Utils.init_logging(CLIENT_NAME, exception_logger="Client")
     main(*sys.argv[1:])
-

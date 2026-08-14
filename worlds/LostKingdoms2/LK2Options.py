@@ -115,7 +115,7 @@ class RandomizeBonusDraws(Choice):
     default = 1
 
 class RandomizeEnemies(Toggle):
-    """Choose to randomize every non-unique monster in the game. Every instance of monster X will become monster Y.
+    """Choose to randomize every non-unique enemy in the game. Every instance of enemy X will become enemy Y.
     Still very experimental, so play at your own risk. If the game crashes, lags, or becomes corrupted; please report
     with logs."""
     display_name = "Randomize Enemies"

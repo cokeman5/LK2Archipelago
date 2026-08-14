@@ -264,10 +264,14 @@ class LostKingdoms2World(World):
             random.seed(rng_seed + 4)
             level_ordering = randomize_exits()
             logger.debug("Level ordering is: " + str(level_ordering))
-            inverted_ordering = {dest: exit_key for exit_key, dest in level_ordering.items()}
+            inverted_ordering = {}
+            for exit_name in level_ordering.keys():
+                inverted_ordering[level_ordering[exit_name]] = exit_name
         else:
-            inverted_ordering = {dest: exit_key for exit_key, dest in lost_kingdoms_2_region_exits.items()}
             level_ordering = lost_kingdoms_2_region_exits
+            inverted_ordering = {}
+            for exit_name in level_ordering.keys():
+                inverted_ordering[level_ordering[exit_name]["level"]] = exit_name
 
         for region_name in lost_kingdoms_2_regions:
             region = self.multiworld.get_region(region_name, self.player)
