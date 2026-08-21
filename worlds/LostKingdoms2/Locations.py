@@ -332,8 +332,6 @@ lost_kingdoms_2_key_locations = {
     "Holzogh Town - Corpse": {'level': 'Holzogh Town', 'type': 'Key Item', 'bitOffset': 30, 'location_id': 20030}
 }
 
-magic_boosters_location = {'level': 'Ruldo Forest', 'cardName': '', 'isoAddress': '', 'missable': 0,'RAMAddress': '8025dd90', 'type': 'Magic Boosters', 'bitOffset': 3, 'location_id': 70001}
-
 lost_kingdoms_2_regions = {
     "Nobleman's Residence": { "RAMAddress": "8025dc0e", "levelID": 1, "exclude_from_level_randomization": True},
     "Bhashea High Road": { "RAMAddress": "8025dc4e", "levelID": 2, "exclude_from_level_randomization": False},
@@ -1681,6 +1679,7 @@ lost_kingdoms_2_enemies = {
     "Proving Grounds F20  - Enemysanity - Emperor #1" : {"level" : "Proving Grounds F20","RAMAddress" : "80223fb8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 8, 'location_id': 60935},
 }
 
+
 lost_kingdoms_2_enemysanity_light = {
     "Enemysanity - Skeleton" : {"type" : "Enemysanity Light", 'missable': 0, "currentState": 0, 'location_id': 70001, 'proving_grounds': True, 'level': "Proving Grounds F7"},
     "Enemysanity - Ghost Armor" : {"type" : "Enemysanity Light", 'missable': 0, "currentState": 0, 'location_id': 70002, 'proving_grounds': True, 'level': "Proving Grounds F11"},
@@ -1878,6 +1877,8 @@ lost_kingdoms_2_enemysanity_light = {
     "Enemysanity - AstroBot" : {"type" : "Enemysanity Light", 'missable': 0, "currentState": 0, 'location_id': 70194, 'proving_grounds': False, 'level': "Sacred Battle Arena 2"},
     "Enemysanity - AcidBot" : {"type" : "Enemysanity Light", 'missable': 0, "currentState": 0, 'location_id': 70195, 'proving_grounds': False, 'level': "Alanjeh Castle"},
 }
+
+magic_boosters_location = {'level': 'Ruldo Forest', 'cardName': '', 'isoAddress': '', 'missable': 0,'RAMAddress': '8025dd90', 'type': 'Magic Boosters', 'bitOffset': 3, 'location_id': 80001}
 
 lost_kingdoms_2_locations = lost_kingdoms_2_chests | lost_kingdoms_2_red_fairies | lost_kingdoms_2_key_locations | lost_kingdoms_2_combos | lost_kingdoms_2_bonus_draws | lost_kingdoms_2_shop_purchases | lost_kingdoms_2_enemies | lost_kingdoms_2_enemysanity_light
 lost_kingdoms_2_locations["Magic Boosters Activation"] = magic_boosters_location

@@ -590,7 +590,7 @@ def level_modifications(ctx):
             write_memory(0x8025e151, read_memory(0x8025e150, 1), 1)
             write_memory(0x8025e150, 0, 1)
     #Make it so if you beat Bhashea High Road, p2 loads without needing to enter Kadishu
-    elif level_id==lost_kingdoms_2_regions["Bhashea High Road"]["levelID"] and ctx.slot_data.get("randomize_levels", 0) or ctx.slot_data.get("level_unlocks_as_items", 0) :
+    elif level_id==lost_kingdoms_2_regions["Bhashea High Road"]["levelID"] and (ctx.slot_data.get("randomize_levels", 0) or ctx.slot_data.get("level_unlocks_as_items", 0)) :
         #If Kadishu hasn't been beaten, then load the first part of it
         if read_memory(0x8025dc4c,1)==0:
             if read_memory(0x8025dc91,1)!=0:
@@ -601,7 +601,7 @@ def level_modifications(ctx):
             if read_memory(0x8025dc91,1)==0:
                 write_memory(0x8025dc91, 4, 1)
     #Put the value back in the right place if not in Bhashea High Road
-    if not is_in_level() and ctx.slot_data.get("randomize_levels", 0) or ctx.slot_data.get("level_unlocks_as_items", 0):
+    if not is_in_level() and (ctx.slot_data.get("randomize_levels", 0) or ctx.slot_data.get("level_unlocks_as_items", 0)):
         if read_memory(0x8025dc90,1) != 0:
             write_memory(0x8025dc91, read_memory(0x8025dc90,1), 1)
             write_memory(0x8025dc90, 0, 1)
