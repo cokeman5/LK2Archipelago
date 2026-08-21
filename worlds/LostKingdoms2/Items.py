@@ -338,7 +338,7 @@ lost_kingdoms_2_items["Progressive Attribute Proficiency: Neutral"] = {"Type": "
 lost_kingdoms_2_items["Progressive Attribute Proficiency: Mech"] = {"Type": "Progressive Attribute Proficiency", "Amount": 7, "item_id": 20009}
 
 lost_kingdoms_2_level_unlocks = {
-    "Nobleman's Residence Unlock": { "RAMAddress": "8025dc0e", "levelID": 1, "item_id": 30000},
+    #"Nobleman's Residence Unlock": { "RAMAddress": "8025dc0e", "levelID": 1, "item_id": 30000},
     "Bhashea High Road Unlock": { "RAMAddress": "8025dc4e", "levelID": 2, "item_id": 30001},
     "Isamat Urbur Unlock": { "RAMAddress": "8025e0ce", "levelID": 20, "item_id": 30002},
     "Kendarie Fortress Unlock": { "RAMAddress": "8025dcce", "levelID": 4, "item_id": 30003},

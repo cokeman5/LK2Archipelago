@@ -2,9 +2,20 @@
 Progressive leveling. Disables the game's own XP-based leveling entirely
 and instead drives player level directly off progressive_leveling
 (LK2Client.STORAGE_ADDRESSES, 0x8025e656) via a per-tick mechanic
-registered with mechanic_per_tick_hook - the AP client writes the desired
-level there, and this mechanic calls the game's own ProcessLevelUp
-(0x80073674) repeatedly until playerLevel (0x8025d02c) catches up.
+registered with mechanic_per_tick_hook - the AP client writes there, and
+this mechanic calls the game's own ProcessLevelUp (0x80073674) repeatedly
+until playerLevel (0x8025d02c) catches up.
+
+progressive_leveling is the AP client's own storage - this mechanic only
+ever READS it, never writes. An earlier version initialized it to
+PROGRESSIVE_LEVELING_BASELINE on first read if still 0, which silently
+overwrote whatever the client had (or was about to) store there - a
+genuine bug, not a deliberate design (the same bug also existed, and was
+also fixed, in mechanic_progressive_attributes.py). progressive_leveling
+holds a COUNT of progressive level-up items received, not an absolute
+target level - the actual target level is PROGRESSIVE_LEVELING_BASELINE +
+progressive_leveling, computed fresh every time without ever writing back
+to the trigger address itself.
 
 ProcessLevelUp gates on three ANDed conditions: DAT_80209277=='\\0' (not in
 a cutscene-driven player-state), requiredXP<=playerExp, and playerLevel!=20
@@ -113,64 +124,69 @@ def _build_stub(patcher):
     lvl_hi = (PLAYER_LEVEL >> 16) & 0xFFFF
     lvl_lo = PLAYER_LEVEL & 0xFFFF
 
-    instructions = [
+    # Label-based fill system, not hardcoded "loop_idx + N" offsets - see
+    # mechanic_progressive_attributes.py's own _build_stub docstring for why
+    # (confirmed, by actually building and inspecting that mechanic's own,
+    # differently-structured stub, that hardcoded offsets silently left
+    # several branches unfilled after an unrelated edit shifted everything
+    # after it). Applying the same, safer pattern here even though this
+    # mechanic's own structure hasn't shown the same symptom, since the
+    # underlying fragility is the same.
+    instructions = []
+    fills = []
+    labels = {}
+
+    instructions += [
         _stwu(1, -32, 1),
         _mflr(0),
         _stw(0, 36, 1),
         _stw(29, 20, 1),
         _stw(30, 24, 1),
         _stw(31, 28, 1),
-        _lis(29, pl_hi),                # r29 = &progressive_leveling
+        _lis(29, pl_hi),                # r29 = &progressive_leveling (READ-ONLY - AP client's own storage)
         _ori(29, 29, pl_lo),
-    ]
-    # One-time baseline init: if progressive_leveling has never been set
-    # (still 0), initialize it to PROGRESSIVE_LEVELING_BASELINE. Naturally
-    # only takes effect once, since this value should only ever increase
-    # afterward (AP-granted levels never decrease it back to 0).
-    instructions += [
-        _lbz(3, 0, 29),
-        _cmpwi(3, 0),
-        None,   # bne skip_init (filled below)
-        _li(3, PROGRESSIVE_LEVELING_BASELINE),
-        _stb(3, 0, 29),
-    ]
-    bne_init_idx = len(instructions) - 3
-    skip_init_idx = len(instructions)
-
-    instructions += [
         _lis(30, lvl_hi),               # r30 = &playerLevel
         _ori(30, 30, lvl_lo),
         _li(31, MAX_LEVEL_SAFETY_CAP),  # r31 = safety counter
     ]
 
-    loop_idx = len(instructions)
+    labels["loop"] = len(instructions)
     instructions += [
-        _lbz(3, 0, 29),                 # r3 = desired level
+        _lbz(3, 0, 29),                 # r3 = progressive_leveling (item count, NOT the target level)
+        _addi(3, 3, PROGRESSIVE_LEVELING_BASELINE),  # r3 = baseline + item count = actual desired level
+        _cmpwi(3, MAX_LEVEL),
     ]
     # Safety clamp: playerLevel can never exceed MAX_LEVEL (ProcessLevelUp's
-    # own hard gate), so if the stored desired value is ever set above it,
-    # "desired > current" would never become false - this would silently
-    # burn through the full 20-iteration safety cap every single tick,
-    # forever, looking like a freeze even though each individual tick does
+    # own hard gate), so if baseline+count ever computes above it, "desired
+    # > current" would never become false - this would silently burn
+    # through the full 20-iteration safety cap every single tick, forever,
+    # looking like a freeze even though each individual tick does
     # terminate.
-    instructions += [
-        _cmpwi(3, MAX_LEVEL),
-        None,   # ble skip_clamp (filled below)
-        _li(3, MAX_LEVEL),
-    ]
-    skip_clamp_idx = len(instructions)
+    idx = len(instructions)
+    instructions.append(None)
+    fills.append((idx, "ble", "skip_clamp"))
+    instructions.append(_li(3, MAX_LEVEL))
+    labels["skip_clamp"] = len(instructions)
 
     instructions += [
         _lbz(4, 0, 30),                 # r4 = current level
         _cmplw(3, 4),
-        None,   # ble done (filled below)
-        _cmpwi(31, 0),
-        None,   # beq done (filled below)
-        _addi(31, 31, -1),
-        None,   # bl ProcessLevelUp (filled below)
-        None,   # b loop (filled below)
     ]
-    done_idx = len(instructions)
+    idx = len(instructions)
+    instructions.append(None)
+    fills.append((idx, "ble", "done"))
+    instructions.append(_cmpwi(31, 0))
+    idx = len(instructions)
+    instructions.append(None)
+    fills.append((idx, "beq", "done"))
+    instructions.append(_addi(31, 31, -1))
+    idx = len(instructions)
+    instructions.append(None)
+    fills.append((idx, "bl", PROCESS_LEVEL_UP))
+    idx = len(instructions)
+    instructions.append(None)
+    fills.append((idx, "b", "loop"))
+    labels["done"] = len(instructions)
 
     epilogue = [
         _lwz(0, 36, 1),
@@ -185,12 +201,21 @@ def _build_stub(patcher):
     total_words = len(instructions) + len(epilogue)
     stub_addr = patcher.alloc_cave(total_words * 4)
 
-    instructions[bne_init_idx] = _bne(stub_addr + bne_init_idx * 4, stub_addr + skip_init_idx * 4)
-    instructions[loop_idx + 2] = _ble(stub_addr + (loop_idx + 2) * 4, stub_addr + skip_clamp_idx * 4)
-    instructions[loop_idx + 6] = _ble(stub_addr + (loop_idx + 6) * 4, stub_addr + done_idx * 4)
-    instructions[loop_idx + 8] = _beq(stub_addr + (loop_idx + 8) * 4, stub_addr + done_idx * 4)
-    instructions[loop_idx + 10] = patcher.make_bl(stub_addr + (loop_idx + 10) * 4, PROCESS_LEVEL_UP)
-    instructions[loop_idx + 11] = _b(stub_addr + (loop_idx + 11) * 4, stub_addr + loop_idx * 4)
+    for idx, kind, target in fills:
+        from_addr = stub_addr + idx * 4
+        if kind == "bl":
+            instructions[idx] = patcher.make_bl(from_addr, target)
+        elif kind == "b":
+            instructions[idx] = _b(from_addr, stub_addr + labels[target] * 4)
+        elif kind == "beq":
+            instructions[idx] = _beq(from_addr, stub_addr + labels[target] * 4)
+        elif kind == "ble":
+            instructions[idx] = _ble(from_addr, stub_addr + labels[target] * 4)
+        else:
+            raise ValueError(f"unknown fill kind: {kind}")
+
+    assert all(instr is not None for instr in instructions), \
+        "unfilled branch placeholder remained in mechanic_progressive_leveling stub"
 
     patcher.write_code(stub_addr, instructions + epilogue)
     return stub_addr

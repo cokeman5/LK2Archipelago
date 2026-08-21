@@ -547,6 +547,9 @@ def _apply_mechanics(patcher: ISOPatcher, output_data: dict, cardback_gtx: bytes
     from .Patch_Mechanics import mechanic_ap_key_item_opcode
     mechanic_ap_key_item_opcode.apply(patcher)
 
+    #from .Patch_Mechanics import mechanic_debug_memory_monitor
+    #mechanic_debug_memory_monitor.apply(patcher)
+
     if output_data.get("fairysanity", 0):
         from .Patch_Mechanics import mechanic_fairysanity
         mechanic_fairysanity.apply(patcher)

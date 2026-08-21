@@ -35,21 +35,27 @@ class ShopsanityConditionOption(Toggle):
     default = 0
 
 class CombosanityConditionOption(Toggle):
-    """Choose whether to add combos as checks.
+    """Choose whether to add combos as locations.
     +40 locations."""
     display_name = "Combosanity"
     default = 0
 
 class EnemysanityConditionOption(Choice):
-    """Choose whether to make every single unique enemy kill a check.
-    Be warned that spawn triggers in this game are very unintuitive, hidden, and
-    once a level is beaten it will have new enemy spawns. Please report any issue you encounter.
-    Enemysanity Plus includes all the enemies in the Proving Grounds.
-    +547 locations. Enemysanity Plus: additional +405"""
+    """Choose whether to make enemy kills into locations. Light means one check per "species" of enemy.
+    While standard enemysanity is one check per instance of an enemy.
+    Plus means that enemies in the Proving Grounds will be included, otherwise they are excluded.
+    Be warned that some spawn triggers in this game are very unintuitive, hidden, and
+    once a level is beaten it will have new enemy spawn triggers. Please report any issue you encounter.
+    Light: +106 locations
+    Light Plus: +196 locations
+    Enemysanity: +530 locations
+    Enemysanity Plus: +935 locations"""
     display_name = "Enemysanity"
     option_disabled = 0
-    option_enemysanity = 1
-    option_enemysanity_plus = 2
+    option_enemysanity_light = 1
+    option_enemysanity_light_plus = 2
+    option_enemysanity = 3
+    option_enemysanity_plus = 4
     default = 0
 
 class ProgressiveLevelingOption(Toggle):
@@ -78,7 +84,8 @@ class ExcludeSacredBattleArenaChecksOption(Toggle):
 class LevelUnlocksAsItems(Toggle):
     """Whether to add level unlocks to the pool.
     Instead of unlocking a level after beating a level, you must find the level unlocks as AP items
-    Takes precedence over Level randomization."""
+    Takes precedence over Level randomization.
+    Experimental; there may be serious bugs, so play at your own risk, and report any issues."""
     display_name = "Level Unlocks as Items"
     default = 0
 

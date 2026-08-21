@@ -110,10 +110,25 @@ S23_ISO_OFFSET = 0xc98b540
 
 # File-relative offsets within s23.pds of all 3 "has Olf Runestone
 # already been obtained" checks (opcode 135, argument 24 - key item
-# index 23, Olf Runestone). A 4th, unrelated opcode-135 check in this
-# same file (argument 15, Mysterious Key, same as seen in s01.pds) is
-# deliberately NOT touched.
+# index 23, Olf Runestone).
 S23_OLF_RUNESTONE_CHECK_OFFSETS = [0x42b89c, 0x42d14c, 0x42d5e4]
+
+# File-relative offset within s23.pds of the single "has Mysterious Key
+# already been obtained" check (opcode 135, argument 15 - key item
+# index 14, Mysterious Key, the same item whose 5 checks in s01.pds are
+# deliberately left alone). This was previously excluded here as
+# "unrelated"; now redirected per explicit request. It is the only
+# argument-15 occurrence in this file - a full scan of s23.pds for the
+# opcode-135 signature (header 0x00870002, arg0 0x00040000) returns
+# exactly 4 hits: the 3 Olf Runestone ones above, plus this one.
+#
+# NOTE on naming: "Mysterious Key" follows this file's own existing
+# 1-indexed key-item annotations. Locations.py's own Key Item entry for
+# this level at the matching bitOffset 15 is named "Sacred Battle Arena
+# 1 - Gurd Reward" (location_id 20015) - i.e. the AP location that
+# grants it, not the item itself. Worth confirming the two really do
+# refer to the same thing before relying on this in logic.
+S23_MYSTERIOUS_KEY_CHECK_OFFSETS = [0x42d614]
 
 # File-relative offsets within s20.pds of the 1st and 3rd of 3 "has
 # Nebeth Runestone already been obtained" checks (opcode 135, argument
@@ -310,6 +325,13 @@ def apply(patcher):
         S23_ISO_OFFSET,
         S23_OLF_RUNESTONE_CHECK_OFFSETS,
         "s23.pds",
+    )
+
+    _redirect_opcode_135_checks(
+        patcher,
+        S23_ISO_OFFSET,
+        S23_MYSTERIOUS_KEY_CHECK_OFFSETS,
+        "s23.pds (Mysterious Key)",
     )
 
     _redirect_opcode_135_checks(

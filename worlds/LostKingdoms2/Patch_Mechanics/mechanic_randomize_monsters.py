@@ -615,15 +615,21 @@ def _group_swaps_by_target_level(swaps):
 
 LEVEL_ID_ADDR = 0x80209262  # byte holding the currently-loading level's own numeric ID - see _infer_level_id() above
 
-# --- Hook point 1: immediately after LoadLevelAndShowLoadingScreen's own
-# "QueueAsyncFileLoad(3, (&DAT_80205af0)[levelId], 0, BuildKnownCardList)"
-# call - confirmed via direct disassembly search for "li r3,3" immediately
-# followed by a bl to QueueAsyncFileLoad (0x80044C34). HOOK_ADDR's own
-# instruction (`lwz r0, -0x5380(r2)`, loading DAT_802eca40) is overwritten
-# with `bl stub_addr`; its own return address (LR, set automatically by
-# bl) lands exactly on the instruction after the one we overwrote.
-HOOK_ADDR = 0x800533A4
-ORIGINAL_HOOK_INSTRUCTION = 0x8002AC80  # lwz r0, -0x5380(r2) - relocated, executed at the very end of our stub
+# --- REVISION 32: HOOK1/HOOK_ADDR is no longer installed at all - kept
+# here as historical reference only (both constants below are now
+# unused by any active code). Originally installed immediately after
+# LoadLevelAndShowLoadingScreen's own "QueueAsyncFileLoad(3, (&DAT_
+# 80205af0)[levelId], 0, BuildKnownCardList)" call - but once sound,
+# file_buffer/donor model data, and CTM/texture loading all moved to
+# HOOK2 (each for its own, independent timing reason - see each
+# section's own comment near HOOK2 for specifics), nothing this hook's
+# own loop computed was still consumed anywhere; HOOK2 already,
+# independently recomputes every one of those same values itself. The
+# native instruction this address originally held (`lwz r0, -0x5380
+# (r2)`, loading DAT_802eca40) is left completely untouched now, since
+# nothing patches this address anymore at all. ---
+HOOK_ADDR = 0x800533A4  # unused - see REVISION 32 note above
+ORIGINAL_HOOK_INSTRUCTION = 0x8002AC80  # unused - see REVISION 32 note above
 
 # --- Hook point 2: LoadLevelAndShowLoadingScreen's own while loop (which
 # drains the native async queue, including the level file's own
@@ -800,6 +806,32 @@ POLL_CONTROLLER = 0x80005BA4        # PollControllerState
 DC_INVALIDATE = 0x800F30CC          # DCInvalidateRange(addr, size)
 DVD_CLOSE = 0x800F9B90              # DVDClose(fileInfo*)
 DECODE_RESOURCE_POOL = 0x80056908   # DecodeResourcePoolCategory
+# REVISION 36: the native counterpart to DECODE_RESOURCE_POOL's own
+# internal allocation. DecodeResourcePoolCategory ends with:
+#     if (*(ushort *)((int)resourceHandle + 10) != 0) {
+#       categoryValue = MemAlloc((uint)*(ushort *)(resourceHandle+10) << 2);
+#       resourceHandle[6] = categoryValue;      // == byte offset 0x18
+#       ... fills it with fixed-up sub-model pointers ...
+#     }
+# and FreeLevelDataBuffer is the matching free:
+#     if (*(int *)(dataBlock + 0x18) != 0) MemFree(*(int *)(dataBlock + 0x18));
+#     *(undefined4 *)(dataBlock + 0x18) = 0;
+# Native always pairs the two (FreeCardResourceSlot does exactly this for
+# its own slots). This mechanic called the decode half once per record
+# but never the free half, leaking one array per swapped monster per
+# level visit - confirmed empirically by elimination: disabling sound
+# changed nothing, disabling the CTM block changed nothing, and
+# disabling the model-data block (which contains the
+# DecodeResourcePoolCategory call) took the leak to exactly zero.
+# The leaked size is (subCount << 2), read from the DONOR's own data,
+# which is why the measured per-record size varied by monster (~176-192
+# bytes = 44-48 entries) rather than being a fixed struct size.
+# Safe to call unconditionally: it null-checks 0x18 before freeing and
+# zeroes the field afterwards, so it is idempotent - if native also
+# frees this same slot (our SLOT_BASE_ADDR region overlaps the array
+# FreeCardResourceSlot indexes), the second call is a no-op rather than
+# a double free.
+FREE_LEVEL_DATA_BUFFER = 0x800567C8  # FreeLevelDataBuffer(dataBlock)
 GET_OWNED_CARD_RECORD = 0x80065678  # GetOwnedCardRecord(playerIndex, cardId)
 MEM_ALLOC = 0x800060A0               # MemAlloc(size) - single-param wrapper, confirmed via prior disassembly
 MEM_FREE = 0x800f2c9c                # the REAL underlying free implementation (called "FUN_800f2c9c" in decompiled
@@ -859,9 +891,19 @@ SOUND_SLOT_BUFFER_BASE = SOUND_SLOT_FLAG_BASE - 0x14
 # earlier levels first (each one re-queueing loads for whichever
 # donors happen to repeat) crashed with a severe CPU exception -
 # consistent with a heap eventually exhausted/corrupted by this many
-# accumulated, never-freed allocations. Fixed as part of the same
-# flag=3 deferred-cleanup mechanism below, which now frees THIS
-# location instead of SOUND_SLOT_BUFFER_BASE.
+# accumulated, never-freed allocations.
+#
+# FIXED via one-visit-deferred freeing - see PENDING_SAM_FREE_SCRATCH_
+# ADDR's own docstring, near the other per-record scratch array
+# allocations below, for the full mechanism and the two, different,
+# more "precise" earlier attempts (immediate free; calling native
+# ResetAudioForLevelChange directly) that were tried and reverted
+# first, both for corrupting native OS/audio state in different ways.
+# NOT YET LIVE-VERIFIED as of this fix's own introduction - the
+# reasoning (one full level visit is certainly long enough for any
+# sound effect to finish) is sound, but hasn't been confirmed against
+# an actual crash-reproduction the way the earlier attempts were
+# confirmed to fail.
 REAL_SAM_BUFFER_BASE = SOUND_SLOT_BUFFER_BASE + 0xc
 
 # ResetAudioForLevelChange (0x80094A84) - the game's own native
@@ -891,10 +933,6 @@ def _lwz(rD, offset, rA):
 
 def _lbz(rD, offset, rA):
     return 0x88000000 | (rD << 21) | (rA << 16) | (offset & 0xFFFF)
-
-
-def _lbzx(rD, rA, rB):
-    return 0x7C0000AE | (rD << 21) | (rA << 16) | (rB << 11)
 
 
 def _stw(rS, offset, rA):
@@ -945,12 +983,20 @@ def _cmpwi(rA, simm):
     return 0x2C000000 | (rA << 16) | (simm & 0xFFFF)
 
 
+def _cmplwi(rA, uimm):
+    return 0x28000000 | (rA << 16) | (uimm & 0xFFFF)
+
+
 def _beq(from_addr, to_addr):
     return 0x41820000 | ((to_addr - from_addr) & 0xFFFC)
 
 
 def _bne(from_addr, to_addr):
     return 0x40820000 | ((to_addr - from_addr) & 0xFFFC)
+
+
+def _bgt(from_addr, to_addr):
+    return 0x41810000 | ((to_addr - from_addr) & 0xFFFC)
 
 
 def _b(from_addr, to_addr):
@@ -1326,14 +1372,86 @@ def apply(patcher, output_data):
     # the pointer into our own ctm_buffer, gets read again later,
     # likely by a lazy/deferred GX texture upload, not just during
     # that initial decode.)
+    # REVISION 37 (cave-space pass): target_slot_addr was being
+    # recomputed from scratch at FIVE separate points inside a single
+    # record's own body, 9 instructions each (read record ptr, load
+    # table_index, multiply by stride, add base). It is identical at
+    # every one of those points, so compute it once and reload it in 3.
+    # A register would be cheaper still, but HOOK2 preserves no
+    # callee-saved registers (it saves LR to a static word rather than
+    # carving a frame), so anything held across its bl calls has to
+    # live in memory.
+    current_target_slot_addr_addr = patcher.alloc_cave(4)
     current_ctm_buffer_slot_addr_addr = patcher.alloc_cave(4)
     current_file_buffer_slot_addr_addr = patcher.alloc_cave(4)
     last_ctm_buffer_scratch_addr = patcher.alloc_cave(max_group_size * 4)
     last_file_buffer_scratch_addr = patcher.alloc_cave(max_group_size * 4)
+    # REVISION 37 (cave-space pass): the REVISION 36/36b machinery
+    # that used to live here - a last_target_slot_scratch_addr array,
+    # its zeroing pass, a per-record store in HOOK2, and a matching
+    # FreeLevelDataBuffer call in EXIT_HOOK - has been REMOVED as
+    # redundant. It existed to free the array OUR own
+    # DecodeResourcePoolCategory call allocates into the slot
+    # ("B"), but the native exit-time cleanup already reclaims that
+    # slot: before any fix, the measured leak was exactly ONE block
+    # per record, not two, and the block that leaked was the NATIVE
+    # array ("A") our re-decode orphaned - which means B was always
+    # being freed by native. REVISION 36c's pre-free (immediately
+    # before the decode call in HOOK2) is what actually fixes the
+    # leak, and it is sufficient on its own.
     for i in range(max_group_size):
         patcher.patch_word(last_ctm_buffer_scratch_addr + i * 4, 0)
         patcher.patch_word(last_file_buffer_scratch_addr + i * 4, 0)
 
+    # --- REVISION 34: the .sam "leak" does not exist, and the
+    # one-visit-deferred free that used to live here has been REMOVED
+    # (along with its PENDING_SAM_FREE_SCRATCH_ADDR array, its
+    # free-loop at the top of hook2, and its stash step down in the
+    # sound-loading section).
+    #
+    # Confirmed directly in the decompiled source: ProcessAsyncLoadQueue
+    # has TWO switches on the load type - one that STARTS the load and
+    # one that runs on COMPLETION. For type 0x13 (the .sam load, which
+    # is exactly the type this mechanic queues too), the completion
+    # handler runs, unconditionally:
+    #
+    #     case 0x13:
+    #       LoadShopUIElement(sound_id, sound_id);   // fixes up the
+    #                                                // slot's other
+    #                                                // pointer fields,
+    #                                                // then hands them
+    #                                                // to FUN_80139600
+    #       FreeShopUIElement(sound_id);             // MemFree(
+    #                                                // REAL_SAM_BUFFER_
+    #                                                // BASE[sound_id])
+    #
+    # i.e. the native game ALREADY frees the .sam buffer itself, the
+    # moment the load completes - almost certainly because FUN_80139600
+    # has by then uploaded the raw samples to ARAM (audio RAM), making
+    # the main-RAM staging copy dead weight. The smaller .pps sequence
+    # data (offset +0 in the same slot struct) is CPU-read and stays
+    # resident, which is why only IT is freed later, in
+    # ResetAudioForLevelChange.
+    #
+    # Crucially, FreeShopUIElement does NOT null the field afterwards,
+    # so REAL_SAM_BUFFER_BASE[sound_id] is left holding a DANGLING
+    # pointer to already-freed memory. Every "leak fix" attempt in this
+    # file's own history was therefore reading a stale pointer and
+    # handing it to MemFree a second time - a straight double free.
+    #
+    # This was confirmed live, and explains every symptom seen while
+    # chasing it: the pointer always looked perfectly valid (it WAS a
+    # real allocation, just already freed); the crash was always inside
+    # MEM_FREE's own free-list insert/coalesce walk; the "allocator
+    # header" at ptr-0x1c/ptr-0x20 contained float-shaped audio/texture
+    # bytes (the freed block had since been recycled and written over by
+    # some later allocation); it took 2+ visits to the SAME level before
+    # leaving to reproduce (the block has to actually get reused in
+    # between); and NOPing the free-loop made it disappear entirely.
+    #
+    # DO NOT re-add any .sam freeing here. Nothing this mechanic
+    # allocates for sound needs freeing - the native completion handler
+    # covers our type-0x13 loads exactly as it covers its own. ---
     # --- REVISION 26: the global run table (one shared copy, indexed
     # by each record's own native_run_id) plus a matching per-run
     # runtime cursor array. Each run entry is (start_offset,
@@ -1466,10 +1584,10 @@ def apply(patcher, output_data):
         since r3 is about to be overwritten), r3 = memoryArenaHandle's
         own CURRENT value (loaded fresh - it's a real game global, not
         a fixed constant, so it must be read at call time, not baked
-        in). Every call site in this file happens to already have the
-        pointer to free sitting in r3 (from the lwz that read it), so
-        ptr_reg is always 3 in practice, but this takes the register
-        explicitly rather than assuming that silently."""
+        in). Takes the register explicitly since call sites vary (all
+        three current EXIT_HOOK call sites pass 5, having just loaded
+        the pointer to free into r5 via an lwz) rather than assuming
+        any one fixed register silently."""
         instructions.append(_mr(4, ptr_reg))
         instructions += emit_load_mem_word(3, MEMORY_ARENA_HANDLE_ADDR)
         idx = len(instructions)
@@ -1555,411 +1673,6 @@ def apply(patcher, output_data):
         fills.append((idx, "bl", format_digits_addr))
 
     # ================================================================
-    # HOOK1 stub: ONE shared loop over every record in the table (not
-    # grouped by level anymore - the per-record level check below is
-    # cheap and makes the old group-branching machinery unnecessary).
-    # For each record whose own target_level_id matches the level
-    # currently loading: sound preload, texture preload, donor model
-    # data load (saving the computed donor address into
-    # donor_addr_scratch[donor_scratch_idx] for HOOK2 to pick up later
-    # - NOT written to the target slot yet, since FixupLevelSceneData's
-    # own native processing, which runs later during the while loop
-    # this hook precedes, would silently overwrite it).
-    # ================================================================
-    instructions = [
-        _mflr(0),
-        _lis(3, hi(lr_save_addr)),
-        _ori(3, 3, lo(lr_save_addr)),
-        _stw(0, 0, 3),
-        _lis(3, hi(r29_save_addr)),
-        _ori(3, 3, lo(r29_save_addr)),
-        _stw(29, 0, 3),
-        _lis(3, hi(r30_save_addr)),
-        _ori(3, 3, lo(r30_save_addr)),
-        _stw(30, 0, 3),
-    ]
-
-    fills = []
-    labels = {}
-
-    # init current_record_ptr = records_addr
-    instructions += emit_load_addr(3, records_addr)
-    instructions += emit_store_mem_word(3, 4, current_record_ptr_addr)
-    # init donor_scratch_idx = 0
-    instructions.append(_li(3, 0))
-    instructions += emit_store_mem_word(3, 4, donor_scratch_idx_addr)
-
-    # Zero this visit's own buffer-tracking arrays fresh, every time
-    # HOOK1 runs - they must not carry over stale pointers from a
-    # previous, unrelated level's own visit; EXIT_HOOK relies on these
-    # correctly reflecting only what THIS visit allocated. Uses real
-    # runtime loops (not Python-side unrolling) to keep code size fixed
-    # regardless of max_group_size.
-    emit_zero_array(fills, instructions, labels, "ctm", last_ctm_buffer_scratch_addr, max_group_size)
-    emit_zero_array(fills, instructions, labels, "file", last_file_buffer_scratch_addr, max_group_size)
-    emit_zero_array(fills, instructions, labels, "texarr", last_resolved_texture_array_scratch_addr, max_group_size)
-    emit_zero_array(fills, instructions, labels, "runcursor", run_cursor_scratch_addr, len(RUN_TABLE))
-
-    # table_descriptor_scratch_addr was ONLY ever zeroed once, at
-    # ISO-build time (patcher.patch_word, near its own alloc_cave call)
-    # - confirmed a genuine gap: unlike the four arrays above, it never
-    # got this same runtime reset, so it could carry a STALE pointer
-    # from a previous visit into a new one. This matters specifically
-    # because HOOK1's own texture-load failure paths (ctm_open_failed/
-    # ctm_memalloc_failed/ctm_read_start_failed) all skip straight to
-    # _done without ever writing this record's own table_descriptor
-    # slot - if a texture load ever fails for a given record on a
-    # LATER visit, that slot would still hold the pointer written
-    # there on an EARLIER visit, one EXIT_HOOK already freed back
-    # then. This visit's own EXIT_HOOK would then find that same,
-    # already-freed pointer and free it again - a double-free,
-    # corrupting the memory arena's own free-list, with the resulting
-    # crash only surfacing later - and only on a level/donor where a
-    # load happens to fail on a repeat visit, never on the first load,
-    # matching the reported symptom exactly (only ever seen after
-    # multiple re-entries, never immediately). 3 words per slot
-    # (count/unused/array_ptr), so max_group_size*3 words total.
-    emit_zero_array(fills, instructions, labels, "tabledesc", table_descriptor_scratch_addr, max_group_size * 3)
-
-    labels["loop_top"] = len(instructions)
-    instructions += emit_load_mem_word(3, current_record_ptr_addr)
-    instructions += emit_load_addr(4, records_end_addr)
-    instructions.append(_cmplw(3, 4))
-    idx = len(instructions)
-    instructions.append(None)
-    fills.append((idx, "bge", "loop_done"))
-
-    # --- level check ---
-    instructions += emit_load_field(5, REC_TARGET_LEVEL_ID, 1)
-    instructions += emit_load_addr(6, LEVEL_ID_ADDR)
-    instructions.append(_lbz(6, 0, 6))
-    instructions.append(_cmplw(5, 6))
-    idx = len(instructions)
-    instructions.append(None)
-    fills.append((idx, "bne", "next_record"))
-
-    # --- claim this record's own scratch slot UNCONDITIONALLY, right
-    # here, before any of the sound/texture work below that can fail
-    # and jump ahead to {tag}_done - the slot must be claimed (and the
-    # counter advanced) purely based on "this record's own level
-    # matched", the SAME criterion HOOK2 uses for its own independent
-    # idx sequence, so the two stay aligned even if this record's own
-    # texture load fails partway through. ---
-    instructions += emit_load_mem_word(3, donor_scratch_idx_addr)
-    instructions.append(_rlwinm(3, 3, 2, 0, 29))  # r3 = idx * 4 (byte offset), reused below - shift-left-2, saves an instruction vs li+mullw
-
-    # --- REVISION 28: resolve this record's own donor_pool_index into
-    # a real DONOR_TABLE entry address once, right here, and cache it. ---
-    instructions += emit_load_field(7, REC_DONOR_POOL_INDEX, 1)
-    instructions += [_li(8, DONOR_TABLE_ENTRY_SIZE), _mullw(7, 7, 8)]
-    instructions += emit_load_addr(8, donor_table_addr)
-    instructions += [_add(7, 7, 8)]
-    instructions += emit_store_mem_word(7, 8, current_donor_table_entry_addr_addr)
-
-    instructions += emit_load_addr(4, last_ctm_buffer_scratch_addr)
-    instructions += [_add(5, 3, 4)]
-    instructions += emit_store_mem_word(5, 6, current_ctm_buffer_slot_addr_addr)
-
-    instructions += emit_load_addr(4, last_resolved_texture_array_scratch_addr)
-    instructions += [_add(5, 3, 4)]
-    instructions += emit_store_mem_word(5, 6, current_resolved_texture_array_slot_addr_addr)
-
-    # table_descriptor is a 12-byte (3-word) struct per slot, not 4 -
-    # recompute idx * 12 separately (r3 above holds idx * 4).
-    instructions += emit_load_mem_word(3, donor_scratch_idx_addr)
-    instructions += [_li(4, 12), _mullw(3, 3, 4)]
-    instructions += emit_load_addr(4, table_descriptor_scratch_addr)
-    instructions += [_add(5, 3, 4)]
-    instructions += emit_store_mem_word(5, 6, current_table_descriptor_addr_addr)
-
-    instructions += emit_load_mem_word(3, donor_scratch_idx_addr)
-    instructions.append(_addi(3, 3, 1))
-    instructions += emit_store_mem_word(3, 4, donor_scratch_idx_addr)
-
-    tag = "hook1"  # single shared body now - no per-swap tag needed
-
-    # NOTE: sound loading used to happen here, in HOOK1. Moved to HOOK2
-    # - see this file's own top-of-HOOK2 comment for why.
-
-    # === TEXTURE: format donor_card_id into ctm path, then load ===
-    labels[f"{tag}_texture_start"] = len(instructions)
-    emit_format_digits_call_donor(fills, instructions, DTE_DONOR_CARD_ID, 1, ctm_path_addr + CTM_PATH_DIGITS_OFFSET, 3)
-
-    instructions += emit_load_addr(3, ctm_path_addr)
-    idx = len(instructions)
-    instructions.append(None)
-    fills.append((idx, "bl", DVD_CONVERT_PATH))
-    instructions += [
-        _mr(29, 3),
-        _cmpwi(3, -1),
-    ]
-    idx = len(instructions)
-    instructions.append(None)
-    fills.append((idx, "beq", f"{tag}_texture_skip"))
-
-    instructions += [
-        _mr(3, 29),
-        _lis(4, hi(fileinfo_addr)),
-        _ori(4, 4, lo(fileinfo_addr)),
-    ]
-    idx = len(instructions)
-    instructions.append(None)
-    fills.append((idx, "bl", DVD_FAST_OPEN))
-    instructions += [_cmpwi(3, 0)]
-    idx = len(instructions)
-    instructions.append(None)
-    fills.append((idx, "beq", f"{tag}_ctm_open_failed"))
-
-    instructions += [
-        _lis(3, hi(fileinfo_addr)),
-        _ori(3, 3, lo(fileinfo_addr)),
-        _lwz(3, DVDFILEINFO_SIZE_OFFSET, 3),
-        _addi(3, 3, 0x1f),
-        _rlwinm(3, 3, 0, 0, 26),
-        _lis(6, hi(ctm_size_var_addr)),
-        _ori(6, 6, lo(ctm_size_var_addr)),
-        _stw(3, 0, 6),
-    ]
-
-    idx = len(instructions)
-    instructions.append(None)
-    fills.append((idx, "bl", MEM_ALLOC))
-    instructions += [
-        _lis(6, hi(ctm_buffer_var_addr)),
-        _ori(6, 6, lo(ctm_buffer_var_addr)),
-        _stw(3, 0, 6),
-        _mr(30, 3),
-        _cmpwi(3, 0),
-    ]
-    idx = len(instructions)
-    instructions.append(None)
-    fills.append((idx, "beq", f"{tag}_ctm_memalloc_failed"))
-
-    # --- REVISION 16: record THIS VISIT's own ctm_buffer pointer for
-    # EXIT_HOOK to free at the real end of this same visit. ---
-    instructions += emit_load_mem_word(4, current_ctm_buffer_slot_addr_addr)
-    instructions.append(_stw(3, 0, 4))
-
-    instructions += [
-        _lis(3, hi(fileinfo_addr)),
-        _ori(3, 3, lo(fileinfo_addr)),
-        _mr(4, 30),
-        _lis(5, hi(ctm_size_var_addr)),
-        _ori(5, 5, lo(ctm_size_var_addr)),
-        _lwz(5, 0, 5),
-        _li(6, 0),
-        _lis(7, hi(callback_stub_addr)),
-        _ori(7, 7, lo(callback_stub_addr)),
-        _li(8, 2),
-    ]
-    idx = len(instructions)
-    instructions.append(None)
-    fills.append((idx, "bl", ASYNC_READ))
-    instructions += [_cmpwi(3, 0)]
-    idx = len(instructions)
-    instructions.append(None)
-    fills.append((idx, "beq", f"{tag}_ctm_read_start_failed"))
-
-    instructions += [
-        _lis(3, hi(COMPLETION_FLAG_ADDR)),
-        _ori(3, 3, lo(COMPLETION_FLAG_ADDR)),
-        _li(4, 0),
-        _stb(4, 0, 3),
-    ]
-
-    labels[f"{tag}_ctm_poll_loop"] = len(instructions)
-    instructions += [
-        _lis(3, hi(COMPLETION_FLAG_ADDR)),
-        _ori(3, 3, lo(COMPLETION_FLAG_ADDR)),
-        _lbz(3, 0, 3),
-        _cmpwi(3, 0),
-    ]
-    idx = len(instructions)
-    instructions.append(None)
-    fills.append((idx, "bne", f"{tag}_ctm_poll_done"))
-
-    idx = len(instructions)
-    instructions.append(None)
-    fills.append((idx, "bl", CHECK_DVD_STATUS))
-    instructions += [_cmpwi(3, 0)]
-    idx = len(instructions)
-    instructions.append(None)
-    fills.append((idx, "bne", f"{tag}_ctm_drive_ready"))
-
-    idx = len(instructions)
-    instructions.append(None)
-    fills.append((idx, "bl", MUTE_AUDIO))
-    idx = len(instructions)
-    instructions.append(None)
-    fills.append((idx, "b", f"{tag}_ctm_poll_continue"))
-
-    labels[f"{tag}_ctm_drive_ready"] = len(instructions)
-    idx = len(instructions)
-    instructions.append(None)
-    fills.append((idx, "bl", POLL_CONTROLLER))
-
-    labels[f"{tag}_ctm_poll_continue"] = len(instructions)
-    idx = len(instructions)
-    instructions.append(None)
-    fills.append((idx, "b", f"{tag}_ctm_poll_loop"))
-
-    labels[f"{tag}_ctm_poll_done"] = len(instructions)
-    instructions += [
-        _mr(3, 30),
-        _lis(4, hi(ctm_size_var_addr)),
-        _ori(4, 4, lo(ctm_size_var_addr)),
-        _lwz(4, 0, 4),
-    ]
-    idx = len(instructions)
-    instructions.append(None)
-    fills.append((idx, "bl", DC_INVALIDATE))
-    instructions += [
-        _lis(3, hi(fileinfo_addr)),
-        _ori(3, 3, lo(fileinfo_addr)),
-    ]
-    idx = len(instructions)
-    instructions.append(None)
-    fills.append((idx, "bl", DVD_CLOSE))
-
-    instructions += [
-        _mr(3, 30),
-        _lwz(4, 8, 30),
-        _add(3, 3, 4),
-    ]
-    instructions += emit_load_mem_word(4, current_table_descriptor_addr_addr)
-    instructions += [
-        _stw(3, 4, 4),
-        _mr(3, 4),
-    ]
-    idx = len(instructions)
-    instructions.append(None)
-    fills.append((idx, "bl", LOAD_ENTITY_ANIMATION_TABLE))
-
-    # --- REVISION 17: track tableDescriptor[2] (the resolved-texture-
-    # array LoadEntityAnimationTable itself MemAlloc's internally) so
-    # EXIT_HOOK can free it too - previously invisible to us entirely,
-    # and previously orphaned every time a shared table_descriptor got
-    # reused for the next monster in the same level. ---
-    instructions += emit_load_mem_word(3, current_table_descriptor_addr_addr)
-    instructions.append(_lwz(3, 8, 3))
-    instructions += emit_load_mem_word(4, current_resolved_texture_array_slot_addr_addr)
-    instructions.append(_stw(3, 0, 4))
-
-    # --- REVISION 21 CORRECTION: an earlier version of this revision
-    # freed ctm_buffer immediately after LoadEntityAnimationTable
-    # returned, reasoning that the decoded texture data lives in its
-    # own separate fields (cacheEntryScan+0x10/+0x30) and the raw
-    # source pointer (materialData, cacheEntryScan+0xc) was only read
-    # during that synchronous decode. CONFIRMED WRONG via direct
-    # testing: doing so broke every donor's own texture. materialData
-    # is read again later - almost certainly by a lazy/deferred GPU
-    # texture upload step this project hasn't traced yet - so
-    # ctm_buffer needs the same full-level-visit lifetime as
-    # file_buffer after all. Reverted to freeing it at EXIT_HOOK only,
-    # same as everything else. See this file's own docstring for the
-    # actual, still-unresolved memory-pressure problem this was trying
-    # to fix (a large native MemAlloc, for an unrelated level-7
-    # cutscene, failing because of how much memory our own resident
-    # donor buffers hold at once) - a different, safer fix is needed.
-
-    labels[f"{tag}_texture_skip"] = len(instructions)
-
-    # --- ctm-load failure paths (best-effort, non-fatal - skip ahead
-    # to _done). NOTE: ctm_open_failed's own target changed from
-    # texture_skip to _done directly - with the donor-model-data block
-    # now moved to HOOK2, texture_skip and _done became the SAME
-    # index (nothing left between them), which would have made this
-    # "b" branch to itself (exactly the REVISION 8 bug this file's own
-    # top docstring warns about). Targeting _done instead is safe
-    # because ctm_memalloc_failed/ctm_read_start_failed's own real
-    # instructions (the DVD_CLOSE calls) sit between this block and
-    # _done's own label, so _done resolves to a genuinely later index. ---
-    labels[f"{tag}_ctm_open_failed"] = len(instructions)
-    idx = len(instructions)
-    instructions.append(None)
-    fills.append((idx, "b", f"{tag}_done"))
-
-    labels[f"{tag}_ctm_memalloc_failed"] = len(instructions)
-    instructions += [
-        _lis(3, hi(fileinfo_addr)),
-        _ori(3, 3, lo(fileinfo_addr)),
-    ]
-    idx = len(instructions)
-    instructions.append(None)
-    fills.append((idx, "bl", DVD_CLOSE))
-    idx = len(instructions)
-    instructions.append(None)
-    fills.append((idx, "b", f"{tag}_done"))
-
-    labels[f"{tag}_ctm_read_start_failed"] = len(instructions)
-    instructions += [
-        _lis(3, hi(fileinfo_addr)),
-        _ori(3, 3, lo(fileinfo_addr)),
-    ]
-    idx = len(instructions)
-    instructions.append(None)
-    fills.append((idx, "bl", DVD_CLOSE))
-    idx = len(instructions)
-    instructions.append(None)
-    fills.append((idx, "b", f"{tag}_done"))
-
-    labels[f"{tag}_done"] = len(instructions)
-
-    labels["next_record"] = len(instructions)
-    instructions += emit_load_mem_word(3, current_record_ptr_addr)
-    instructions.append(_addi(3, 3, RECORD_SIZE))
-    instructions += emit_store_mem_word(3, 4, current_record_ptr_addr)
-    idx = len(instructions)
-    instructions.append(None)
-    fills.append((idx, "b", "loop_top"))
-
-    labels["loop_done"] = len(instructions)
-    instructions += [
-        _lis(3, hi(lr_save_addr)),
-        _ori(3, 3, lo(lr_save_addr)),
-        _lwz(3, 0, 3),
-        _mtlr(3),
-        _lis(3, hi(r29_save_addr)),
-        _ori(3, 3, lo(r29_save_addr)),
-        _lwz(29, 0, 3),
-        _lis(3, hi(r30_save_addr)),
-        _ori(3, 3, lo(r30_save_addr)),
-        _lwz(30, 0, 3),
-        ORIGINAL_HOOK_INSTRUCTION,
-        0x4E800020,  # blr
-    ]
-
-    total_words = len(instructions)
-    stub_addr = patcher.alloc_cave(total_words * 4)
-
-    branch_makers = {
-        "b": _b,
-        "bl": None,
-        "beq": _beq,
-        "bne": _bne,
-        "bge": _bge,
-        "bdnz": _bdnz,
-        "blt": _blt,
-    }
-
-    for f_idx, kind, target in fills:
-        from_addr = stub_addr + f_idx * 4
-        if kind == "bl":
-            if isinstance(target, str):
-                to_addr = stub_addr + labels[target] * 4
-                instructions[f_idx] = patcher.make_bl(from_addr, to_addr)
-            else:
-                instructions[f_idx] = patcher.make_bl(from_addr, target)
-        else:
-            to_addr = stub_addr + labels[target] * 4
-            instructions[f_idx] = branch_makers[kind](from_addr, to_addr)
-
-    patcher.write_code(stub_addr, instructions)
-    patcher.write_branch(HOOK_ADDR, stub_addr, link=True)
-    logger.info(f"[mechanic_randomize_monsters] stub_addr = {hex(stub_addr)}")
-    logger.info(f"[mechanic_randomize_monsters] HOOK_ADDR = {hex(HOOK_ADDR)} (patched to bl {hex(stub_addr)})")
-
-    # ================================================================
     # HOOK2 stub: same flat loop structure as HOOK1, over the same
     # record table - for each record whose target_level_id matches,
     # read back the donor address HOOK1 computed and stashed into
@@ -2007,18 +1720,38 @@ def apply(patcher, output_data):
     # genuinely different approach is found, not just a different
     # timing within the same approach.
 
-    # REMOVED (per explicit request): an earlier version of this file
-    # relocated HOOK1's own texture-loading loop to run as a nested
-    # subroutine call from here, timed to avoid a hypothesized DVD/
-    # file-contention hazard. That hypothesis turned out not to
-    # explain the actual, reported audio issue, and the extra nesting
-    # complexity/cave cost wasn't earning its keep - HOOK1 is back to
-    # its own, direct installation at HOOK_ADDR.
+    # REVISION 32: HOOK1 removed entirely - once sound, file_buffer/
+    # model data, and CTM/texture loading all moved here, HOOK1's own
+    # loop had nothing left to do (every value it computed was already
+    # independently, redundantly recomputed here too). See this file's
+    # own REVISION 32 note near HOOK_ADDR's own (former) definition for
+    # the fuller rationale.
 
     instructions2 += emit_load_addr(3, records_addr)
     instructions2 += emit_store_mem_word(3, 4, current_record_ptr_addr)
     instructions2.append(_li(3, 0))
     instructions2 += emit_store_mem_word(3, 4, donor_scratch_idx_addr)
+
+    # --- MOVED FROM HOOK1 (REVISION 32): zero this visit's own buffer-
+    # tracking arrays fresh, every time this hook runs - they must not
+    # carry over stale pointers from a previous, unrelated level's own
+    # visit; EXIT_HOOK relies on these correctly reflecting only what
+    # THIS visit allocated. This used to run at HOOK1's own start,
+    # before HOOK1 itself became entirely redundant and was removed -
+    # moved here rather than dropped, since the correctness requirement
+    # itself didn't go away just because HOOK1 did. ---
+    emit_zero_array(fills2, instructions2, labels2, "ctm", last_ctm_buffer_scratch_addr, max_group_size)
+    emit_zero_array(fills2, instructions2, labels2, "file", last_file_buffer_scratch_addr, max_group_size)
+    emit_zero_array(fills2, instructions2, labels2, "texarr", last_resolved_texture_array_scratch_addr, max_group_size)
+    emit_zero_array(fills2, instructions2, labels2, "runcursor", run_cursor_scratch_addr, len(RUN_TABLE))
+    emit_zero_array(fills2, instructions2, labels2, "tabledesc", table_descriptor_scratch_addr, max_group_size * 3)
+
+    # REVISION 34: the ".sam buffer leak fix, part 1 of 2" free-loop
+    # that used to sit here has been REMOVED - the native type-0x13
+    # completion handler already frees every .sam buffer itself, so this
+    # loop was double-freeing already-freed memory. See the REVISION 34
+    # note further up (where PENDING_SAM_FREE_SCRATCH_ADDR used to be
+    # allocated) for the full evidence.
 
     labels2["loop_top"] = len(instructions2)
     instructions2 += emit_load_mem_word(3, current_record_ptr_addr)
@@ -2037,8 +1770,9 @@ def apply(patcher, output_data):
     fills2.append((idx2, "bne", "next_record"))
 
     # --- REVISION 28: resolve this record's own donor_pool_index into
-    # a real DONOR_TABLE entry address once, right here (mirrors HOOK1's
-    # own identical step). ---
+    # a real DONOR_TABLE entry address once, right here (this used to
+    # mirror an identical step HOOK1 also performed, before HOOK1 was
+    # removed entirely - REVISION 32). ---
     instructions2 += emit_load_field(7, REC_DONOR_POOL_INDEX, 1)
     instructions2 += [_li(8, DONOR_TABLE_ENTRY_SIZE), _mullw(7, 7, 8)]
     instructions2 += emit_load_addr(8, donor_table_addr)
@@ -2144,7 +1878,20 @@ def apply(patcher, output_data):
     instructions2 += [_cmpwi(3, -1)]
     idx2 = len(instructions2)
     instructions2.append(None)
-    fills2.append((idx2, "beq", "hook2_skip_sound_16"))
+    # REVISION 35 (leak/bad-free audit): on .pps failure this used to
+    # branch to its own "hook2_skip_sound_16" label, which fell straight
+    # through into the .sam load below and, if THAT succeeded, still set
+    # SOUND_SLOT_FLAG_BASE[sound_id] = 2. That flag is what tells the
+    # native ResetAudioForLevelChange cleanup loop to
+    # MemFree(SOUND_SLOT_BUFFER_BASE[sound_id]) (offset +0, the .pps
+    # buffer) at level exit - so setting it without a .pps load having
+    # actually been queued handed MemFree whatever stale value that
+    # field already held (a pointer a PREVIOUS visit's own
+    # ResetAudioForLevelChange had already freed, or uninitialized
+    # garbage). Same failure class as the .sam double free removed in
+    # REVISION 34. Skip the entire sound setup for this record instead:
+    # no .pps means no .sam worth loading and, critically, no flag.
+    fills2.append((idx2, "beq", "hook2_sound_done"))
     instructions2.append(_mr(4, 3))
     instructions2.append(_li(3, 0x16))
     instructions2 += emit_load_donor_field(5, DTE_DONOR_SOUND_ID, 2)
@@ -2153,7 +1900,25 @@ def apply(patcher, output_data):
     instructions2.append(None)
     fills2.append((idx2, "bl", QUEUE_ASYNC_FILE_LOAD))
 
-    labels2["hook2_skip_sound_16"] = len(instructions2)
+    # --- sound-slot-active flag: SOUND_SLOT_FLAG_BASE + sound_id*0x18 ---
+    # REVISION 35: moved UP to here, immediately after the .pps load is
+    # queued, from its old position after the .sam load below. The flag
+    # means exactly "this slot's own .pps buffer is live and needs
+    # freeing at level exit", so it must be tied to the .pps queue
+    # succeeding and nothing else. Previously it sat after the .sam
+    # load, so a .sam path-resolution failure (which branches to
+    # hook2_sound_done) skipped the flag write even though the .pps
+    # load HAD already been queued - leaving flag 0 on a slot whose
+    # .pps buffer was genuinely allocated, so the native cleanup loop
+    # skipped it and the buffer leaked. Setting it here fixes that
+    # direction too.
+    instructions2 += emit_load_donor_field(3, DTE_DONOR_SOUND_ID, 2)
+    instructions2.append(_li(4, 0x18))
+    instructions2.append(_mullw(3, 3, 4))
+    instructions2 += emit_load_addr(4, SOUND_SLOT_FLAG_BASE)
+    instructions2.append(_add(3, 3, 4))
+    instructions2.append(_li(5, 2))
+    instructions2.append(_stb(5, 0, 3))
 
     # REMOVED (superseded by a direct native-code fix instead - see
     # FUN_80130ce8's own hook installation near this mechanic's own
@@ -2171,29 +1936,23 @@ def apply(patcher, output_data):
     # depends on. Patching FUN_80130ce8 directly, at its own root
     # cause, replaces all of this.
 
-    # REMOVED (confirmed unsafe via static analysis): a version of
-    # this fix freed REAL_SAM_BUFFER_BASE[donor_sound_id] here,
-    # immediately before queueing a new load that would otherwise
-    # silently orphan it. Confirmed live this corrupted a completely
-    # different, native OS data structure - the decrementer/timer
-    # interrupt handler's own generic alarm queue (a sorted linked
-    # list, DecrementerExceptionHandler's own code walks it via
-    # repeated "next = current->next" reads) - with the exact same
-    # corrupted address recurring identically across every subsequent
-    # level load, consistent with a dangling list node left behind
-    # once freed memory got reused for something else. The most
-    # plausible mechanism: the native audio subsystem likely registers
-    # its own alarm/timer entry against an actively-playing buffer
-    # (e.g. to track streaming progress or fire on completion) - a
-    # buffer freed by us while such an entry still references it
-    # leaves that entry dangling, corrupting this same, unrelated OS
-    # queue once the memory is reused. This is a load-completion vs.
-    # playback-completion timing mismatch made concrete: freeing here
-    # is unsafe regardless of exactly when it happens, since we have
-    # no visibility into whether the audio subsystem's own alarm
-    # entry for this buffer has actually been removed yet. A real fix
-    # would need to identify how/where that alarm gets deregistered
-    # and check for its absence before freeing - not yet investigated.
+    # REVISION 34: the stash step (".sam buffer leak fix, part 2 of 2")
+    # that used to sit here has been REMOVED, together with its
+    # free-loop counterpart at the top of hook2.
+    #
+    # Both existed to fix a .sam buffer leak that, on direct inspection
+    # of the decompiled source, DOES NOT EXIST: the native completion
+    # handler for type-0x13 loads (the type this mechanic queues) calls
+    # FreeShopUIElement, which MemFree's REAL_SAM_BUFFER_BASE[sound_id]
+    # the moment the load finishes - without nulling the field, leaving
+    # a dangling pointer behind. Stashing that pointer and freeing it a
+    # visit later was therefore a plain double free. See the REVISION 34
+    # note further up for the full evidence trail.
+    #
+    # The two earlier attempts documented here previously (freeing
+    # immediately before the overwriting load, and calling
+    # ResetAudioForLevelChange ourselves) were both variations on the
+    # same non-problem, which is why neither could be made to work.
 
 
     instructions2 += emit_load_addr(3, sound_sam_path_addr)
@@ -2212,14 +1971,12 @@ def apply(patcher, output_data):
     instructions2.append(None)
     fills2.append((idx2, "bl", QUEUE_ASYNC_FILE_LOAD))
 
-    # --- sound-slot-active flag: SOUND_SLOT_FLAG_BASE + sound_id*0x18 ---
-    instructions2 += emit_load_donor_field(3, DTE_DONOR_SOUND_ID, 2)
-    instructions2.append(_li(4, 0x18))
-    instructions2.append(_mullw(3, 3, 4))
-    instructions2 += emit_load_addr(4, SOUND_SLOT_FLAG_BASE)
-    instructions2.append(_add(3, 3, 4))
-    instructions2.append(_li(5, 2))
-    instructions2.append(_stb(5, 0, 3))
+    # REVISION 35: the flag write that used to sit here has moved UP to
+    # immediately after the .pps queue above - see its own comment there
+    # for why. Reaching this point means both loads were queued; a .sam
+    # failure branches to hook2_sound_done with the flag already
+    # correctly set by the .pps step, so the .pps buffer still gets
+    # freed by the native cleanup loop.
 
     labels2["hook2_sound_done"] = len(instructions2)
 
@@ -2235,6 +1992,35 @@ def apply(patcher, output_data):
     instructions2 += emit_load_addr(4, last_file_buffer_scratch_addr)
     instructions2 += [_add(5, 3, 4)]
     instructions2 += emit_store_mem_word(5, 6, current_file_buffer_slot_addr_addr)
+
+    # --- REVISION 31: same idea, for CTM/texture-array/table_descriptor
+    # tracking - moved here from HOOK1 alongside the CTM load itself
+    # (below), so CTM can share HOOK2's own run-pooling scheme/cursor
+    # with file_buffer instead of always doing a fresh MemAlloc. r3
+    # still holds idx*4 from the file_buffer computation just above. ---
+    instructions2 += emit_load_addr(4, last_ctm_buffer_scratch_addr)
+    instructions2 += [_add(5, 3, 4)]
+    instructions2 += emit_store_mem_word(5, 6, current_ctm_buffer_slot_addr_addr)
+
+    instructions2 += emit_load_addr(4, last_resolved_texture_array_scratch_addr)
+    instructions2 += [_add(5, 3, 4)]
+    instructions2 += emit_store_mem_word(5, 6, current_resolved_texture_array_slot_addr_addr)
+
+    # table_descriptor is a 12-byte (3-word) struct per slot, not 4 -
+    # recompute idx * 12 separately (r3 above holds idx * 4).
+    instructions2 += emit_load_mem_word(3, donor_scratch_idx_addr)
+    instructions2 += [_li(4, 12), _mullw(3, 3, 4)]
+    instructions2 += emit_load_addr(4, table_descriptor_scratch_addr)
+    instructions2 += [_add(5, 3, 4)]
+    instructions2 += emit_store_mem_word(5, 6, current_table_descriptor_addr_addr)
+
+    # tag itself is a holdover name from when this label prefix was
+    # shared with HOOK1 (now removed entirely - REVISION 32) - kept as
+    # "hook1" rather than renamed, since renaming would mean touching
+    # every f"{tag}_..." label reference throughout this whole model-
+    # data section for no functional benefit; it's just a label-name
+    # prefix now, with no other meaning.
+    tag = "hook1"
 
     # === donor model data: format donor_level_id into the level path,
     # compute sector-aligned read params from donor_file_offset/size at
@@ -2517,10 +2303,14 @@ def apply(patcher, output_data):
     # reads word[0] (0) plus a series of small fixed offsets, crashing
     # inside DecodeResourcePoolCategory itself - confirmed directly
     # against a real crash log (reads from 0x4, 0x8, 0xc... matching a
-    # NULL base exactly). idx must still advance either way, to stay
-    # in sync with HOOK1's own unconditional-per-match counter - only
-    # the actual slot write/DecodeResourcePoolCategory/word[8]
-    # sequence gets skipped for a record whose own load failed. ---
+    # NULL base exactly). idx must still advance either way - it
+    # indexes this record's own slot in every one of HOOK2's own
+    # scratch arrays (last_ctm_buffer_scratch, last_file_buffer_
+    # scratch, etc.), all sized/walked by EXIT_HOOK using this same,
+    # unconditional-per-match sequence, regardless of whether this
+    # specific record's own load succeeded - only the actual slot
+    # write/DecodeResourcePoolCategory/word[8] sequence gets skipped
+    # for a record whose own load failed. ---
     instructions2.append(_cmpwi(3, 0))
     idx2 = len(instructions2)
     instructions2.append(None)
@@ -2528,14 +2318,48 @@ def apply(patcher, output_data):
 
     instructions2 += emit_load_target_slot_addr(4)
     instructions2.append(_stw(3, 0, 4))
+    # REVISION 37: stash it - every later use in this record reloads
+    # from here instead of recomputing (see the scratch's own note).
+    instructions2 += emit_store_mem_word(4, 5, current_target_slot_addr_addr)
     instructions2.append(0x7C832378)  # mr r3, r4  (r3 = target_slot_addr, for DecodeResourcePoolCategory's own parameter)
+
+    # --- REVISION 36c: THE ACTUAL LEAK FIX. DecodeResourcePoolCategory
+    # ends by OVERWRITING resourceHandle[6] (byte offset 0x18) with a
+    # fresh MemAlloc, without freeing whatever that field already held:
+    #     if (*(ushort *)((int)resourceHandle + 10) != 0) {
+    #       categoryValue = MemAlloc(... << 2);
+    #       resourceHandle[6] = categoryValue;      // no free of the old value
+    #     }
+    # Native already decoded this same slot during its own level load
+    # (allocating array A) before HOOK2 ever runs. Our decode call just
+    # below therefore allocates array B and ORPHANS A - one leaked
+    # native allocation per swapped monster, per level visit. That is
+    # exactly the measured signature: one block per record, sized
+    # (subCount << 2) so it varies by monster (~176-192 bytes), and
+    # invisible to every MemAlloc breakpoint on this mechanic's own two
+    # call sites because native allocated it.
+    #
+    # Freeing here first is precisely what native itself does before
+    # re-loading a slot (FreeCardResourceSlot calls FreeLevelDataBuffer
+    # on the slot before LoadCardResourceSlot re-decodes it). Safe and
+    # idempotent: FreeLevelDataBuffer null-checks 0x18, frees it, and
+    # zeroes the field, so a slot that was never decoded is a no-op.
+    #
+    # This is why REVISION 36/36b changed nothing: freeing at EXIT_HOOK
+    # correctly releases B, but A was already orphaned back here. Both
+    # halves are needed - this one stops the orphaning, and EXIT_HOOK's
+    # own call still releases B at level exit. ---
+    idx2 = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx2, "bl", FREE_LEVEL_DATA_BUFFER))
+    instructions2 += emit_load_mem_word(3, current_target_slot_addr_addr)  # reload (REVISION 37)
 
     idx2 = len(instructions2)
     instructions2.append(None)
     fills2.append((idx2, "bl", DECODE_RESOURCE_POOL))
 
     instructions2 += emit_load_donor_field(3, DTE_DONOR_CARD_ID, 1)
-    instructions2 += emit_load_target_slot_addr(4)
+    instructions2 += emit_load_mem_word(4, current_target_slot_addr_addr)
     instructions2.append(_sth(3, 8, 4))
 
     instructions2.append(_li(3, 0))
@@ -2566,10 +2390,281 @@ def apply(patcher, output_data):
     fills2.append((idx2, "bge", "skip_levelstat_write"))
 
     instructions2 += [_lwz(5, 4, 3)]
-    instructions2 += emit_load_target_slot_addr(4)
+    instructions2 += emit_load_mem_word(4, current_target_slot_addr_addr)
     instructions2.append(_stw(5, 0x20, 4))
 
     labels2["skip_levelstat_write"] = len(instructions2)
+
+    # === REVISION 31: CTM/texture load - moved here from HOOK1 so it
+    # can share the exact same run-pooling scheme/cursor as file_buffer
+    # above, drawing from whatever capacity that record's own run has
+    # LEFT after file_buffer's own consumption (not a separate, CTM-
+    # only sub-pool) - falls back to fresh MemAlloc only once the
+    # run's own total space is genuinely exhausted. Runs only if
+    # file_buffer's own load above succeeded (see the "beq advance_idx"
+    # check above this point) - a slot whose own core model-data write
+    # got skipped has no use for texture data either. ===
+    emit_format_digits_call_donor(fills2, instructions2, DTE_DONOR_CARD_ID, 1, ctm_path_addr + CTM_PATH_DIGITS_OFFSET, 3)
+
+    instructions2 += emit_load_addr(3, ctm_path_addr)
+    idx2 = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx2, "bl", DVD_CONVERT_PATH))
+    instructions2 += [
+        _mr(29, 3),
+        _cmpwi(3, -1),
+    ]
+    idx2 = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx2, "beq", "ctm_open_failed"))
+
+    instructions2 += [
+        _mr(3, 29),
+        _lis(4, hi(fileinfo_addr)),
+        _ori(4, 4, lo(fileinfo_addr)),
+    ]
+    idx2 = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx2, "bl", DVD_FAST_OPEN))
+    instructions2 += [_cmpwi(3, 0)]
+    idx2 = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx2, "beq", "ctm_open_failed"))
+
+    instructions2 += [
+        _lis(3, hi(fileinfo_addr)),
+        _ori(3, 3, lo(fileinfo_addr)),
+        _lwz(3, DVDFILEINFO_SIZE_OFFSET, 3),
+        _addi(3, 3, 0x1f),
+        _rlwinm(3, 3, 0, 0, 26),
+        _lis(6, hi(ctm_size_var_addr)),
+        _ori(6, 6, lo(ctm_size_var_addr)),
+        _stw(3, 0, 6),
+    ]
+
+    # --- try the SAME run pool file_buffer just used, continuing from
+    # wherever its own consumption left the cursor (re-load run_id
+    # fresh - r3-r12 aren't preserved across the several bl calls made
+    # since file_buffer's own copy of this same value). ---
+    instructions2 += emit_load_field(3, REC_NATIVE_RUN_ID, 1)
+    instructions2.append(_cmpwi(3, NO_RUN_AVAILABLE))
+    idx2 = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx2, "beq", "ctm_use_fresh_alloc"))
+
+    instructions2 += [_li(4, RUN_TABLE_ENTRY_SIZE), _mullw(4, 3, 4)]
+    instructions2 += emit_load_addr(5, run_table_addr)
+    instructions2 += [_add(6, 4, 5), _addi(6, 6, 1)]
+    instructions2.append(_lwz(7, -1, 6))
+    instructions2.append(_rlwinm(7, 7, 0, 8, 31))       # r7 = start_offset
+    instructions2.append(_lwz(8, 2, 6))
+    instructions2.append(_rlwinm(8, 8, 0, 8, 31))       # r8 = total_size
+
+    instructions2.append(_rlwinm(9, 3, 2, 0, 29))       # r9 = run_id * 4
+    instructions2 += emit_load_addr(10, run_cursor_scratch_addr)
+    instructions2 += [_add(11, 9, 10)]                   # r11 = this run's own cursor slot address
+    instructions2.append(_lwz(12, 0, 11))                # r12 = current cursor (whatever file_buffer left it at)
+
+    instructions2 += emit_load_mem_word(4, ctm_size_var_addr)
+    instructions2.append(_add(4, 12, 4))                 # r4 = candidate new cursor
+    instructions2.append(_cmplw(8, 4))
+    idx2 = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx2, "blt", "ctm_use_fresh_alloc"))
+
+    instructions2 += emit_load_addr(9, LEVEL_DATA_BASE_ADDR)
+    instructions2.append(_lwz(9, 0, 9))
+    instructions2.append(_cmpwi(9, 0))
+    idx2 = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx2, "beq", "ctm_use_fresh_alloc"))
+
+    instructions2.append(_add(9, 9, 7))                  # r9 += start_offset
+    instructions2.append(_add(9, 9, 12))                 # r9 += old cursor -> this record's own reused address
+    instructions2.append(_stw(4, 0, 11))                 # persist new cursor
+
+    instructions2 += [
+        _lis(6, hi(ctm_buffer_var_addr)),
+        _ori(6, 6, lo(ctm_buffer_var_addr)),
+        _stw(9, 0, 6),
+        _mr(30, 9),
+    ]
+    # NOTE: deliberately NOT writing current_ctm_buffer_slot_addr_addr
+    # here - same reasoning as file_buffer's own identical note above:
+    # this memory was never MemAlloc'd by us, so EXIT_HOOK must never
+    # try to MEM_FREE it.
+    idx2 = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx2, "b", "ctm_buffer_acquired"))
+
+    labels2["ctm_use_fresh_alloc"] = len(instructions2)
+    instructions2 += emit_load_mem_word(3, ctm_size_var_addr)
+    idx2 = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx2, "bl", MEM_ALLOC))
+    instructions2 += [
+        _lis(6, hi(ctm_buffer_var_addr)),
+        _ori(6, 6, lo(ctm_buffer_var_addr)),
+        _stw(3, 0, 6),
+        _mr(30, 3),
+        _cmpwi(3, 0),
+    ]
+    idx2 = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx2, "beq", "ctm_memalloc_failed"))
+
+    instructions2 += emit_load_mem_word(4, current_ctm_buffer_slot_addr_addr)
+    instructions2.append(_stw(3, 0, 4))
+
+    labels2["ctm_buffer_acquired"] = len(instructions2)
+    instructions2 += [
+        _mr(3, 29),
+        _lis(4, hi(fileinfo_addr)),
+        _ori(4, 4, lo(fileinfo_addr)),
+    ]
+    idx2 = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx2, "bl", DVD_FAST_OPEN))
+    instructions2 += [_cmpwi(3, 0)]
+    idx2 = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx2, "beq", "ctm_read_start_failed"))
+
+    instructions2 += [
+        _lis(3, hi(fileinfo_addr)),
+        _ori(3, 3, lo(fileinfo_addr)),
+        _mr(4, 30),
+    ]
+    instructions2 += emit_load_mem_word(5, ctm_size_var_addr)
+    instructions2 += [
+        _li(6, 0),
+        _lis(7, hi(callback_stub_addr)),
+        _ori(7, 7, lo(callback_stub_addr)),
+        _li(8, 2),
+    ]
+    idx2 = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx2, "bl", ASYNC_READ))
+    instructions2 += [_cmpwi(3, 0)]
+    idx2 = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx2, "beq", "ctm_read_start_failed"))
+
+    instructions2 += [
+        _lis(3, hi(COMPLETION_FLAG_ADDR)),
+        _ori(3, 3, lo(COMPLETION_FLAG_ADDR)),
+        _li(4, 0),
+        _stb(4, 0, 3),
+    ]
+
+    labels2["ctm_poll_loop"] = len(instructions2)
+    instructions2 += [
+        _lis(3, hi(COMPLETION_FLAG_ADDR)),
+        _ori(3, 3, lo(COMPLETION_FLAG_ADDR)),
+        _lbz(3, 0, 3),
+        _cmpwi(3, 0),
+    ]
+    idx2 = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx2, "bne", "ctm_poll_done"))
+
+    idx2 = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx2, "bl", CHECK_DVD_STATUS))
+    instructions2 += [_cmpwi(3, 0)]
+    idx2 = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx2, "bne", "ctm_drive_ready"))
+
+    idx2 = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx2, "bl", MUTE_AUDIO))
+    idx2 = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx2, "b", "ctm_poll_continue"))
+
+    labels2["ctm_drive_ready"] = len(instructions2)
+    idx2 = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx2, "bl", POLL_CONTROLLER))
+
+    labels2["ctm_poll_continue"] = len(instructions2)
+    idx2 = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx2, "b", "ctm_poll_loop"))
+
+    labels2["ctm_poll_done"] = len(instructions2)
+    instructions2 += [
+        _mr(3, 30),
+        _lis(4, hi(ctm_size_var_addr)),
+        _ori(4, 4, lo(ctm_size_var_addr)),
+        _lwz(4, 0, 4),
+    ]
+    idx2 = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx2, "bl", DC_INVALIDATE))
+    instructions2 += [
+        _lis(3, hi(fileinfo_addr)),
+        _ori(3, 3, lo(fileinfo_addr)),
+    ]
+    idx2 = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx2, "bl", DVD_CLOSE))
+
+    instructions2 += [
+        _mr(3, 30),
+        _lwz(4, 8, 30),
+        _add(3, 3, 4),
+    ]
+    instructions2 += emit_load_mem_word(4, current_table_descriptor_addr_addr)
+    instructions2 += [
+        _stw(3, 4, 4),
+        _mr(3, 4),
+    ]
+    idx2 = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx2, "bl", LOAD_ENTITY_ANIMATION_TABLE))
+
+    instructions2 += emit_load_mem_word(3, current_table_descriptor_addr_addr)
+    instructions2.append(_lwz(3, 8, 3))
+    instructions2 += emit_load_mem_word(4, current_resolved_texture_array_slot_addr_addr)
+    instructions2.append(_stw(3, 0, 4))
+
+    idx2 = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx2, "b", "ctm_done"))
+
+    # --- ctm-load failure paths (best-effort, non-fatal) ---
+    labels2["ctm_open_failed"] = len(instructions2)
+    idx2 = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx2, "b", "ctm_done"))
+
+    labels2["ctm_memalloc_failed"] = len(instructions2)
+    instructions2 += [
+        _lis(3, hi(fileinfo_addr)),
+        _ori(3, 3, lo(fileinfo_addr)),
+    ]
+    idx2 = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx2, "bl", DVD_CLOSE))
+    idx2 = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx2, "b", "ctm_done"))
+
+    labels2["ctm_read_start_failed"] = len(instructions2)
+    instructions2 += [
+        _lis(3, hi(fileinfo_addr)),
+        _ori(3, 3, lo(fileinfo_addr)),
+    ]
+    idx2 = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx2, "bl", DVD_CLOSE))
+    idx2 = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx2, "b", "ctm_done"))
+
+    labels2["ctm_done"] = len(instructions2)
 
     labels2["advance_idx"] = len(instructions2)
     # increment donor_scratch_idx (only for records that actually matched)
@@ -2603,6 +2698,22 @@ def apply(patcher, output_data):
 
     total_words2 = len(instructions2)
     stub2_addr = patcher.alloc_cave(total_words2 * 4)
+
+    # branch_makers itself used to be defined once, in HOOK1's own now-
+    # removed code (REVISION 32), and reused here (and in EXIT_HOOK's
+    # own, later fills-resolution loop) purely because Python functions
+    # share one scope - moved here since this is now the first place
+    # it's actually needed.
+    branch_makers = {
+        "b": _b,
+        "bl": None,
+        "beq": _beq,
+        "bne": _bne,
+        "bge": _bge,
+        "bdnz": _bdnz,
+        "blt": _blt,
+        "bgt": _bgt,
+    }
 
     for f_idx, kind, target in fills2:
         from_addr = stub2_addr + f_idx * 4
@@ -2649,7 +2760,7 @@ def apply(patcher, output_data):
     # part of every native level transition (LoadLevelAndShowLoading
     # Screen's own cleanup sequence) - critically, that native call
     # happens well AFTER the new level's own InitLevelAudioAndCamera/
-    # RunLevelEntryScriptSync have already run, giving HOOK1's own
+    # RunLevelEntryScriptSync have already run, giving HOOK2's own
     # just-queued async sound loads (0x16/0x13, queued via
     # QueueAsyncFileLoad) time to actually be processed and have their
     # own buffer pointer fields populated. Confirmed via main_dol.c
@@ -2658,7 +2769,7 @@ def apply(patcher, output_data):
     # entry (ProcessAsyncLoadQueue) - not instantly when queued, and
     # not guaranteed to have happened yet by the time EXIT_HOOK runs
     # (which fires right as the player leaves the level, potentially
-    # very soon after HOOK1 just queued a whole batch of new sound
+    # very soon after HOOK2 just queued a whole batch of new sound
     # loads for it). Calling ResetAudioForLevelChange from here risked
     # freeing a sound slot's own buffer-pointer field before the async
     # queue had processed it - i.e. freeing genuine uninitialized

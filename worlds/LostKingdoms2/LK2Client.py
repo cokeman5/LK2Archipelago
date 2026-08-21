@@ -4,6 +4,7 @@ import sys
 import time
 import traceback
 from typing import TYPE_CHECKING, Any
+from unittest import case
 
 import dolphin_memory_engine
 
@@ -67,9 +68,8 @@ CURR_HEALTH_ADDR = 0x80223c98
 CARDS_LOADED = 0x80732bd4
 
 God_of_Harmony_Health_ADDRESS = 0x80223eb8
-God_of_Harmony_ID_ADDRESS = 0x80223e5c # = 2164498496
-Emperor_Health_ADDRESS = 0x80223fc8
-Emperor_ID_ADDRESS = 0x80223f6c # = 8153e580
+God_of_Harmony_ID_ADDRESS = 0x80223e54 # = 2149813784
+Emperor_ID_ADDRESS = 0x80223f64 # = 80238e18
 Emperor_Status = 0
 
 #Stored/Trigger values 0x8025e650-0x8025e68b
@@ -449,7 +449,7 @@ def give_key_item(ctx,item_name: str) -> bool:
 
 def give_progressive_level(ctx) -> bool:
     try:
-        current_player_level = read_memory(PLAYER1_META_ADDRESSES["player_level"]["address"], PLAYER1_META_ADDRESSES["player_level"]["size"])
+        current_player_level = read_memory(STORAGE_ADDRESSES["progressive_leveling"]["address"], STORAGE_ADDRESSES["progressive_leveling"]["size"])
         write_memory(STORAGE_ADDRESSES["progressive_leveling"]["address"], current_player_level + 1, STORAGE_ADDRESSES["progressive_leveling"]["size"])
         increment_item_index(ctx)
         return True
@@ -590,7 +590,7 @@ def level_modifications(ctx):
             write_memory(0x8025e151, read_memory(0x8025e150, 1), 1)
             write_memory(0x8025e150, 0, 1)
     #Make it so if you beat Bhashea High Road, p2 loads without needing to enter Kadishu
-    elif level_id==lost_kingdoms_2_regions["Bhashea High Road"]["levelID"] and ctx.slot_data.get("randomize_levels", 0):
+    elif level_id==lost_kingdoms_2_regions["Bhashea High Road"]["levelID"] and ctx.slot_data.get("randomize_levels", 0) or ctx.slot_data.get("level_unlocks_as_items", 0) :
         #If Kadishu hasn't been beaten, then load the first part of it
         if read_memory(0x8025dc4c,1)==0:
             if read_memory(0x8025dc91,1)!=0:
@@ -601,7 +601,7 @@ def level_modifications(ctx):
             if read_memory(0x8025dc91,1)==0:
                 write_memory(0x8025dc91, 4, 1)
     #Put the value back in the right place if not in Bhashea High Road
-    if not is_in_level() and ctx.slot_data.get("randomize_levels", 0):
+    if not is_in_level() and ctx.slot_data.get("randomize_levels", 0) or ctx.slot_data.get("level_unlocks_as_items", 0):
         if read_memory(0x8025dc90,1) != 0:
             write_memory(0x8025dc91, read_memory(0x8025dc90,1), 1)
             write_memory(0x8025dc90, 0, 1)
@@ -643,7 +643,7 @@ def modify_default_level_selections():
         write_memory(0x80167674, 0x801674e0, 4)
 
 def is_level_unlocked(level: str) -> bool:
-    return read_memory(int(lost_kingdoms_2_regions[level]["RAMAddress"],16), 1) == 128
+    return read_memory(int(lost_kingdoms_2_regions[level]["RAMAddress"],16), 1) > 0
 
 def is_in_level() -> bool:
     return read_memory(CURRENT_MENU_ADDR, 1) in (0,2,8,9)
@@ -673,14 +673,14 @@ async def check_victory_conditions(ctx: LK2Context):
     if not HAS_GOALED:
         match ctx.slot_data.get("win_condition", -1):
             case 0:
-                if read_memory(God_of_Harmony_Health_ADDRESS) == 0 and read_memory(0x80223ea8,2) != 7 and lost_kingdoms_2_regions["Royal Tower, Upper"]["levelID"] == read_memory(LEVEL_ID_ADDRESS, 1):
+                if read_memory(God_of_Harmony_Health_ADDRESS) == 0 and read_memory(God_of_Harmony_ID_ADDRESS,4) == 2149813784 and lost_kingdoms_2_regions["Royal Tower, Upper"]["levelID"] == read_memory(LEVEL_ID_ADDRESS, 1):
                     await ctx.send_msgs([{
                         "cmd": "StatusUpdate",
                         "status": ClientStatus.CLIENT_GOAL
                     }])
                     HAS_GOALED = True
             case 1:
-                if read_memory(0x80223fb8,1) == 0 and read_memory(0x80223fb8,2) != 7 and lost_kingdoms_2_regions["Proving Grounds F20"]["levelID"] == read_memory(LEVEL_ID_ADDRESS, 1):
+                if read_memory(0x80223fb8,1) == 0 and read_memory(0x80223fb8,2) == 7 and read_memory(Emperor_ID_ADDRESS,4) == 2149813784 and lost_kingdoms_2_regions["Proving Grounds F20"]["levelID"] == read_memory(LEVEL_ID_ADDRESS, 1):
                     await ctx.send_msgs([{
                         "cmd": "StatusUpdate",
                         "status": ClientStatus.CLIENT_GOAL
@@ -732,44 +732,51 @@ def check_regular_location(ctx: LK2Context, location: str) -> bool:
     """
 
     level_name = lost_kingdoms_2_locations[location].get("level")
-    if level_name == "Menu" or lost_kingdoms_2_regions[level_name]["levelID"] == read_memory(LEVEL_ID_ADDRESS, 1):
-        match lost_kingdoms_2_locations[location]["type"]:
-            case "Chest" | "Red Fairy" | "Magic Boosters":
-                if lost_kingdoms_2_locations[location]["RAMAddress"]!="":
-                    if (location == "Temple of Sharacia - help valkyrie") | (location == "Temple of Sharacia - help ashura"):
-                        if read_memory(Valkyrie_Ashura_ADDRESS) != 256:
+    current_level = read_memory(LEVEL_ID_ADDRESS, 1)
+    level_names = level_name if isinstance(level_name, list) else [level_name]
+    for level_name in level_names:
+        if level_name == "Menu" or lost_kingdoms_2_regions[level_name]["levelID"] == current_level:
+            match lost_kingdoms_2_locations[location]["type"]:
+                case "Chest" | "Red Fairy" | "Magic Boosters":
+                    if lost_kingdoms_2_locations[location]["RAMAddress"]!="":
+                        if (location == "Temple of Sharacia - help valkyrie") | (location == "Temple of Sharacia - help ashura"):
+                            if read_memory(Valkyrie_Ashura_ADDRESS) != 256:
+                                return False
+                        elif "Fairy House - collect" in location:
+                            memory_value = read_memory(int(lost_kingdoms_2_locations[location]["RAMAddress"], 16),1)
+                            return memory_value >= lost_kingdoms_2_locations[location]["bitOffset"]
+                        memory_value = read_memory(int(lost_kingdoms_2_locations[location]["RAMAddress"], 16))
+                        if lost_kingdoms_2_locations[location]["bitOffset"] >= 0:
+                            bit_value = (memory_value & (1 << lost_kingdoms_2_locations[location]["bitOffset"]))
+                            return bit_value != 0
+                        else:
                             return False
-                    elif "Fairy House - collect" in location:
-                        memory_value = read_memory(int(lost_kingdoms_2_locations[location]["RAMAddress"], 16),1)
-                        return memory_value >= lost_kingdoms_2_locations[location]["bitOffset"]
-                    memory_value = read_memory(int(lost_kingdoms_2_locations[location]["RAMAddress"], 16))
-                    if lost_kingdoms_2_locations[location]["bitOffset"] >= 0:
-                        bit_value = (memory_value & (1 << lost_kingdoms_2_locations[location]["bitOffset"]))
-                        return bit_value != 0
                     else:
                         return False
-                else:
+                case "Key Item":
+                    memory_value = read_memory(STORAGE_ADDRESSES["key_item_location"]["address"],STORAGE_ADDRESSES["key_item_location"]["size"])
+                    bit_value = (memory_value & (1 << lost_kingdoms_2_locations[location]["bitOffset"]))
+                    return bit_value
+                case "Combo":
+                    memory_value = read_memory(PLAYER1_META_ADDRESSES["combo_revealed_bitmask"]["address"], PLAYER1_META_ADDRESSES["combo_revealed_bitmask"]["size"])
+                    bit_value = (memory_value >> lost_kingdoms_2_combos[location]["bitOffset"]) & 1
+                    return bit_value
+                case "Enemysanity":
+                    if is_in_level() and ctx.slot_data.get("enemysanity", 0) in (3,4):
+                        return check_enemy_death(ctx,location)
                     return False
-            case "Key Item":
-                memory_value = read_memory(STORAGE_ADDRESSES["key_item_location"]["address"],STORAGE_ADDRESSES["key_item_location"]["size"])
-                bit_value = (memory_value & (1 << lost_kingdoms_2_locations[location]["bitOffset"]))
-                return bit_value
-            case "Combo":
-                memory_value = read_memory(PLAYER1_META_ADDRESSES["combo_revealed_bitmask"]["address"], PLAYER1_META_ADDRESSES["combo_revealed_bitmask"]["size"])
-                bit_value = (memory_value >> lost_kingdoms_2_combos[location]["bitOffset"]) & 1
-                return bit_value
-            case "Enemysanity":
-                if is_in_level() and ctx.slot_data.get("enemysanity", 0):
-                    return check_enemy_death(ctx,location)
-                return False
-            case "Shop Purchase":
-                memory_value = read_memory(STORAGE_ADDRESSES["shop_location"]["address"], STORAGE_ADDRESSES["shop_location"]["size"])
-                bit_value = (memory_value >> lost_kingdoms_2_shop_purchases[location]["bitOffset"]) & 1
-                return bit_value
+                case "Enemysanity Light":
+                    if is_in_level() and ctx.slot_data.get("enemysanity", 0) in (1,2):
+                        return check_enemy_death_light(ctx,location, current_level)
+                case "Shop Purchase":
+                    memory_value = read_memory(STORAGE_ADDRESSES["shop_location"]["address"], STORAGE_ADDRESSES["shop_location"]["size"])
+                    bit_value = (memory_value >> lost_kingdoms_2_shop_purchases[location]["bitOffset"]) & 1
+                    return bit_value
 
-        return False
-    else:
-        return False
+    #If on the world map, reset any enemysanity states from 1 to 0
+    if read_memory(CURRENT_MENU_ADDR,1) == 4 and lost_kingdoms_2_locations[location]["type"] == "Enemysanity" and lost_kingdoms_2_locations[location]["currentState"] == 1:
+        lost_kingdoms_2_locations[location]["currentState"] = 0
+    return False
 
 def check_enemy_death(ctx: LK2Context,location: str) -> bool:
     # Helper to get all enemies in the same group for the current level
@@ -836,6 +843,15 @@ def check_enemy_death(ctx: LK2Context,location: str) -> bool:
             current_loc_data["currentState"] = 2
             return True
 
+    return False
+
+def check_enemy_death_light(ctx: LK2Context,location: str, current_level: int):
+    target_species = location.split(" - ")[1]
+    for enemy in lost_kingdoms_2_enemies:
+        if lost_kingdoms_2_regions[lost_kingdoms_2_enemies[enemy]["level"]]["levelID"] == current_level:
+            species = enemy.split(" - ")[-1].split(" #")[0]
+            if species == target_species:
+                return check_enemy_death(ctx,enemy)
     return False
 
 def get_enemy_species(RAMAddress: str) -> str:

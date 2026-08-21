@@ -406,16 +406,36 @@ class LostKingdoms2World(World):
                 continue
             if lost_kingdoms_2_locations[key]["type"] == "Shop Purchase" and self.options.shopsanity.value==0:
                 continue
-            if lost_kingdoms_2_locations[key]["type"] == "Enemysanity" and self.options.enemysanity.value==0:
+            if lost_kingdoms_2_locations[key]["type"] == "Enemysanity" and self.options.enemysanity.value not in [3,4]:
                 continue
-            if lost_kingdoms_2_locations[key]["type"] == "Enemysanity" and "Proving Grounds" in key and self.options.enemysanity.value!=2:
+            if lost_kingdoms_2_locations[key]["type"] == "Enemysanity" and "Proving Grounds" in key and self.options.enemysanity.value!=4:
                 continue
-            region = self.multiworld.get_region(lost_kingdoms_2_locations[key]["level"], self.player)
-            location_data = LK2LocationData(self.location_name_to_id[key])
-            location = LK2Location(self.player,key, region, location_data)
-            if lost_kingdoms_2_locations[key].get("missable", 0) == 1:
-                location.progress_type = LocationProgressType.EXCLUDED
-            region.locations.append(location)
+            if lost_kingdoms_2_locations[key]["type"] == "Enemysanity Light" and self.options.enemysanity.value not in [1,2]:
+                continue
+            if lost_kingdoms_2_locations[key]["type"] == "Enemysanity Light" and lost_kingdoms_2_locations[key]["proving_grounds"] and self.options.enemysanity.value != 2:
+                continue
+            level_names = lost_kingdoms_2_locations[key]["level"]
+            if not isinstance(level_names, list):
+                region = self.multiworld.get_region(level_names, self.player)
+                location_data = LK2LocationData(self.location_name_to_id[key])
+                location = LK2Location(self.player,key, region, location_data)
+                if lost_kingdoms_2_locations[key].get("missable", 0) == 1:
+                    location.progress_type = LocationProgressType.EXCLUDED
+                region.locations.append(location)
+            else:
+                new_region_name = ""
+                for level_name in level_names:
+                    new_region_name = new_region_name + "|" + level_name
+                new_region_name = new_region_name[1:]
+                region = Region(new_region_name, self.player, self.multiworld)
+                self.multiworld.regions.append(region)
+                for level_name in level_names:
+                    self.multiworld.get_region(level_name, self.player).connect(region,f"{region.name}")
+                location_data = LK2LocationData(self.location_name_to_id[key])
+                location = LK2Location(self.player, key, region, location_data)
+                if lost_kingdoms_2_locations[key].get("missable", 0) == 1:
+                    location.progress_type = LocationProgressType.EXCLUDED
+                region.locations.append(location)
 
         match self.options.win_condition.value:
             case 0:
@@ -650,6 +670,16 @@ class LostKingdoms2World(World):
                 case "Royal Tower, Middle":
                     entrance = self.multiworld.get_entrance(f"{region.name}", self.player)
                     add_rule(entrance, lambda state: state.has("God of Destruction", self.player))
+                    if self.options.level_unlocks_as_items.value:
+                        add_rule(entrance,lambda state, region_name=region_name: state.has(region_name + " Unlock", self.player))
+                case "Royal Tower, Lower":
+                    entrance = self.multiworld.get_entrance(f"{region.name}", self.player)
+                    if self.options.level_unlocks_as_items.value:
+                        add_rule(entrance,lambda state, region_name=region_name: state.has(region_name + " Unlock", self.player))
+                case "Royal Tower, Upper":
+                    entrance = self.multiworld.get_entrance(f"{region.name}", self.player)
+                    if self.options.level_unlocks_as_items.value:
+                        add_rule(entrance,lambda state, region_name=region_name: state.has(region_name + " Unlock", self.player))
 
 
         for location in self.multiworld.get_locations(self.player):
