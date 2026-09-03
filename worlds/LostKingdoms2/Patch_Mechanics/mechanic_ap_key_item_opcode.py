@@ -6,7 +6,31 @@ KEY_ITEM_LOCATION = STORAGE_ADDRESSES['key_item_location']['address']
 WRITE_SCRIPT_RESULT = 0x800893A4
 
 OPCODE_TABLE_BASE = 0x80165a38
-NEW_OPCODE_INDEX = 499  # confirmed-zero slot in the dispatch table
+# The script opcode dispatcher is:
+#     lwzx r12, OPCODE_TABLE_BASE, opcode*4 ; mtctr r12 ; bctrl
+# with NO bounds check - only "opcode != 0" and "(opcode & 0x8000) == 0".
+# So any index below 0x8000 dispatches, and registering a handler is just a
+# matter of writing a code pointer at OPCODE_TABLE_BASE + index*4.
+#
+# The real table is 498 entries (0..497, ending at 0x80166200) and every one
+# of them is populated - there is no spare slot inside it. Index 499 was
+# used previously because the word there reads zero in a clean DOL, but that
+# word is NOT spare: it sits at +0x1C from 0x801661E8, an address used as a
+# base by a dozen instructions, in the middle of a float constant pool
+# (1.0 at +0x00, 0.5 at +0x08). Writing a code pointer into it corrupts that
+# pool, and anything the game writes back through that base corrupts our
+# handler pointer in turn.
+#
+# 5385 (0x8016AE5C) instead: the middle of the only >=32-word run of zeros
+# below index 0x8000, 128 bytes clear of the nearest address any lis+offset
+# pair in the DOL resolves to, sitting in the padding between two byte
+# lookup tables in data3. Verified zero at build time below before writing.
+#
+# This is safer than 499, not provably perfect - it is still a word the game
+# owns, and nothing here proves no runtime code writes to it. If the handler
+# ever stops firing, or a crash points at a bad branch target out of the
+# dispatcher, suspect this slot first.
+NEW_OPCODE_INDEX = 5385
 
 # NOTE: this opcode is registered but not yet applied to every relevant
 # location. Doors in Nobleman's Residence check the real key-item bitmask
@@ -110,25 +134,24 @@ S23_ISO_OFFSET = 0xc98b540
 
 # File-relative offsets within s23.pds of all 3 "has Olf Runestone
 # already been obtained" checks (opcode 135, argument 24 - key item
-# index 23, Olf Runestone).
+# index 23, Olf Runestone). A 4th, unrelated opcode-135 check in this
+# same file (argument 15, Mysterious Key, same as seen in s01.pds) is
+# deliberately NOT touched.
 S23_OLF_RUNESTONE_CHECK_OFFSETS = [0x42b89c, 0x42d14c, 0x42d5e4]
 
-# File-relative offset within s23.pds of the single "has Mysterious Key
-# already been obtained" check (opcode 135, argument 15 - key item
-# index 14, Mysterious Key, the same item whose 5 checks in s01.pds are
-# deliberately left alone). This was previously excluded here as
-# "unrelated"; now redirected per explicit request. It is the only
-# argument-15 occurrence in this file - a full scan of s23.pds for the
-# opcode-135 signature (header 0x00870002, arg0 0x00040000) returns
-# exactly 4 hits: the 3 Olf Runestone ones above, plus this one.
+S14_ISO_OFFSET = 0xa26d160
+
+# File-relative offset within s14.pds of the single "has Jewel of Alanjah
+# already been obtained" check (opcode 135, argument 20 - key item index 19,
+# Jewel of Alanjah). This file contains exactly ONE opcode-135 check, so
+# unlike s01/s20/s21/s23 there is no unrelated occurrence to avoid.
 #
-# NOTE on naming: "Mysterious Key" follows this file's own existing
-# 1-indexed key-item annotations. Locations.py's own Key Item entry for
-# this level at the matching bitOffset 15 is named "Sacred Battle Arena
-# 1 - Gurd Reward" (location_id 20015) - i.e. the AP location that
-# grants it, not the item itself. Worth confirming the two really do
-# refer to the same thing before relying on this in logic.
-S23_MYSTERIOUS_KEY_CHECK_OFFSETS = [0x42d614]
+# Verified against the already-redirected s23 Mysterious Key check: the
+# surrounding words are byte-for-byte identical (0x00040000 / 0x00000000
+# before, 0x00040000 / argument / 0x00040012 after), with only the argument
+# differing - so this is structurally the same construct the redirect
+# handles, not a coincidental byte match.
+S14_JEWEL_OF_ALANJAH_CHECK_OFFSETS = [0x4c465c]
 
 # File-relative offsets within s20.pds of the 1st and 3rd of 3 "has
 # Nebeth Runestone already been obtained" checks (opcode 135, argument
@@ -242,7 +265,17 @@ def _build_opcode_handler(patcher):
     patcher.write_code(stub_addr, instructions)
 
     # Register this stub as opcode NEW_OPCODE_INDEX in the script dispatch table
-    patcher.patch_word(OPCODE_TABLE_BASE + NEW_OPCODE_INDEX * 4, stub_addr)
+    slot_addr = OPCODE_TABLE_BASE + NEW_OPCODE_INDEX * 4
+    slot_iso = patcher.ram_to_iso(slot_addr)
+    patcher.file.seek(slot_iso)
+    existing = int.from_bytes(patcher.file.read(4), "big")
+    if existing != 0:
+        raise ValueError(
+            f"Expected opcode slot {NEW_OPCODE_INDEX} ({hex(slot_addr)}) to be unused "
+            f"(zero), found {hex(existing)} instead. Aborting rather than overwrite "
+            f"something unexpected."
+        )
+    patcher.patch_word(slot_addr, stub_addr)
 
     return stub_addr
 
@@ -329,14 +362,14 @@ def apply(patcher):
 
     _redirect_opcode_135_checks(
         patcher,
-        S23_ISO_OFFSET,
-        S23_MYSTERIOUS_KEY_CHECK_OFFSETS,
-        "s23.pds (Mysterious Key)",
+        S20_ISO_OFFSET,
+        S20_NEBETH_RUNESTONE_CHECK_OFFSETS,
+        "s20.pds (Nebeth Runestone)",
     )
 
     _redirect_opcode_135_checks(
         patcher,
-        S20_ISO_OFFSET,
-        S20_NEBETH_RUNESTONE_CHECK_OFFSETS,
-        "s20.pds (Nebeth Runestone)",
+        S14_ISO_OFFSET,
+        S14_JEWEL_OF_ALANJAH_CHECK_OFFSETS,
+        "s14.pds (Jewel of Alanjah)",
     )

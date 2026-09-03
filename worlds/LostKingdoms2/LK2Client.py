@@ -847,11 +847,12 @@ def check_enemy_death(ctx: LK2Context,location: str) -> bool:
 
 def check_enemy_death_light(ctx: LK2Context,location: str, current_level: int):
     target_species = location.split(" - ")[1]
-    for enemy in lost_kingdoms_2_enemies:
-        if lost_kingdoms_2_regions[lost_kingdoms_2_enemies[enemy]["level"]]["levelID"] == current_level:
-            species = enemy.split(" - ")[-1].split(" #")[0]
+    for enemy_location in lost_kingdoms_2_enemies:
+        if lost_kingdoms_2_regions[lost_kingdoms_2_enemies[enemy_location]["level"]]["levelID"] == current_level:
+            species = enemy_location.split(" - ")[-1].split(" #")[0]
             if species == target_species:
-                return check_enemy_death(ctx,enemy)
+                if check_enemy_death(ctx,enemy_location):
+                    return True
     return False
 
 def get_enemy_species(RAMAddress: str) -> str:

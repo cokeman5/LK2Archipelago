@@ -46,8 +46,8 @@ class EnemysanityConditionOption(Choice):
     Plus means that enemies in the Proving Grounds will be included, otherwise they are excluded.
     Be warned that some spawn triggers in this game are very unintuitive, hidden, and
     once a level is beaten it will have new enemy spawn triggers. Please report any issue you encounter.
-    Light: +106 locations
-    Light Plus: +196 locations
+    Light: +109 locations
+    Light Plus: +199 locations
     Enemysanity: +530 locations
     Enemysanity Plus: +935 locations"""
     display_name = "Enemysanity"
@@ -135,10 +135,124 @@ class RandomizeEnemies(Toggle):
     display_name = "Randomize Enemies"
     default = 0
 
-class RandomizeMagicCosts(Toggle):
-    """Choose to randomize the magic stone cost of every card to between 1-15. Warning: This can trivialize the game"""
+class RandomizeMagicCosts(Choice):
+    """Choose to randomize the magic stone cost of every card to between the set minimal
+    and maximum values. Shuffle swaps the vanilla costs randomly, maintaining the same distribution.
+     Warning: This can trivialize the game"""
     display_name = "Randomize Magic Costs"
+    option_off = 0
+    option_on = 1
+    option_shuffle = 2
     default = 0
+
+class RandomizeMagicCostsMin(Range):
+    """The minimum magic cost a card can be if Randomize magic Costs is enabled."""
+    range_start = 0
+    range_end = 20
+    default = 0
+
+class RandomizeMagicCostsMax(Range):
+    """The maximum magic cost a card can be if Randomize magic Costs is enabled."""
+    range_start = 0
+    range_end = 20
+    default = 15
+
+class MagicCostsMultiplier(Range):
+    """Multiplies all the of the magic stone costs by amount divided by 100;
+    So 100 means no multiplier, 50 means half cost, 200 means double, etc
+    Takes place after any randomization and is clamped by what the game allows."""
+    range_start = 0
+    range_end = 1000
+    default = 100
+
+class RandomizeCardPrices(Choice):
+    """Choose to randomize the buy/sell costs of every card to between the set minimal
+    and maximum values. Shuffle swaps the vanilla costs randomly, maintaining the same distribution.
+    Cards always sell for approximately 2/3 of their price.
+    """
+    display_name = "Randomize Card Prices"
+    option_off = 0
+    option_on = 1
+    option_shuffle = 2
+    default = 0
+
+class RandomizeCardPricesMin(Range):
+    """The minimum price a card can have if Randomize Card Prices is enabled."""
+    range_start = 0
+    range_end = 9999
+    default = 0
+
+class RandomizeCardPricesMax(Range):
+    """The maximum price a card can have if Randomize Card Prices is enabled."""
+    range_start = 0
+    range_end = 9999
+    default = 2000
+
+class CardPricesMultiplier(Range):
+    """Multiplies all the of the card prices by amount divided by 100;
+    So 100 means no multiplier, 50 means half cost, 200 means double, etc
+    Takes place after any randomization and is clamped by what the game allows."""
+    range_start = 0
+    range_end = 1000
+    default = 100
+
+class RandomizeCopyXPCosts(Choice):
+    """Choose to randomize the Copy XP cost of every card to between the set minimal
+    and maximum values. Shuffle swaps the vanilla costs randomly, maintaining the same distribution."""
+    display_name = "Randomize Magic Costs"
+    option_off = 0
+    option_on = 1
+    option_shuffle = 2
+    default = 0
+
+class RandomizeCopyXPCostsMin(Range):
+    """The minimum Copy XP cost a card can have if Randomize magic Costs is enabled."""
+    range_start = 0
+    range_end = 65535
+    default = 0
+
+class RandomizeCopyXPCostsMax(Range):
+    """The maximum Copy XP cost a card can have if Randomize magic Costs is enabled."""
+    range_start = 0
+    range_end = 65535
+    default = 30000
+
+class CopyXPCostsMultiplier(Range):
+    """Multiplies all the of the Copy XP costs by amount divided by 100;
+    So 100 means no multiplier, 50 means half cost, 200 means double, etc
+    Takes place after any randomization and is clamped by what the game allows."""
+    range_start = 0
+    range_end = 1000
+    default = 100
+
+class RandomizeUpgradeXPCosts(Choice):
+    """Choose to randomize the upgrade XP cost of every card to between the set minimal
+    and maximum values. Shuffle swaps the vanilla costs randomly, maintaining the same distribution."""
+    display_name = "Randomize Magic Costs"
+    option_off = 0
+    option_on = 1
+    option_shuffle = 2
+    default = 0
+
+class RandomizeUpgradeXPCostsMin(Range):
+    """The minimum upgrade XP cost a card can have if Randomize magic Costs is enabled."""
+    range_start = 0
+    range_end = 65535
+    default = 0
+
+class RandomizeUpgradeXPCostsMax(Range):
+    """The maximum upgrade XP cost a card can have if Randomize magic Costs is enabled."""
+    range_start = 0
+    range_end = 65535
+    default = 25000
+
+class UpgradeXPCostsMultiplier(Range):
+    """Multiplies all the of the Upgrade XP costs by amount divided by 100;
+    So 100 means no multiplier, 50 means half cost, 200 means double, etc
+    Takes place after any randomization and is clamped by what the game allows."""
+    range_start = 0
+    range_end = 1000
+    default = 100
 
 class LevelRandomization(Toggle):
     """Randomize which levels unlock when you would normally unlock a level.
@@ -196,8 +310,23 @@ class LostKingdoms2Options(PerGameCommonOptions):
     randomize_starting_deck : RandomizeStartingDeck
     randomize_shop_contents : RandomizeShopContents
     randomize_bonus_draws : RandomizeBonusDraws
-    randomize_magic_stone_costs : RandomizeMagicCosts
     randomize_levels : LevelRandomization
     randomize_enemies: RandomizeEnemies
     randomize_level_music: MusicRandomization
     character_model : CharacterModel
+    randomize_magic_stone_costs: RandomizeMagicCosts
+    randomize_magic_stone_costs_min: RandomizeMagicCostsMin
+    randomize_magic_stone_costs_max: RandomizeMagicCostsMax
+    magic_stone_costs_multiplier: MagicCostsMultiplier
+    randomize_card_prices: RandomizeCardPrices
+    randomize_card_prices_min: RandomizeCardPricesMin
+    randomize_card_prices_max: RandomizeCardPricesMax
+    card_prices_multiplier: CardPricesMultiplier
+    randomize_copy_xp_costs: RandomizeCopyXPCosts
+    randomize_copy_xp_costs_min: RandomizeCopyXPCostsMin
+    randomize_copy_xp_costs_max: RandomizeCopyXPCostsMax
+    copy_xp_cost_multiplier: CopyXPCostsMultiplier
+    randomize_upgrade_xp_costs: RandomizeUpgradeXPCosts
+    randomize_upgrade_xp_costs_min: RandomizeUpgradeXPCostsMin
+    randomize_upgrade_xp_costs_max: RandomizeUpgradeXPCostsMax
+    upgrade_xp_cost_multiplier: UpgradeXPCostsMultiplier

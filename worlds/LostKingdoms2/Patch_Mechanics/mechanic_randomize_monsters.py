@@ -461,14 +461,38 @@ DVD_SECTOR_SIZE = 0x800  # 2048 bytes
 #   +0x01 (1 byte,  u8 ) target_level_id
 #   +0x02 (1 byte,  u8 ) donor_pool_index     (index into DONOR_TABLE)
 #   +0x03 (1 byte,  u8 ) native_run_id        (REVISION 26: 0xFF = no verified-safe run available)
+#   +0x04 (3 bytes, u24) native_texture_offset  (REVISION 39 - file offset of
+#                                                 THIS native monster's own GTX1
+#                                                 texture inside the target level
+#                                                 file, i.e. where the donor's own
+#                                                 texture gets written in place)
+# REVISION 41: a monster uses UP TO 12 textures, not one. The single-texture
+# assumption made every swapped monster render its secondary parts pure white,
+# because only the dominant texture's id was ever registered. Storage for the
+# full list is affordable now only because the tables moved to the disc.
+MAX_TEXTURES_PER_MONSTER = 12
+
 RECORD_STRUCT_FORMAT = ">BBBB"
-RECORD_SIZE = struct.calcsize(RECORD_STRUCT_FORMAT)
-assert RECORD_SIZE == 4
+RECORD_SIZE = struct.calcsize(RECORD_STRUCT_FORMAT) + 3 * MAX_TEXTURES_PER_MONSTER
+assert RECORD_SIZE == 40
 
 REC_TABLE_INDEX = 0x00          # u8
 REC_TARGET_LEVEL_ID = 0x01      # u8
 REC_DONOR_POOL_INDEX = 0x02     # u8
-REC_NATIVE_RUN_ID = 0x03        # u8
+REC_NATIVE_RUN_ID = 0x03        # u8  (bit 0x40 = REC_FLAG_TEXTURE_FITS)
+#   +0x04 .. +0x27  u24[12]  per donor texture, where to WRITE it:
+#       non-zero = file offset of a native texture slot this donor texture
+#                  fits inside and may overwrite
+#       zero     = no usable slot, allocate instead
+# The pairing is decided at PATCH time, where both sides' sizes and the
+# shared flags are all known, so the stub just reads a destination per
+# texture rather than searching.
+REC_TEXTURE_DEST = 0x04  # u24[MAX_TEXTURES_PER_MONSTER]
+
+# REVISION 41: REC_FLAG_TEXTURE_FITS is gone. With a list of textures per
+# monster the answer is per-texture, not per-record, so it lives in
+# REC_TEXTURE_DEST instead - zero meaning "allocate this one".
+REC_RUN_ID_MASK = 0xFF
 
 SLOT_BASE_ADDR = 0x80238e18
 SLOT_STRIDE = 0x24
@@ -487,15 +511,27 @@ SLOT_STRIDE = 0x24
 #   +0x07 (3 bytes, u24) donor_size          (REVISION 32: same reasoning - max real value ~412KB.
 #                                              Reading 1 byte early safely borrows from
 #                                              donor_file_offset's own last byte instead.)
+#   +0x0a (3 bytes, u24) donor_texture_offset (REVISION 39 - file offset of this
+#                                              donor's own GTX1 texture inside its
+#                                              OWN level file)
+#   +0x0d (1 byte,  u8 ) donor_texture_size_index (index into TEXTURE_SIZES - only
+#                                              a handful of distinct texture sizes
+#                                              exist across the whole game, so an
+#                                              index costs 1 byte where the size
+#                                              itself would cost 3)
 DONOR_TABLE_ENTRY_FORMAT = ">BBH"  # only the fixed-width prefix - the two u24 fields are packed manually
-DONOR_TABLE_ENTRY_SIZE = struct.calcsize(DONOR_TABLE_ENTRY_FORMAT) + 3 + 3
-assert DONOR_TABLE_ENTRY_SIZE == 10
+DONOR_TABLE_ENTRY_SIZE = (struct.calcsize(DONOR_TABLE_ENTRY_FORMAT) + 3 + 3 + 1
+                          + 4 * MAX_TEXTURES_PER_MONSTER)
+assert DONOR_TABLE_ENTRY_SIZE == 59
 
 DTE_DONOR_CARD_ID = 0x00       # u8
 DTE_DONOR_LEVEL_ID = 0x01      # u8
 DTE_DONOR_SOUND_ID = 0x02      # u16
 DTE_DONOR_FILE_OFFSET = 0x04   # u24
 DTE_DONOR_SIZE = 0x07          # u24
+DTE_DONOR_TEXTURE_COUNT = 0x0a   # u8, how many of the slots below are real
+DTE_DONOR_TEXTURES = 0x0b        # per slot: u24 file offset + u8 size index
+DTE_TEXTURE_STRIDE = 4
 
 NO_RUN_AVAILABLE = 0xFF
 
@@ -508,16 +544,36 @@ def _pack_u24(value):
     return struct.pack(">I", value)[1:]
 
 
+# REVISION 39: every distinct GTX1 texture size in the game, so a donor's
+# own texture size can be carried as a 1-byte index instead of a u24.
+# Populated at patch time from whatever monster_database.py actually holds,
+# rather than hardcoded, so a database update cannot silently desync it.
+TEXTURE_SIZES = []
+
+
+def _texture_size_index(size):
+    if size not in TEXTURE_SIZES:
+        TEXTURE_SIZES.append(size)
+    idx = TEXTURE_SIZES.index(size)
+    assert idx <= 255, "more than 256 distinct texture sizes - index no longer fits in a u8"
+    return idx
+
+
 def _pack_record(swap):
     table_index = (swap["target_slot_addr"] - SLOT_BASE_ADDR) // SLOT_STRIDE
     assert 0 <= table_index <= 255, f"table_index {table_index} out of u8 range for {swap['name']}"
+    run_id = swap["run_id"] if swap["run_id"] is not None else NO_RUN_AVAILABLE
+    dests = swap.get("texture_dests", [])
+    assert len(dests) <= MAX_TEXTURES_PER_MONSTER
+    packed = b"".join(_pack_u24(d) for d in dests)
+    packed += _pack_u24(0) * (MAX_TEXTURES_PER_MONSTER - len(dests))
     return struct.pack(
         RECORD_STRUCT_FORMAT,
         table_index,
         swap["target_level_id"],
         swap["donor_pool_index"],
-        swap["run_id"] if swap["run_id"] is not None else NO_RUN_AVAILABLE,
-    )
+        run_id,
+    ) + packed
 
 
 def _pack_donor_table_entry(donor_entry):
@@ -530,6 +586,13 @@ def _pack_donor_table_entry(donor_entry):
         )
         + _pack_u24(donor_entry["donor_file_offset"])
         + _pack_u24(donor_entry["donor_size"])
+        + struct.pack(">B", len(donor_entry.get("donor_textures", [])))
+        + b"".join(
+            _pack_u24(off) + struct.pack(">B", size_index)
+            for off, size_index in donor_entry.get("donor_textures", [])
+        )
+        + (b"\x00" * 4) * (MAX_TEXTURES_PER_MONSTER
+                            - len(donor_entry.get("donor_textures", [])))
     )
 
 
@@ -804,6 +867,28 @@ CHECK_DVD_STATUS = 0x80054380       # CheckDVDDriveStatus
 MUTE_AUDIO = 0x80096A20             # MuteAudioDuringDiscRead
 POLL_CONTROLLER = 0x80005BA4        # PollControllerState
 DC_INVALIDATE = 0x800F30CC          # DCInvalidateRange(addr, size)
+DC_FLUSH_RANGE = 0x800F30F8         # DCFlushRange(addr, size)
+MEMCPY = 0x8000551C                 # memcpy(dst, src, len)
+
+# REVISION 39: LoadAndCacheAnimationTexture(textureData, ...) - registers one
+# GTX1 texture into the global texture cache. It claims a free slot from the
+# STATIC 1024-entry CACHE_ENTRY_TABLE_ADDR array and writes the texture's own
+# 16-bit id (from textureData+8) into HASH_TABLE_ADDR[id], which is how models
+# find their textures - purely by id, never by position. Crucially it performs
+# NO allocation of its own, unlike LoadEntityAnimationTable (which MemAllocs a
+# resolved-pointer array), so registering a donor texture costs nothing.
+LOAD_AND_CACHE_ANIMATION_TEXTURE = 0x8004A0D4
+
+# Staging buffer for texture reads. DVD reads must be SECTOR aligned (see
+# _compute_read_params' own note - 32-byte alignment is not enough), but a
+# texture sits mid-sector inside its level file, so a sector-padded read
+# lands up to 2KB of neighbouring texture data either side of it. Writing
+# that straight into the native texture's own slot would corrupt the
+# adjacent GTX1 entries, so every texture is read into this one shared
+# buffer and then memcpy'd to its real destination at the exact size.
+# Sized for the largest texture in the game (87,328) plus two sectors of
+# alignment slack. Allocated ONCE per level visit, not per monster.
+TEXTURE_STAGING_BUFFER_SIZE = 87328 + 2 * DVD_SECTOR_SIZE
 DVD_CLOSE = 0x800F9B90              # DVDClose(fileInfo*)
 DECODE_RESOURCE_POOL = 0x80056908   # DecodeResourcePoolCategory
 # REVISION 36: the native counterpart to DECODE_RESOURCE_POOL's own
@@ -957,6 +1042,12 @@ def _addi(rD, rA, simm):
 
 def _add(rD, rA, rB):
     return 0x7C000214 | (rD << 21) | (rA << 16) | (rB << 11)
+
+
+def _andi_dot(rA, rS, uimm):
+    """andi. rA, rS, UIMM - AND with immediate, always sets CR0 (hence the
+    trailing dot), which is what lets the flag test below branch directly."""
+    return (28 << 26) | (rS << 21) | (rA << 16) | (uimm & 0xFFFF)
 
 
 def _rlwinm(rA, rS, SH, MB, ME):
@@ -1138,6 +1229,7 @@ def apply(patcher, output_data):
     # species). Iterating distinct_native_card_ids (already sorted,
     # deterministic) gives each entry a stable, reproducible index. ---
     donor_table = []
+    donor_texture_lists = {}
     native_card_id_to_pool_index = {}
     for native_card_id in distinct_native_card_ids:
         donor_card_id = donor_mapping[native_card_id]
@@ -1147,13 +1239,22 @@ def apply(patcher, output_data):
 
         pool_index = len(donor_table)
         native_card_id_to_pool_index[native_card_id] = pool_index
+        # REVISION 39: the donor's own GTX1 texture, taken from its own level
+        # file. A monster with no texture recorded (only s40.pds card 0x20,
+        # which is garbage data with no texture block at all) falls back to
+        # size 0, which the runtime treats as "no texture to load".
+        donor_textures = list(donor_data.get("textures", []))[:MAX_TEXTURES_PER_MONSTER]
         donor_table.append({
             "donor_card_id": donor_card_id,
             "donor_level_id": _infer_level_id(donor_level_file),
             "donor_sound_id": donor_data["sound_id"],
             "donor_file_offset": donor_data["file_offset"],
             "donor_size": donor_data["size"],
+            "donor_textures": [
+                (t[1], _texture_size_index(t[2])) for t in donor_textures
+            ],
         })
+        donor_texture_lists[native_card_id] = donor_textures
 
         native_name = db.get_monster(native_card_id)["name"]
         logger.info(
@@ -1166,6 +1267,38 @@ def apply(patcher, output_data):
         swap["target_level_id"] = _infer_level_id(swap["target_level_file"])
         swap["donor_pool_index"] = native_card_id_to_pool_index[swap["native_card_id"]]
 
+        # --- REVISION 41: pair each donor texture with somewhere to put it.
+        #
+        # The native monster is being replaced, so its own textures are dead
+        # space this donor may overwrite - but ONLY the ones it does not share
+        # with another monster in the same level. A shared texture is still
+        # needed by whoever else uses it (0x55 in s01 is used by four
+        # monsters, 0x4B/0x4C in s15 by all six), so overwriting it would
+        # corrupt them.
+        #
+        # Largest donor textures are placed first: a big texture has fewer
+        # slots that can hold it, so letting a small one take a large slot
+        # first would waste it. Anything left unplaced gets 0, meaning the
+        # stub allocates for it.
+        native_entry = db.get_monster(swap["native_card_id"])["native_levels"].get(
+            swap["target_level_file"], {}
+        )
+        free_slots = [
+            {"offset": t[1], "size": t[2], "taken": False}
+            for t in native_entry.get("textures", []) if not t[3]
+        ]
+        donor_textures = donor_texture_lists.get(swap["native_card_id"], [])
+        dests = [0] * len(donor_textures)
+        for idx in sorted(range(len(donor_textures)),
+                          key=lambda i: -donor_textures[i][2]):
+            need = donor_textures[idx][2]
+            for slot in free_slots:
+                if not slot["taken"] and slot["size"] >= need:
+                    slot["taken"] = True
+                    dests[idx] = slot["offset"]
+                    break
+        swap["texture_dests"] = dests
+
     # ================================================================
     # REVISION 14: pack SWAPS into a compact binary record table
     # instead of generating unique code per swap - see this file's own
@@ -1174,21 +1307,19 @@ def apply(patcher, output_data):
     # ================================================================
     record_bytes = b"".join(_pack_record(swap) for swap in SWAPS)
     record_count = len(SWAPS)
-    records_addr = patcher.alloc_cave(len(record_bytes))
-    patcher.patch_bytes(records_addr, record_bytes)
-    records_end_addr = records_addr + len(record_bytes)
+    # REVISION 40: records/donor/run tables are no longer cave-resident -
+    # they are packed into one disc blob below, once all three exist.
     logger.info(
-        f"[mechanic_randomize_monsters] records_addr = {hex(records_addr)}, "
-        f"{record_count} records, {len(record_bytes)} bytes total"
+        f"[mechanic_randomize_monsters] {record_count} records, "
+        f"{len(record_bytes)} bytes total"
     )
 
     # --- REVISION 28: the shared donor table ---
     donor_table_bytes = b"".join(_pack_donor_table_entry(entry) for entry in donor_table)
-    donor_table_addr = patcher.alloc_cave(len(donor_table_bytes))
-    patcher.patch_bytes(donor_table_addr, donor_table_bytes)
+
     logger.info(
-        f"[mechanic_randomize_monsters] donor_table_addr = {hex(donor_table_addr)}, "
-        f"{len(donor_table)} entries, {len(donor_table_bytes)} bytes total"
+        f"[mechanic_randomize_monsters] {len(donor_table)} donor entries, "
+        f"{len(donor_table_bytes)} bytes total"
     )
 
     # Max swaps native to any SINGLE level - this is how big the
@@ -1296,17 +1427,51 @@ def apply(patcher, output_data):
     # used for donor_addr_scratch etc.) its own dedicated 3-word
     # descriptor, and tracking tableDescriptor[2] itself the same way
     # ctm_buffer/file_buffer are tracked, for EXIT_HOOK to free too.
-    table_descriptor_scratch_addr = patcher.alloc_cave(max_group_size * 3 * 4)
-    for i in range(max_group_size):
-        patcher.patch_word(table_descriptor_scratch_addr + i * 12, 0)
-        patcher.patch_word(table_descriptor_scratch_addr + i * 12 + 4, 0)
-        patcher.patch_word(table_descriptor_scratch_addr + i * 12 + 8, 0)
-    current_table_descriptor_addr_addr = patcher.alloc_cave(4)
+    # REVISION 39: TEXTURE_SIZES holds every distinct GTX1 texture size in the
+    # game (8 of them), so a donor's own texture size travels in the donor
+    # table as a 1-byte index instead of a u24. Emitted here as a word table
+    # the stub indexes at runtime.
+    texture_size_table_addr = patcher.alloc_cave(len(TEXTURE_SIZES) * 4)
+    for i, size in enumerate(TEXTURE_SIZES):
+        patcher.patch_word(texture_size_table_addr + i * 4, size)
 
-    last_resolved_texture_array_scratch_addr = patcher.alloc_cave(max_group_size * 4)
-    for i in range(max_group_size):
-        patcher.patch_word(last_resolved_texture_array_scratch_addr + i * 4, 0)
-    current_resolved_texture_array_slot_addr_addr = patcher.alloc_cave(4)
+    # Pointer to the shared texture staging buffer, allocated once at the top
+    # of HOOK2 and freed in EXIT_HOOK.
+    texture_staging_ptr_addr = patcher.alloc_cave(4)
+    patcher.patch_word(texture_staging_ptr_addr, 0)
+
+    # Scratch for one texture read in flight. Values have to survive the bl
+    # calls between computing them and using them, and HOOK2 preserves no
+    # callee-saved registers, so they live in memory.
+    # REVISION 41: the texture loop's own state. tex_alloc_scratch records
+    # every texture that had to be allocated rather than written into a
+    # native slot, so EXIT_HOOK can free them - with up to 12 textures per
+    # monster and up to max_group_size monsters per level, the single slot
+    # per record the .ctm path used is no longer enough.
+    tex_loop_index_addr = patcher.alloc_cave(4)
+    tex_free_index_addr = patcher.alloc_cave(4)
+    tex_src_offset_addr = patcher.alloc_cave(4)
+    tex_dest_offset_addr = patcher.alloc_cave(4)
+    tex_alloc_count_addr = patcher.alloc_cave(4)
+    tex_alloc_scratch_addr = patcher.alloc_cave(
+        max_group_size * MAX_TEXTURES_PER_MONSTER * 4)
+    for _i in range(max_group_size * MAX_TEXTURES_PER_MONSTER):
+        patcher.patch_word(tex_alloc_scratch_addr + _i * 4, 0)
+    for _a in (tex_loop_index_addr, tex_free_index_addr, tex_src_offset_addr,
+               tex_dest_offset_addr, tex_alloc_count_addr):
+        patcher.patch_word(_a, 0)
+
+    tex_aligned_offset_addr = patcher.alloc_cave(4)
+    tex_aligned_len_addr = patcher.alloc_cave(4)
+    tex_prefix_addr = patcher.alloc_cave(4)
+    tex_dest_addr = patcher.alloc_cave(4)
+    for _a in (tex_aligned_offset_addr, tex_aligned_len_addr, tex_prefix_addr, tex_dest_addr):
+        patcher.patch_word(_a, 0)
+
+    # REVISION 39: table_descriptor_scratch, current_table_descriptor_addr,
+    # last_resolved_texture_array_scratch and
+    # current_resolved_texture_array_slot_addr all belonged to the .ctm
+    # path and are gone with it - 136 bytes of cave reclaimed.
 
     read_offset_var_addr = patcher.alloc_cave(4)
     read_length_var_addr = patcher.alloc_cave(4)
@@ -1323,9 +1488,6 @@ def apply(patcher, output_data):
     patcher.patch_bytes(donor_level_path_addr, b"game/s00.pds\x00")
     DONOR_LEVEL_PATH_DIGITS_OFFSET = 6  # "s[XX].pds" - 2 digits
 
-    ctm_path_addr = patcher.alloc_cave(19)
-    patcher.patch_bytes(ctm_path_addr, b"game/ctm/e000.CTM\x00")
-    CTM_PATH_DIGITS_OFFSET = 10  # "e[XXX].CTM" - 3 digits
 
     sound_path_addr = patcher.alloc_cave(15)
     patcher.patch_bytes(sound_path_addr, b"sound/e000.pps\x00")
@@ -1478,9 +1640,54 @@ def apply(patcher, output_data):
     run_table_bytes = b"\x00"  # 1-byte padding - see note above
     for start_offset, total_size in RUN_TABLE:
         run_table_bytes += _pack_u24(start_offset) + _pack_u24(total_size)
-    run_table_addr = patcher.alloc_cave(len(run_table_bytes))
-    patcher.patch_bytes(run_table_addr, run_table_bytes)
     RUN_TABLE_ENTRY_SIZE = 6
+
+    # === REVISION 40: records, donor table and run table live on the DISC.
+    #
+    # All three are pure lookup data - written once at patch time, read at
+    # HOOK2 and EXIT_HOOK, never modified at runtime - so there is no reason
+    # for them to occupy the ~8KB code cave that every mechanic competes
+    # for. They are packed into one contiguous blob in the disc padding past
+    # the end of the ISO's own filesystem, and HOOK2 pulls the whole blob
+    # into a heap buffer with a single DVD read - the same machinery it
+    # already uses for donor models and textures.
+    #
+    # That takes this mechanic's cave usage from ~7.8KB to ~2.7KB. The read
+    # is ~5KB against the 200KB+ of monster data HOOK2 already loads, so it
+    # costs nothing measurable next to what surrounds it.
+    #
+    # run_cursor_scratch deliberately stays in the cave: it is written every
+    # level, so it is state, not static data.
+    disc_blob = bytearray(record_bytes)
+    DISC_DONOR_TABLE_OFF = len(disc_blob)
+    disc_blob += donor_table_bytes
+    DISC_RUN_TABLE_OFF = len(disc_blob)
+    disc_blob += run_table_bytes
+    disc_blob_size = len(disc_blob)
+    assert DISC_DONOR_TABLE_OFF < 0x8000 and DISC_RUN_TABLE_OFF < 0x8000, (
+        "table offsets inside the disc blob no longer fit an addi immediate - "
+        "the stub reaches them as blob_ptr + offset"
+    )
+    # DVD reads are sector-granular, so the read length is the blob rounded
+    # up. alloc_disc_data reserves in whole sectors too, so the padding read
+    # past the end of the blob is space we own.
+    records_bytes_len = len(record_bytes)   # loop bound: blob_ptr + this = end of records
+    assert records_bytes_len < 0x8000, "record block no longer fits an addi immediate"
+    disc_blob_read_len = (disc_blob_size + DVD_SECTOR_SIZE - 1) & ~(DVD_SECTOR_SIZE - 1)
+    disc_blob_offset = patcher.alloc_disc_data(disc_blob_size)
+    patcher.write_disc_data(disc_blob_offset, bytes(disc_blob))
+
+    # Pointer to the heap copy. Zero means "not loaded" - every consumer
+    # checks it, so a failed allocation or read leaves the level vanilla
+    # rather than dereferencing garbage.
+    disc_blob_ptr_addr = patcher.alloc_cave(4)
+    patcher.patch_word(disc_blob_ptr_addr, 0)
+
+    logger.info(
+        f"[mechanic_randomize_monsters] disc blob: {disc_blob_size} bytes at "
+        f"iso 0x{disc_blob_offset:x} (records 0, donors {DISC_DONOR_TABLE_OFF}, "
+        f"runs {DISC_RUN_TABLE_OFF})"
+    )
     run_cursor_scratch_addr = patcher.alloc_cave(len(RUN_TABLE) * 4)
     for i in range(len(RUN_TABLE)):
         patcher.patch_word(run_cursor_scratch_addr + i * 4, 0)
@@ -1506,6 +1713,13 @@ def apply(patcher, output_data):
             instrs.append(_lbz(reg, field_offset, reg))
         elif size == 2:
             instrs.append(_lhz(reg, field_offset, reg))
+        elif size == 3:
+            # REVISION 39: u24, same trick emit_load_donor_field uses - read a
+            # full word starting one byte early and mask the borrowed top byte
+            # off. Safe because the only u24 record field (+0x04) is preceded
+            # by native_run_id at +0x03.
+            instrs.append(_lwz(reg, field_offset - 1, reg))
+            instrs.append(_rlwinm(reg, reg, 0, 8, 31))
         elif size == 4:
             instrs.append(_lwz(reg, field_offset, reg))
         else:
@@ -1727,7 +1941,120 @@ def apply(patcher, output_data):
     # own REVISION 32 note near HOOK_ADDR's own (former) definition for
     # the fuller rationale.
 
-    instructions2 += emit_load_addr(3, records_addr)
+    # --- REVISION 40: pull the records/donor/run blob off the disc.
+    #
+    # A DVDFileInfo is just a small struct; DVDFastOpen only ever fills four
+    # of its fields from the FST entry it looks up (+0x30 disc offset,
+    # +0x34 length, +0x38 and +0x0c zeroed). Writing those four directly
+    # reads from any disc offset without needing an FST entry at all, which
+    # is what lets this blob live in the padding past the filesystem.
+    # DVDReadAsync still bounds-checks the read against the +0x34 length we
+    # supply here, so bad arithmetic reads short rather than wandering.
+    #
+    # fileinfo_addr is reused rather than allocating a second one: this read
+    # completes before the per-record loop opens its first donor file, and
+    # DVDFastOpen overwrites exactly these fields anyway. ---
+    instructions2 += emit_load_addr(4, fileinfo_addr)
+    instructions2 += [
+        _lis(3, hi(disc_blob_offset)),
+        _ori(3, 3, lo(disc_blob_offset)),
+        _stw(3, 0x30, 4),
+    ]
+    instructions2 += [
+        _lis(3, hi(disc_blob_read_len)),
+        _ori(3, 3, lo(disc_blob_read_len)),
+        _stw(3, 0x34, 4),
+        _li(3, 0),
+        _stw(3, 0x38, 4),
+        _stw(3, 0x0c, 4),
+    ]
+    instructions2 += [
+        _lis(3, hi(disc_blob_read_len)),
+        _ori(3, 3, lo(disc_blob_read_len)),
+    ]
+    idx = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx, "bl", MEM_ALLOC))
+    instructions2 += emit_store_mem_word(3, 4, disc_blob_ptr_addr)
+    instructions2.append(_cmpwi(3, 0))
+    idx = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx, "beq", "disc_blob_failed"))
+
+    instructions2.append(_mr(30, 3))
+    instructions2.append(_li(0, 0))
+    instructions2 += emit_store_mem_word(0, 4, COMPLETION_FLAG_ADDR)
+    instructions2 += emit_load_addr(3, fileinfo_addr)
+    instructions2.append(_mr(4, 30))
+
+    # same DMA destination guard the model and texture reads use - a DVD
+    # read writes wherever it is pointed, with no bounds check and no CPU
+    # involvement, so a bad allocation result must not become an arbitrary
+    # write. Everything legitimate is at or above 0x80300000 (all DOL
+    # sections and bss end by 0x802ECB38) and below the 0x81800000 top of RAM.
+    instructions2.append(_rlwinm(5, 4, 16, 16, 31))
+    instructions2.append(_cmplwi(5, 0x8030))
+    idx = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx, "blt", "disc_blob_read_failed"))
+    instructions2.append(_cmplwi(5, 0x8180))
+    idx = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx, "bge", "disc_blob_read_failed"))
+
+    instructions2 += [
+        _lis(5, hi(disc_blob_read_len)),
+        _ori(5, 5, lo(disc_blob_read_len)),
+        _li(6, 0),
+        _lis(7, hi(callback_stub_addr)),
+        _ori(7, 7, lo(callback_stub_addr)),
+        _li(8, 2),
+    ]
+    idx = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx, "bl", ASYNC_READ))
+    instructions2.append(_cmpwi(3, 0))
+    idx = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx, "beq", "disc_blob_read_failed"))
+
+    labels2["disc_blob_poll"] = len(instructions2)
+    instructions2 += emit_load_mem_word(3, COMPLETION_FLAG_ADDR)
+    instructions2.append(_cmpwi(3, 0))
+    idx = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx, "bne", "disc_blob_ready"))
+    idx = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx, "bl", POLL_CONTROLLER))
+    idx = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx, "b", "disc_blob_poll"))
+
+    labels2["disc_blob_ready"] = len(instructions2)
+    instructions2.append(_mr(3, 30))
+    instructions2 += [
+        _lis(4, hi(disc_blob_read_len)),
+        _ori(4, 4, lo(disc_blob_read_len)),
+    ]
+    idx = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx, "bl", DC_INVALIDATE))
+    idx = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx, "b", "disc_blob_done"))
+
+    # A failed read must not leave a pointer to a buffer full of garbage -
+    # free it and clear the pointer, so every consumer sees "not loaded".
+    labels2["disc_blob_read_failed"] = len(instructions2)
+    instructions2 += emit_load_mem_word(3, disc_blob_ptr_addr)
+    emit_mem_free(fills2, instructions2, 3)
+    instructions2.append(_li(3, 0))
+    instructions2 += emit_store_mem_word(3, 4, disc_blob_ptr_addr)
+    labels2["disc_blob_failed"] = len(instructions2)
+    labels2["disc_blob_done"] = len(instructions2)
+
+    instructions2 += emit_load_mem_word(3, disc_blob_ptr_addr)  # records sit at blob + 0
     instructions2 += emit_store_mem_word(3, 4, current_record_ptr_addr)
     instructions2.append(_li(3, 0))
     instructions2 += emit_store_mem_word(3, 4, donor_scratch_idx_addr)
@@ -1742,9 +2069,27 @@ def apply(patcher, output_data):
     # itself didn't go away just because HOOK1 did. ---
     emit_zero_array(fills2, instructions2, labels2, "ctm", last_ctm_buffer_scratch_addr, max_group_size)
     emit_zero_array(fills2, instructions2, labels2, "file", last_file_buffer_scratch_addr, max_group_size)
-    emit_zero_array(fills2, instructions2, labels2, "texarr", last_resolved_texture_array_scratch_addr, max_group_size)
     emit_zero_array(fills2, instructions2, labels2, "runcursor", run_cursor_scratch_addr, len(RUN_TABLE))
-    emit_zero_array(fills2, instructions2, labels2, "tabledesc", table_descriptor_scratch_addr, max_group_size * 3)
+
+    # REVISION 41: this visit's texture allocations start empty.
+    instructions2.append(_li(3, 0))
+    instructions2 += emit_store_mem_word(3, 4, tex_alloc_count_addr)
+
+    # --- REVISION 39: allocate the shared texture staging buffer once, here,
+    # rather than per monster. Every donor texture is read into it and then
+    # memcpy'd out at its exact size (see TEXTURE_STAGING_BUFFER_SIZE's own
+    # note for why the read cannot go straight to its destination). A failed
+    # allocation is not fatal: texture_staging_ptr stays 0 and each record's
+    # own texture step skips itself, leaving that monster with the native
+    # texture it is replacing rather than killing the whole swap. ---
+    instructions2 += [
+        _lis(3, hi(TEXTURE_STAGING_BUFFER_SIZE)),
+        _ori(3, 3, lo(TEXTURE_STAGING_BUFFER_SIZE)),
+    ]
+    idx = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx, "bl", MEM_ALLOC))
+    instructions2 += emit_store_mem_word(3, 4, texture_staging_ptr_addr)
 
     # REVISION 34: the ".sam buffer leak fix, part 1 of 2" free-loop
     # that used to sit here has been REMOVED - the native type-0x13
@@ -1755,7 +2100,21 @@ def apply(patcher, output_data):
 
     labels2["loop_top"] = len(instructions2)
     instructions2 += emit_load_mem_word(3, current_record_ptr_addr)
-    instructions2 += emit_load_addr(4, records_end_addr)
+    instructions2 += emit_load_mem_word(4, disc_blob_ptr_addr)
+
+    # REVISION 40: with the records on the disc, a failed load leaves the
+    # blob pointer at 0 - and 0 + records_bytes_len is a perfectly ordinary
+    # looking loop bound, so without this check the loop would happily walk
+    # 239 records from address 0. Bail out instead and leave the level
+    # vanilla. (This is exactly what went wrong the first time: the pointer
+    # was still 0 when the loop started, producing reads at 0x00000001 and
+    # upward in RECORD_SIZE steps.)
+    instructions2.append(_cmpwi(4, 0))
+    idx2 = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx2, "beq", "loop_done"))
+
+    instructions2.append(_addi(4, 4, records_bytes_len))  # end of the record block
     instructions2.append(_cmplw(3, 4))
     idx2 = len(instructions2)
     instructions2.append(None)
@@ -1775,7 +2134,8 @@ def apply(patcher, output_data):
     # removed entirely - REVISION 32). ---
     instructions2 += emit_load_field(7, REC_DONOR_POOL_INDEX, 1)
     instructions2 += [_li(8, DONOR_TABLE_ENTRY_SIZE), _mullw(7, 7, 8)]
-    instructions2 += emit_load_addr(8, donor_table_addr)
+    instructions2 += emit_load_mem_word(8, disc_blob_ptr_addr)
+    instructions2.append(_addi(8, 8, DISC_DONOR_TABLE_OFF))
     instructions2 += [_add(7, 7, 8)]
     instructions2 += emit_store_mem_word(7, 8, current_donor_table_entry_addr_addr)
 
@@ -2002,17 +2362,6 @@ def apply(patcher, output_data):
     instructions2 += [_add(5, 3, 4)]
     instructions2 += emit_store_mem_word(5, 6, current_ctm_buffer_slot_addr_addr)
 
-    instructions2 += emit_load_addr(4, last_resolved_texture_array_scratch_addr)
-    instructions2 += [_add(5, 3, 4)]
-    instructions2 += emit_store_mem_word(5, 6, current_resolved_texture_array_slot_addr_addr)
-
-    # table_descriptor is a 12-byte (3-word) struct per slot, not 4 -
-    # recompute idx * 12 separately (r3 above holds idx * 4).
-    instructions2 += emit_load_mem_word(3, donor_scratch_idx_addr)
-    instructions2 += [_li(4, 12), _mullw(3, 3, 4)]
-    instructions2 += emit_load_addr(4, table_descriptor_scratch_addr)
-    instructions2 += [_add(5, 3, 4)]
-    instructions2 += emit_store_mem_word(5, 6, current_table_descriptor_addr_addr)
 
     # tag itself is a holdover name from when this label prefix was
     # shared with HOOK1 (now removed entirely - REVISION 32) - kept as
@@ -2085,7 +2434,8 @@ def apply(patcher, output_data):
     fills2.append((idx, "beq", f"{tag}_use_fresh_alloc"))
 
     instructions2 += [_li(4, RUN_TABLE_ENTRY_SIZE), _mullw(4, 3, 4)]  # r4 = run_id * 6 (not a power of 2, needs a real multiply)
-    instructions2 += emit_load_addr(5, run_table_addr)
+    instructions2 += emit_load_mem_word(5, disc_blob_ptr_addr)
+    instructions2.append(_addi(5, 5, DISC_RUN_TABLE_OFF))
     instructions2 += [_add(6, 4, 5), _addi(6, 6, 1)]  # r6 = run_table_addr + run_id*6 + 1 = this run's own entry start (past the 1-byte padding)
     instructions2.append(_lwz(7, -1, 6))               # r7 = word read 1 byte early (safely borrows the padding byte, or the previous entry's own last byte)
     instructions2.append(_rlwinm(7, 7, 0, 8, 31))       # r7 = start_offset (u24, masked)
@@ -2168,6 +2518,32 @@ def apply(patcher, output_data):
         _ori(3, 3, lo(fileinfo_addr)),
         _mr(4, 30),
     ]
+
+    # --- REVISION 38: refuse to DMA into anything but the heap.
+    # DVDReadAsync writes hundreds of KB straight to whatever address it is
+    # handed, with no bounds checking and no CPU involvement - a bad
+    # destination silently splats file contents over whatever it hits, and
+    # because it is DMA it is invisible to CPU write breakpoints. The
+    # existing guards only reject a ZERO base; a stale or garbage non-zero
+    # LEVEL_DATA_BASE passes them and produces an arbitrary destination.
+    # A user-reported crash had executable code at 0x80079AF8 reading as
+    # 0x00000000 - consistent with a DVD read landing in the DOL's text
+    # section, whose zero-padded stretches would look exactly like that.
+    # All DOL sections and bss end by 0x802ECB38 and the heap arena starts
+    # around 0x80428B40, so requiring 0x80300000 <= dest < 0x81800000 keeps
+    # every legitimate destination and rejects anything pointing at code,
+    # data, bss or outside RAM. On failure take the existing non-fatal
+    # "read failed" path rather than issuing the read. ---
+    instructions2.append(_rlwinm(5, 4, 16, 16, 31))   # r5 = dest >> 16
+    instructions2.append(_cmplwi(5, 0x8030))
+    idx_guard_lo = len(instructions2)
+    instructions2.append(None)
+    instructions2.append(_cmplwi(5, 0x8180))
+    idx_guard_hi = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx_guard_lo, "blt", f"{tag}_read_start_failed"))
+    fills2.append((idx_guard_hi, "bge", f"{tag}_read_start_failed"))
+
     instructions2 += emit_load_mem_word(5, read_length_var_addr)
     instructions2 += emit_load_mem_word(6, read_offset_var_addr)
     instructions2 += [
@@ -2232,6 +2608,192 @@ def apply(patcher, output_data):
     idx = len(instructions2)
     instructions2.append(None)
     fills2.append((idx, "bl", DC_INVALIDATE))
+
+    # =====================================================================
+    # REVISION 41: DONOR TEXTURE LOAD - now a LOOP over the donor's textures.
+    #
+    # A monster uses up to 12 textures, not one. Registering only the
+    # dominant one left every swapped monster's secondary parts rendering
+    # pure white, because those texture ids resolved to nothing.
+    #
+    # Per texture: read it out of the donor's own level file (still open
+    # here from the model load), copy it to its destination, and register
+    # the id. The destination came from the record and was decided at patch
+    # time - a native texture slot this one fits and may overwrite, or 0
+    # meaning allocate. Allocations are tracked for EXIT_HOOK to free.
+    # =====================================================================
+    instructions2 += [_li(3, 0)]
+    instructions2 += emit_store_mem_word(3, 4, tex_loop_index_addr)
+
+    labels2["tex_loop_top"] = len(instructions2)
+    instructions2 += emit_load_mem_word(3, tex_loop_index_addr)
+    instructions2 += emit_load_donor_field(4, DTE_DONOR_TEXTURE_COUNT, 1)
+    instructions2.append(_cmplw(3, 4))
+    idx = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx, "bge", "tex_all_done"))
+
+    # donor side: file offset and size for texture [i]
+    instructions2 += emit_load_mem_word(3, tex_loop_index_addr)
+    instructions2 += [_li(4, DTE_TEXTURE_STRIDE), _mullw(3, 3, 4)]
+    instructions2 += emit_load_mem_word(4, current_donor_table_entry_addr_addr)
+    instructions2.append(_add(4, 4, 3))
+    instructions2.append(_lwz(5, DTE_DONOR_TEXTURES - 1, 4))
+    instructions2.append(_rlwinm(5, 5, 0, 8, 31))          # u24 source offset
+    instructions2 += emit_store_mem_word(5, 6, tex_src_offset_addr)
+    instructions2.append(_lbz(5, DTE_DONOR_TEXTURES + 3, 4))
+    instructions2.append(_rlwinm(5, 5, 2, 0, 29))
+    instructions2 += emit_load_addr(6, texture_size_table_addr)
+    instructions2 += [_add(5, 5, 6), _lwz(5, 0, 5)]
+    instructions2 += emit_store_mem_word(5, 6, ctm_size_var_addr)   # this texture's size
+    instructions2.append(_cmpwi(5, 0))
+    idx = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx, "beq", "tex_next"))
+
+    # record side: destination file offset for texture [i], 0 = allocate
+    instructions2 += emit_load_mem_word(3, tex_loop_index_addr)
+    instructions2 += [_li(4, 3), _mullw(3, 3, 4)]
+    instructions2 += emit_load_mem_word(4, current_record_ptr_addr)
+    instructions2.append(_add(4, 4, 3))
+    instructions2.append(_lwz(4, REC_TEXTURE_DEST - 1, 4))
+    instructions2.append(_rlwinm(4, 4, 0, 8, 31))
+    instructions2 += emit_store_mem_word(4, 5, tex_dest_offset_addr)
+
+    instructions2 += emit_load_mem_word(29, texture_staging_ptr_addr)
+    instructions2.append(_cmpwi(29, 0))
+    idx = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx, "beq", "tex_all_done"))
+
+    # sector-align the read: a texture sits mid-sector, so read the sectors
+    # containing it into staging and copy out from the offset within them.
+    instructions2 += emit_load_mem_word(5, tex_src_offset_addr)
+    instructions2.append(_rlwinm(6, 5, 0, 0, 20))
+    instructions2.append(_rlwinm(7, 5, 0, 21, 31))
+    instructions2 += emit_store_mem_word(6, 4, tex_aligned_offset_addr)
+    instructions2 += emit_store_mem_word(7, 4, tex_prefix_addr)
+    instructions2 += emit_load_mem_word(3, ctm_size_var_addr)
+    instructions2.append(_add(3, 3, 7))
+    instructions2.append(_addi(3, 3, DVD_SECTOR_SIZE - 1))
+    instructions2.append(_rlwinm(3, 3, 0, 0, 20))
+    instructions2 += emit_store_mem_word(3, 4, tex_aligned_len_addr)
+
+    instructions2.append(_li(0, 0))
+    instructions2 += emit_store_mem_word(0, 4, COMPLETION_FLAG_ADDR)
+    instructions2 += emit_load_addr(3, fileinfo_addr)
+    instructions2.append(_mr(4, 29))
+
+    # DMA destination guard - a DVD read writes wherever it is pointed.
+    instructions2.append(_rlwinm(5, 4, 16, 16, 31))
+    instructions2.append(_cmplwi(5, 0x8030))
+    idx = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx, "blt", "tex_all_done"))
+    instructions2.append(_cmplwi(5, 0x8180))
+    idx = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx, "bge", "tex_all_done"))
+
+    instructions2 += emit_load_mem_word(5, tex_aligned_len_addr)
+    instructions2 += emit_load_mem_word(6, tex_aligned_offset_addr)
+    instructions2 += [
+        _lis(7, hi(callback_stub_addr)),
+        _ori(7, 7, lo(callback_stub_addr)),
+        _li(8, 2),
+    ]
+    idx = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx, "bl", ASYNC_READ))
+    instructions2 += [_cmpwi(3, 0)]
+    idx = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx, "beq", "tex_next"))
+
+    labels2["tex_poll_loop"] = len(instructions2)
+    instructions2 += emit_load_mem_word(3, COMPLETION_FLAG_ADDR)
+    instructions2.append(_cmpwi(3, 0))
+    idx = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx, "bne", "tex_poll_done"))
+    idx = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx, "bl", POLL_CONTROLLER))
+    idx = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx, "b", "tex_poll_loop"))
+
+    labels2["tex_poll_done"] = len(instructions2)
+    instructions2 += [_mr(3, 29)]
+    instructions2 += emit_load_mem_word(4, tex_aligned_len_addr)
+    idx = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx, "bl", DC_INVALIDATE))
+
+    instructions2 += emit_load_mem_word(3, tex_dest_offset_addr)
+    instructions2.append(_cmpwi(3, 0))
+    idx = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx, "beq", "tex_alloc"))
+    instructions2 += emit_load_mem_word(4, LEVEL_DATA_BASE_ADDR)
+    instructions2.append(_cmpwi(4, 0))
+    idx = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx, "beq", "tex_next"))
+    instructions2.append(_add(3, 3, 4))
+    idx = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx, "b", "tex_have_dest"))
+
+    labels2["tex_alloc"] = len(instructions2)
+    instructions2 += emit_load_mem_word(3, ctm_size_var_addr)
+    idx = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx, "bl", MEM_ALLOC))
+    instructions2.append(_cmpwi(3, 0))
+    idx = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx, "beq", "tex_next"))
+    # remember it so EXIT_HOOK can free it
+    instructions2 += emit_load_mem_word(4, tex_alloc_count_addr)
+    instructions2.append(_rlwinm(5, 4, 2, 0, 29))
+    instructions2 += emit_load_addr(6, tex_alloc_scratch_addr)
+    instructions2.append(_add(5, 5, 6))
+    instructions2.append(_stw(3, 0, 5))
+    instructions2.append(_addi(4, 4, 1))
+    instructions2 += emit_store_mem_word(4, 5, tex_alloc_count_addr)
+
+    labels2["tex_have_dest"] = len(instructions2)
+    instructions2 += emit_store_mem_word(3, 4, tex_dest_addr)
+    instructions2 += emit_load_mem_word(4, tex_prefix_addr)
+    instructions2.append(_add(4, 29, 4))
+    instructions2 += emit_load_mem_word(5, ctm_size_var_addr)
+    idx = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx, "bl", MEMCPY))
+
+    instructions2 += emit_load_mem_word(3, tex_dest_addr)
+    instructions2 += emit_load_mem_word(4, ctm_size_var_addr)
+    idx = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx, "bl", DC_FLUSH_RANGE))
+    instructions2 += emit_load_mem_word(3, tex_dest_addr)
+    instructions2 += [_li(4, 0), _li(5, 0), _li(6, 0)]
+    idx = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx, "bl", LOAD_AND_CACHE_ANIMATION_TEXTURE))
+
+    labels2["tex_next"] = len(instructions2)
+    instructions2 += emit_load_mem_word(3, tex_loop_index_addr)
+    instructions2.append(_addi(3, 3, 1))
+    instructions2 += emit_store_mem_word(3, 4, tex_loop_index_addr)
+    idx = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx, "b", "tex_loop_top"))
+
+    labels2["tex_all_done"] = len(instructions2)
+
+
     instructions2 += [
         _lis(3, hi(fileinfo_addr)),
         _ori(3, 3, lo(fileinfo_addr)),
@@ -2395,274 +2957,24 @@ def apply(patcher, output_data):
 
     labels2["skip_levelstat_write"] = len(instructions2)
 
-    # === REVISION 31: CTM/texture load - moved here from HOOK1 so it
-    # can share the exact same run-pooling scheme/cursor as file_buffer
-    # above, drawing from whatever capacity that record's own run has
-    # LEFT after file_buffer's own consumption (not a separate, CTM-
-    # only sub-pool) - falls back to fresh MemAlloc only once the
-    # run's own total space is genuinely exhausted. Runs only if
-    # file_buffer's own load above succeeded (see the "beq advance_idx"
-    # check above this point) - a slot whose own core model-data write
-    # got skipped has no use for texture data either. ===
-    emit_format_digits_call_donor(fills2, instructions2, DTE_DONOR_CARD_ID, 1, ctm_path_addr + CTM_PATH_DIGITS_OFFSET, 3)
-
-    instructions2 += emit_load_addr(3, ctm_path_addr)
-    idx2 = len(instructions2)
-    instructions2.append(None)
-    fills2.append((idx2, "bl", DVD_CONVERT_PATH))
-    instructions2 += [
-        _mr(29, 3),
-        _cmpwi(3, -1),
-    ]
-    idx2 = len(instructions2)
-    instructions2.append(None)
-    fills2.append((idx2, "beq", "ctm_open_failed"))
-
-    instructions2 += [
-        _mr(3, 29),
-        _lis(4, hi(fileinfo_addr)),
-        _ori(4, 4, lo(fileinfo_addr)),
-    ]
-    idx2 = len(instructions2)
-    instructions2.append(None)
-    fills2.append((idx2, "bl", DVD_FAST_OPEN))
-    instructions2 += [_cmpwi(3, 0)]
-    idx2 = len(instructions2)
-    instructions2.append(None)
-    fills2.append((idx2, "beq", "ctm_open_failed"))
-
-    instructions2 += [
-        _lis(3, hi(fileinfo_addr)),
-        _ori(3, 3, lo(fileinfo_addr)),
-        _lwz(3, DVDFILEINFO_SIZE_OFFSET, 3),
-        _addi(3, 3, 0x1f),
-        _rlwinm(3, 3, 0, 0, 26),
-        _lis(6, hi(ctm_size_var_addr)),
-        _ori(6, 6, lo(ctm_size_var_addr)),
-        _stw(3, 0, 6),
-    ]
-
-    # --- try the SAME run pool file_buffer just used, continuing from
-    # wherever its own consumption left the cursor (re-load run_id
-    # fresh - r3-r12 aren't preserved across the several bl calls made
-    # since file_buffer's own copy of this same value). ---
-    instructions2 += emit_load_field(3, REC_NATIVE_RUN_ID, 1)
-    instructions2.append(_cmpwi(3, NO_RUN_AVAILABLE))
-    idx2 = len(instructions2)
-    instructions2.append(None)
-    fills2.append((idx2, "beq", "ctm_use_fresh_alloc"))
-
-    instructions2 += [_li(4, RUN_TABLE_ENTRY_SIZE), _mullw(4, 3, 4)]
-    instructions2 += emit_load_addr(5, run_table_addr)
-    instructions2 += [_add(6, 4, 5), _addi(6, 6, 1)]
-    instructions2.append(_lwz(7, -1, 6))
-    instructions2.append(_rlwinm(7, 7, 0, 8, 31))       # r7 = start_offset
-    instructions2.append(_lwz(8, 2, 6))
-    instructions2.append(_rlwinm(8, 8, 0, 8, 31))       # r8 = total_size
-
-    instructions2.append(_rlwinm(9, 3, 2, 0, 29))       # r9 = run_id * 4
-    instructions2 += emit_load_addr(10, run_cursor_scratch_addr)
-    instructions2 += [_add(11, 9, 10)]                   # r11 = this run's own cursor slot address
-    instructions2.append(_lwz(12, 0, 11))                # r12 = current cursor (whatever file_buffer left it at)
-
-    instructions2 += emit_load_mem_word(4, ctm_size_var_addr)
-    instructions2.append(_add(4, 12, 4))                 # r4 = candidate new cursor
-    instructions2.append(_cmplw(8, 4))
-    idx2 = len(instructions2)
-    instructions2.append(None)
-    fills2.append((idx2, "blt", "ctm_use_fresh_alloc"))
-
-    instructions2 += emit_load_addr(9, LEVEL_DATA_BASE_ADDR)
-    instructions2.append(_lwz(9, 0, 9))
-    instructions2.append(_cmpwi(9, 0))
-    idx2 = len(instructions2)
-    instructions2.append(None)
-    fills2.append((idx2, "beq", "ctm_use_fresh_alloc"))
-
-    instructions2.append(_add(9, 9, 7))                  # r9 += start_offset
-    instructions2.append(_add(9, 9, 12))                 # r9 += old cursor -> this record's own reused address
-    instructions2.append(_stw(4, 0, 11))                 # persist new cursor
-
-    instructions2 += [
-        _lis(6, hi(ctm_buffer_var_addr)),
-        _ori(6, 6, lo(ctm_buffer_var_addr)),
-        _stw(9, 0, 6),
-        _mr(30, 9),
-    ]
-    # NOTE: deliberately NOT writing current_ctm_buffer_slot_addr_addr
-    # here - same reasoning as file_buffer's own identical note above:
-    # this memory was never MemAlloc'd by us, so EXIT_HOOK must never
-    # try to MEM_FREE it.
-    idx2 = len(instructions2)
-    instructions2.append(None)
-    fills2.append((idx2, "b", "ctm_buffer_acquired"))
-
-    labels2["ctm_use_fresh_alloc"] = len(instructions2)
-    instructions2 += emit_load_mem_word(3, ctm_size_var_addr)
-    idx2 = len(instructions2)
-    instructions2.append(None)
-    fills2.append((idx2, "bl", MEM_ALLOC))
-    instructions2 += [
-        _lis(6, hi(ctm_buffer_var_addr)),
-        _ori(6, 6, lo(ctm_buffer_var_addr)),
-        _stw(3, 0, 6),
-        _mr(30, 3),
-        _cmpwi(3, 0),
-    ]
-    idx2 = len(instructions2)
-    instructions2.append(None)
-    fills2.append((idx2, "beq", "ctm_memalloc_failed"))
-
-    instructions2 += emit_load_mem_word(4, current_ctm_buffer_slot_addr_addr)
-    instructions2.append(_stw(3, 0, 4))
-
-    labels2["ctm_buffer_acquired"] = len(instructions2)
-    instructions2 += [
-        _mr(3, 29),
-        _lis(4, hi(fileinfo_addr)),
-        _ori(4, 4, lo(fileinfo_addr)),
-    ]
-    idx2 = len(instructions2)
-    instructions2.append(None)
-    fills2.append((idx2, "bl", DVD_FAST_OPEN))
-    instructions2 += [_cmpwi(3, 0)]
-    idx2 = len(instructions2)
-    instructions2.append(None)
-    fills2.append((idx2, "beq", "ctm_read_start_failed"))
-
-    instructions2 += [
-        _lis(3, hi(fileinfo_addr)),
-        _ori(3, 3, lo(fileinfo_addr)),
-        _mr(4, 30),
-    ]
-    instructions2 += emit_load_mem_word(5, ctm_size_var_addr)
-    instructions2 += [
-        _li(6, 0),
-        _lis(7, hi(callback_stub_addr)),
-        _ori(7, 7, lo(callback_stub_addr)),
-        _li(8, 2),
-    ]
-    idx2 = len(instructions2)
-    instructions2.append(None)
-    fills2.append((idx2, "bl", ASYNC_READ))
-    instructions2 += [_cmpwi(3, 0)]
-    idx2 = len(instructions2)
-    instructions2.append(None)
-    fills2.append((idx2, "beq", "ctm_read_start_failed"))
-
-    instructions2 += [
-        _lis(3, hi(COMPLETION_FLAG_ADDR)),
-        _ori(3, 3, lo(COMPLETION_FLAG_ADDR)),
-        _li(4, 0),
-        _stb(4, 0, 3),
-    ]
-
-    labels2["ctm_poll_loop"] = len(instructions2)
-    instructions2 += [
-        _lis(3, hi(COMPLETION_FLAG_ADDR)),
-        _ori(3, 3, lo(COMPLETION_FLAG_ADDR)),
-        _lbz(3, 0, 3),
-        _cmpwi(3, 0),
-    ]
-    idx2 = len(instructions2)
-    instructions2.append(None)
-    fills2.append((idx2, "bne", "ctm_poll_done"))
-
-    idx2 = len(instructions2)
-    instructions2.append(None)
-    fills2.append((idx2, "bl", CHECK_DVD_STATUS))
-    instructions2 += [_cmpwi(3, 0)]
-    idx2 = len(instructions2)
-    instructions2.append(None)
-    fills2.append((idx2, "bne", "ctm_drive_ready"))
-
-    idx2 = len(instructions2)
-    instructions2.append(None)
-    fills2.append((idx2, "bl", MUTE_AUDIO))
-    idx2 = len(instructions2)
-    instructions2.append(None)
-    fills2.append((idx2, "b", "ctm_poll_continue"))
-
-    labels2["ctm_drive_ready"] = len(instructions2)
-    idx2 = len(instructions2)
-    instructions2.append(None)
-    fills2.append((idx2, "bl", POLL_CONTROLLER))
-
-    labels2["ctm_poll_continue"] = len(instructions2)
-    idx2 = len(instructions2)
-    instructions2.append(None)
-    fills2.append((idx2, "b", "ctm_poll_loop"))
-
-    labels2["ctm_poll_done"] = len(instructions2)
-    instructions2 += [
-        _mr(3, 30),
-        _lis(4, hi(ctm_size_var_addr)),
-        _ori(4, 4, lo(ctm_size_var_addr)),
-        _lwz(4, 0, 4),
-    ]
-    idx2 = len(instructions2)
-    instructions2.append(None)
-    fills2.append((idx2, "bl", DC_INVALIDATE))
-    instructions2 += [
-        _lis(3, hi(fileinfo_addr)),
-        _ori(3, 3, lo(fileinfo_addr)),
-    ]
-    idx2 = len(instructions2)
-    instructions2.append(None)
-    fills2.append((idx2, "bl", DVD_CLOSE))
-
-    instructions2 += [
-        _mr(3, 30),
-        _lwz(4, 8, 30),
-        _add(3, 3, 4),
-    ]
-    instructions2 += emit_load_mem_word(4, current_table_descriptor_addr_addr)
-    instructions2 += [
-        _stw(3, 4, 4),
-        _mr(3, 4),
-    ]
-    idx2 = len(instructions2)
-    instructions2.append(None)
-    fills2.append((idx2, "bl", LOAD_ENTITY_ANIMATION_TABLE))
-
-    instructions2 += emit_load_mem_word(3, current_table_descriptor_addr_addr)
-    instructions2.append(_lwz(3, 8, 3))
-    instructions2 += emit_load_mem_word(4, current_resolved_texture_array_slot_addr_addr)
-    instructions2.append(_stw(3, 0, 4))
-
-    idx2 = len(instructions2)
-    instructions2.append(None)
-    fills2.append((idx2, "b", "ctm_done"))
-
-    # --- ctm-load failure paths (best-effort, non-fatal) ---
-    labels2["ctm_open_failed"] = len(instructions2)
-    idx2 = len(instructions2)
-    instructions2.append(None)
-    fills2.append((idx2, "b", "ctm_done"))
-
-    labels2["ctm_memalloc_failed"] = len(instructions2)
-    instructions2 += [
-        _lis(3, hi(fileinfo_addr)),
-        _ori(3, 3, lo(fileinfo_addr)),
-    ]
-    idx2 = len(instructions2)
-    instructions2.append(None)
-    fills2.append((idx2, "bl", DVD_CLOSE))
-    idx2 = len(instructions2)
-    instructions2.append(None)
-    fills2.append((idx2, "b", "ctm_done"))
-
-    labels2["ctm_read_start_failed"] = len(instructions2)
-    instructions2 += [
-        _lis(3, hi(fileinfo_addr)),
-        _ori(3, 3, lo(fileinfo_addr)),
-    ]
-    idx2 = len(instructions2)
-    instructions2.append(None)
-    fills2.append((idx2, "bl", DVD_CLOSE))
-    idx2 = len(instructions2)
-    instructions2.append(None)
-    fills2.append((idx2, "b", "ctm_done"))
+    # === REVISION 39: the CTM load that used to sit here has been REMOVED.
+    #
+    # It fetched ctm/eNNN.CTM - the CARD asset - and handed it to
+    # LoadEntityAnimationTable on a private descriptor, replicating the
+    # card/summon path for what is actually an ENEMY slot. That was wrong
+    # in kind and ruinous in size: enemy textures are the GTX1 entries
+    # already inside each level file (see the texture block emitted in the
+    # model load above), and a .ctm is roughly 4x the size of the texture
+    # the slot actually needs - Beaker is 163,680 vs 43,040. Across one
+    # real 5-swap seed it allocated 1,153,152 bytes of fresh MemAlloc and
+    # was the direct cause of an observed out-of-memory crash.
+    #
+    # The replacement lives in the model-load block above, while the
+    # donor level file is still open: read the donor's own GTX1 texture,
+    # write it over the native monster's own texture in place where it
+    # fits (81% of swaps), and register it by ID with
+    # LoadAndCacheAnimationTexture - which claims a slot in the static
+    # 1024-entry texture cache and allocates nothing. ===
 
     labels2["ctm_done"] = len(instructions2)
 
@@ -2781,14 +3093,21 @@ def apply(patcher, output_data):
     # itself). Relying on the native, automatic call instead avoids
     # this race entirely.
 
-    instructions3 += emit_load_addr(3, records_addr)
+    instructions3 += emit_load_mem_word(3, disc_blob_ptr_addr)  # records sit at blob + 0
     instructions3 += emit_store_mem_word(3, 4, current_record_ptr_addr)
     instructions3.append(_li(3, 0))
     instructions3 += emit_store_mem_word(3, 4, exit_scratch_idx_addr)
 
     labels3["loop_top"] = len(instructions3)
     instructions3 += emit_load_mem_word(3, current_record_ptr_addr)
-    instructions3 += emit_load_addr(4, records_end_addr)
+    instructions3 += emit_load_mem_word(4, disc_blob_ptr_addr)
+    # same guard as HOOK2 - a level whose blob never loaded has no records
+    # to walk, and 0 + records_bytes_len is not a valid bound.
+    instructions3.append(_cmpwi(4, 0))
+    idx3 = len(instructions3)
+    instructions3.append(None)
+    fills3.append((idx3, "beq", "loop_done"))
+    instructions3.append(_addi(4, 4, records_bytes_len))  # end of the record block
     instructions3.append(_cmplw(3, 4))
     idx3 = len(instructions3)
     instructions3.append(None)
@@ -2841,70 +3160,16 @@ def apply(patcher, output_data):
     emit_mem_free(fills3, instructions3, 5)
     labels3["skip_file_free"] = len(instructions3)
 
-    # --- REVISION 18: before freeing the resolved-texture array,
-    # walk its own entries and reset each texture's own cache slot
-    # (byte 0 of its 0x3c-byte entry in CACHE_ENTRY_TABLE_ADDR) plus
-    # its hash-table entry (HASH_TABLE_ADDR) back to free/0 - otherwise
-    # the cache slot is leaked forever and the next load of this same
-    # donor keeps finding a stale hash entry pointing at data we've
-    # since freed (see CACHE_ENTRY_TABLE_ADDR's own docstring note). ---
-    instructions3 += emit_load_mem_word(3, exit_scratch_idx_addr)
-    instructions3 += [_li(4, 12), _mullw(3, 3, 4)]
-    instructions3 += emit_load_addr(4, table_descriptor_scratch_addr)
-    instructions3 += [_add(6, 3, 4)]  # r6 = this record's own table_descriptor addr
-    instructions3.append(_lwz(3, 0, 6))  # r3 = texture count
-    instructions3.append(_cmpwi(3, 0))
-    idx3 = len(instructions3)
-    instructions3.append(None)
-    fills3.append((idx3, "beq", "skip_cache_cleanup"))
-
-    instructions3.append(_lwz(7, 8, 6))  # r7 = array_ptr (tableDescriptor[2])
-    instructions3.append(_cmpwi(7, 0))
-    idx3 = len(instructions3)
-    instructions3.append(None)
-    fills3.append((idx3, "beq", "skip_cache_cleanup"))
-
-    instructions3.append(_mtctr(3))  # loop `count` times - safe, no bl calls inside
-    labels3["cache_cleanup_loop"] = len(instructions3)
-    instructions3.append(_lwz(8, 0, 7))  # r8 = cacheEntryScan (this texture's own cache-entry pointer)
-    instructions3.append(_cmpwi(8, 0))
-    idx3 = len(instructions3)
-    instructions3.append(None)
-    fills3.append((idx3, "beq", "skip_this_cache_entry"))
-    instructions3 += [
-        _li(9, 0),
-        _stb(9, 0, 8),   # cacheEntryScan[0] = 0 (mark slot free again)
-        _lhz(9, 2, 8),   # r9 = hash = *(u16*)(cacheEntryScan+2)
-        _li(10, 4),
-        _mullw(9, 9, 10),
-    ]
-    instructions3 += emit_load_addr(10, HASH_TABLE_ADDR)
-    instructions3 += [
-        _add(9, 9, 10),
-        _li(10, 0),
-        _stw(10, 0, 9),  # HASH_TABLE_ADDR[hash] = 0
-    ]
-    labels3["skip_this_cache_entry"] = len(instructions3)
-    instructions3.append(_addi(7, 7, 4))  # advance to next array entry
-    idx3 = len(instructions3)
-    instructions3.append(None)
-    fills3.append((idx3, "bdnz", "cache_cleanup_loop"))
-
-    labels3["skip_cache_cleanup"] = len(instructions3)
-
-    # free resolved_texture_array_scratch[idx] if nonzero (REVISION 17
-    # - tableDescriptor[2], LoadEntityAnimationTable's own internal
-    # allocation, previously invisible to us and never freed at all)
-    instructions3 += emit_load_mem_word(3, exit_scratch_idx_addr)
-    instructions3.append(_rlwinm(3, 3, 2, 0, 29))  # idx * 4 via shift-left-2
-    instructions3 += emit_load_addr(4, last_resolved_texture_array_scratch_addr)
-    instructions3 += [_add(5, 3, 4), _lwz(5, 0, 5)]
-    instructions3.append(_cmpwi(5, 0))
-    idx3 = len(instructions3)
-    instructions3.append(None)
-    fills3.append((idx3, "beq", "skip_texture_array_free"))
-    emit_mem_free(fills3, instructions3, 5)
-    labels3["skip_texture_array_free"] = len(instructions3)
+    # REVISION 39: the REVISION 18 texture-cache cleanup and the
+    # resolved-texture-array free that used to sit here are both GONE,
+    # along with the .ctm load they existed to clean up after.
+    #
+    # The cleanup was never actually needed: InitModelCacheSystem runs on
+    # every level load, immediately before the main loading loop, and
+    # zeroes all 61 card-cache slots, all 1024 texture-cache slots and the
+    # whole 0x10000-entry id table. Nothing survives a level transition, so
+    # there is no slot to leak and no stale hash entry to trip over.
+    # Textures registered by this mechanic are discarded the same way.
 
     instructions3 += emit_load_mem_word(3, exit_scratch_idx_addr)
     instructions3.append(_addi(3, 3, 1))
@@ -2919,6 +3184,68 @@ def apply(patcher, output_data):
     fills3.append((idx3, "b", "loop_top"))
 
     labels3["loop_done"] = len(instructions3)
+
+    # --- REVISION 40: release the disc blob. EXIT_HOOK reads records out of
+    # it during the loop above, so it cannot be freed any earlier than this. ---
+    instructions3 += emit_load_mem_word(3, disc_blob_ptr_addr)
+    instructions3.append(_cmpwi(3, 0))
+    idx3 = len(instructions3)
+    instructions3.append(None)
+    fills3.append((idx3, "beq", "skip_disc_blob_free"))
+    emit_mem_free(fills3, instructions3, 3)
+    instructions3.append(_li(3, 0))
+    instructions3 += emit_store_mem_word(3, 4, disc_blob_ptr_addr)
+    labels3["skip_disc_blob_free"] = len(instructions3)
+
+    # --- REVISION 41: free every texture that had to be allocated because no
+    # native slot could hold it. Walks the count recorded during HOOK2 rather
+    # than the whole array, so a level that allocated nothing costs one
+    # compare. ---
+    instructions3 += [_li(3, 0)]
+    instructions3 += emit_store_mem_word(3, 4, tex_free_index_addr)
+
+    labels3["tex_free_top"] = len(instructions3)
+    instructions3 += emit_load_mem_word(3, tex_free_index_addr)
+    instructions3 += emit_load_mem_word(4, tex_alloc_count_addr)
+    instructions3.append(_cmplw(3, 4))
+    idx3 = len(instructions3)
+    instructions3.append(None)
+    fills3.append((idx3, "bge", "tex_free_done"))
+    instructions3.append(_rlwinm(5, 3, 2, 0, 29))
+    instructions3 += emit_load_addr(6, tex_alloc_scratch_addr)
+    instructions3.append(_add(5, 5, 6))
+    instructions3.append(_lwz(3, 0, 5))
+    instructions3.append(_cmpwi(3, 0))
+    idx3 = len(instructions3)
+    instructions3.append(None)
+    fills3.append((idx3, "beq", "tex_free_next"))
+    emit_mem_free(fills3, instructions3, 3)
+    labels3["tex_free_next"] = len(instructions3)
+    instructions3 += emit_load_mem_word(3, tex_free_index_addr)
+    instructions3.append(_addi(3, 3, 1))
+    instructions3 += emit_store_mem_word(3, 4, tex_free_index_addr)
+    idx3 = len(instructions3)
+    instructions3.append(None)
+    fills3.append((idx3, "b", "tex_free_top"))
+    labels3["tex_free_done"] = len(instructions3)
+    instructions3 += [_li(3, 0)]
+    instructions3 += emit_store_mem_word(3, 4, tex_alloc_count_addr)
+
+    # --- REVISION 39: free the shared texture staging buffer and clear the
+    # pointer, so a level whose HOOK2 allocation failed cannot be mistaken
+    # for one still holding a live buffer on the next visit. One allocation
+    # per level visit, one free - unlike the per-monster .ctm buffers this
+    # replaces. ---
+    instructions3 += emit_load_mem_word(3, texture_staging_ptr_addr)
+    instructions3.append(_cmpwi(3, 0))
+    idx3 = len(instructions3)
+    instructions3.append(None)
+    fills3.append((idx3, "beq", "skip_staging_free"))
+    emit_mem_free(fills3, instructions3, 3)
+    instructions3.append(_li(3, 0))
+    instructions3 += emit_store_mem_word(3, 4, texture_staging_ptr_addr)
+    labels3["skip_staging_free"] = len(instructions3)
+
     instructions3 += [
         _lis(3, hi(lr_save_addr)),
         _ori(3, 3, lo(lr_save_addr)),

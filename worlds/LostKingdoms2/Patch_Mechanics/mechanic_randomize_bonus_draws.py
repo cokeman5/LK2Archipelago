@@ -5,7 +5,10 @@ randomize_bonus_draws - logic/values unchanged).
 import random
 
 from worlds.LostKingdoms2 import *
-from .card_randomizer_helpers import get_card_weights, BONUS_DRAW_ADDRESS
+from .card_randomizer_helpers import get_card_weights
+
+# The bonus draw table. Only this mechanic writes it.
+BONUS_DRAW_ADDRESS = 0x80168168
 
 
 def apply(patcher, output_data):
@@ -24,7 +27,7 @@ def apply(patcher, output_data):
                                  int(lost_kingdoms_2_cards[card_name]["hexCode"], 16), 2)
         else:
             weights = get_card_weights(cards, output_data.get("randomize_bonus_draws", 0) == 1,
-                                        bonus_draw["cardGroup"] // 5)
+                                        bonus_draw["cardGroup"] // 5, patcher=patcher)
             card_name = random.choices(cards, weights=weights, k=1)[0]
             cards.remove(card_name)
             patcher.patch_value(BONUS_DRAW_ADDRESS + int(bonus_draw["address"], 16) - 0x183169,

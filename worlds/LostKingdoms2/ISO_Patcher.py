@@ -68,6 +68,8 @@ class ISOPatcher:
         self.cave_ram_end = None
         self.cave_cursor = None
 
+        self.disc_data_cursor = None
+
         self._tick_table_addr = None
         self._tick_next_slot = 0
 
@@ -259,6 +261,108 @@ class ISOPatcher:
 
     def cave_bytes_used(self) -> int:
         return 0 if self.cave_cursor is None else self.cave_cursor - self.cave_ram_start
+
+    # ------------------------------------------------------------------
+    # Disc-backed data storage
+    #
+    # The code cave is only ~8KB and every mechanic competes for it, but
+    # most of what fills it is not code - it is static lookup tables. Those
+    # do not need to be resident: a mechanic can park them on the disc and
+    # DVD-read the bytes into a heap buffer when it needs them, then free
+    # it. That costs one read per level load and no cave at all.
+    #
+    # The region used is the mastering padding past the end of the disc's
+    # own filesystem. On a retail Lost Kingdoms II image the FST's 1876
+    # files all end by 0x3E7CADEB, leaving 392MB that no FST entry covers.
+    # The game cannot reach it: every file it opens goes through
+    # DVDConvertPathToEntrynum/DVDFastOpen against the FST, and the DVD
+    # streaming API (the one way to read raw offsets outside the FST) is
+    # linked but never called anywhere in main.dol.
+    #
+    # Reads are still bounds-checked by the game's own DVDReadAsync, which
+    # validates against the length field of the DVDFileInfo the caller
+    # supplies - so a mechanic that gets its own arithmetic wrong reads
+    # short rather than wandering off into other data.
+    # ------------------------------------------------------------------
+    DISC_DATA_START = 0x3E7CB000     # first sector past the last real file
+    DISC_DATA_SIZE = 0x100000        # 1MB reserved; the padding is 392MB
+    DISC_SECTOR = 0x800
+
+    def alloc_disc_data(self, size: int) -> int:
+        """Reserve space in the disc padding. Returns an ISO FILE OFFSET, not
+        a RAM address - nothing is mapped into memory until a mechanic reads
+        it. Allocations are sector-aligned because DVD reads have to be."""
+        if self.disc_data_cursor is None:
+            self._verify_disc_data_region()
+            self.disc_data_cursor = self.DISC_DATA_START
+
+        size = (size + self.DISC_SECTOR - 1) & ~(self.DISC_SECTOR - 1)
+        offset = self.disc_data_cursor
+        if offset + size > self.DISC_DATA_START + self.DISC_DATA_SIZE:
+            used = self.disc_data_cursor - self.DISC_DATA_START
+            raise RuntimeError(
+                f"Disc data region exhausted: requested {size} bytes but only "
+                f"{self.DISC_DATA_START + self.DISC_DATA_SIZE - offset} remain "
+                f"({used}/{self.DISC_DATA_SIZE} used). Unlike the code cave this "
+                f"CAN be made bigger - raise DISC_DATA_SIZE; there is 392MB of "
+                f"padding and only the first 1MB is reserved."
+            )
+        self.disc_data_cursor += size
+        return offset
+
+    def _verify_disc_data_region(self):
+        """Refuse to use the region unless this really is an image whose own
+        filesystem ends before it. Checked against the ISO's own FST rather
+        than assumed, so a differently-mastered or trimmed image fails loudly
+        instead of silently overwriting real files."""
+        fst_offset = self._read_u32(0x424)
+        fst_size = self._read_u32(0x428)
+        self.file.seek(fst_offset)
+        fst = self.file.read(fst_size)
+        entry_count = struct.unpack_from(">I", fst, 8)[0]
+        if entry_count == 0 or entry_count * 12 > len(fst):
+            raise RuntimeError(f"FST looks invalid (entry count {entry_count})")
+
+        end_of_files = fst_offset + fst_size
+        for i in range(entry_count):
+            base = i * 12
+            if fst[base] & 1:
+                continue  # directory
+            off = struct.unpack_from(">I", fst, base + 4)[0]
+            length = struct.unpack_from(">I", fst, base + 8)[0]
+            end_of_files = max(end_of_files, off + length)
+
+        if end_of_files > self.DISC_DATA_START:
+            raise RuntimeError(
+                f"This ISO's own files run to {hex(end_of_files)}, past the disc "
+                f"data region at {hex(self.DISC_DATA_START)}. Writing there would "
+                f"corrupt real game files - aborting."
+            )
+
+        self.file.seek(0, 2)
+        if self.file.tell() < self.DISC_DATA_START + self.DISC_DATA_SIZE:
+            raise RuntimeError(
+                f"This ISO is only {self.file.tell():,} bytes - too short to hold "
+                f"the disc data region ending at "
+                f"{hex(self.DISC_DATA_START + self.DISC_DATA_SIZE)}. It is probably "
+                f"a trimmed rip; a full-size image is required."
+            )
+
+    def write_disc_data(self, iso_offset: int, data: bytes):
+        """Write bytes straight to an ISO offset from alloc_disc_data(). Not
+        patch_bytes(), which takes a RAM address and resolves it through the
+        DOL section table - this region is not in the DOL at all."""
+        if self.disc_data_cursor is None or not (
+            self.DISC_DATA_START <= iso_offset < self.disc_data_cursor
+        ):
+            raise ValueError(
+                f"{hex(iso_offset)} is not inside an allocated disc data range"
+            )
+        self.file.seek(iso_offset)
+        self.file.write(data)
+
+    def disc_data_bytes_used(self) -> int:
+        return 0 if self.disc_data_cursor is None else self.disc_data_cursor - self.DISC_DATA_START
 
     # ------------------------------------------------------------------
     # Per-tick dispatcher
@@ -537,6 +641,49 @@ def patch(clean_iso_path: str, output_iso_path: str, aplk2_patch_path: str):
         raise
 
 
+# Mode values live in stats_database so the mechanics and this file cannot
+# disagree about what an option value means.
+from .Patch_Mechanics.stats_database import MODE_OFF, MODE_RANDOMIZE
+
+
+def _apply_stat_randomizer(patcher, output_data, module,
+                           mode_key, min_key, max_key, mult_key):
+    """Run one of the four card stat randomizers, if its option is on.
+
+    Kept in one place because all four take the same six arguments in the
+    same order, and a mistake in any single call site is invisible until it
+    corrupts card data.
+    """
+    mode = output_data.get(mode_key, MODE_OFF)
+    # 100 means 1.0 - the options carry integers to stay yaml-friendly.
+    multiplier = output_data.get(mult_key, 100) / 100.0
+
+    # Note this is NOT "return unless randomizing". A multiplier applies to
+    # the vanilla values even with the mode off, so a player can scale a
+    # stat without shuffling or rerolling it. Only the case where nothing at
+    # all would change is skipped.
+    if mode == MODE_OFF and multiplier == 1:
+        return
+
+    minimum = output_data.get(min_key, 0)
+    maximum = output_data.get(max_key, 0)
+    # Only meaningful when rolling new values; shuffle redeals what the game
+    # already had, and mode off does not generate values at all.
+    if mode == MODE_RANDOMIZE and minimum > maximum:
+        raise ValueError(
+            f"{min_key} ({minimum}) is greater than {max_key} ({maximum})"
+        )
+
+    module.apply(
+        patcher,
+        output_data,
+        minimum,
+        maximum,
+        mode,
+        multiplier,
+    )
+
+
 def _apply_mechanics(patcher: ISOPatcher, output_data: dict, cardback_gtx: bytes):
     from .Patch_Mechanics import mechanic_player_name
     mechanic_player_name.apply(patcher, output_data)
@@ -583,9 +730,29 @@ def _apply_mechanics(patcher: ISOPatcher, output_data: dict, cardback_gtx: bytes
     from .Patch_Mechanics import mechanic_cardback_texture
     mechanic_cardback_texture.apply(patcher, cardback_gtx)
 
-    if output_data.get("randomize_magic_stone_costs", 0):
-        from .Patch_Mechanics import mechanic_randomize_magic_stone_costs
-        mechanic_randomize_magic_stone_costs.apply(patcher, output_data)
+    from .Patch_Mechanics import mechanic_randomize_magic_stone_costs
+    _apply_stat_randomizer(
+        patcher, output_data, mechanic_randomize_magic_stone_costs,
+        "randomize_magic_stone_costs", "randomize_magic_stone_costs_min",
+        "randomize_magic_stone_costs_max", "magic_stone_costs_multiplier")
+
+    from .Patch_Mechanics import mechanic_randomize_card_prices
+    _apply_stat_randomizer(
+        patcher, output_data, mechanic_randomize_card_prices,
+        "randomize_card_prices", "randomize_card_prices_min",
+        "randomize_card_prices_max", "card_prices_multiplier")
+
+    from .Patch_Mechanics import mechanic_randomize_copy_costs
+    _apply_stat_randomizer(
+        patcher, output_data, mechanic_randomize_copy_costs,
+        "randomize_copy_xp_costs", "randomize_copy_xp_costs_min",
+        "randomize_copy_xp_costs_max", "copy_xp_cost_multiplier")
+
+    from .Patch_Mechanics import mechanic_randomize_upgrade_costs
+    _apply_stat_randomizer(
+        patcher, output_data, mechanic_randomize_upgrade_costs,
+        "randomize_upgrade_xp_costs", "randomize_upgrade_xp_costs_min",
+        "randomize_upgrade_xp_costs_max", "upgrade_xp_cost_multiplier")
 
     if output_data.get("randomize_starting_deck", 0):
         from .Patch_Mechanics import mechanic_randomize_starting_deck
@@ -602,3 +769,6 @@ def _apply_mechanics(patcher: ISOPatcher, output_data: dict, cardback_gtx: bytes
     if output_data.get("randomize_level_music", 0):
         from .Patch_Mechanics import mechanic_randomize_music
         mechanic_randomize_music.apply(patcher, output_data)
+
+    from .Patch_Mechanics import mechanic_world_map_submenu
+    mechanic_world_map_submenu.apply(patcher, output_data)

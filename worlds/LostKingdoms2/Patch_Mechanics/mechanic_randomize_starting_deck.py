@@ -5,7 +5,10 @@ randomize_starting_deck - logic/values unchanged).
 import random
 
 from worlds.LostKingdoms2 import *
-from .card_randomizer_helpers import get_card_weights, STARTING_DECK_ADDRESS
+from .card_randomizer_helpers import get_card_weights
+
+# The starting deck's own card list. Only this mechanic writes it.
+STARTING_DECK_ADDRESS = 0x80152640
 
 
 def apply(patcher, output_data):
@@ -16,7 +19,8 @@ def apply(patcher, output_data):
     cards = sorted(list(set(cards) - set(excluded_cards)))
 
     for x in range(12):
-        weights = get_card_weights(cards, output_data.get("randomize_starting_deck", 0) == 1, 1)
+        weights = get_card_weights(cards, output_data.get("randomize_starting_deck", 0) == 1, 1,
+                                   patcher=patcher)
         card_name = random.choices(cards, weights=weights, k=1)[0]
         cards.remove(card_name)
         # Card IDs are 2 bytes

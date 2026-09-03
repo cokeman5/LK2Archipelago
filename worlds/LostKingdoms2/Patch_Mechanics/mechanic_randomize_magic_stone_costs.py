@@ -1,29 +1,57 @@
 """
-Randomizes each card's magic stone (mana) cost (ported from
-LK2Generator.py's randomize_magic_stone_costs - logic/values unchanged).
+Randomizes each card's magic stone (mana) cost.
 
-Note: this mutates lost_kingdoms_2_cards[card_name]["mana_cost"] in place,
-which the other three card-randomization mechanics' weighting logic
-(get_card_weights) depends on - this must run before
-mechanic_starting_deck/mechanic_shop_contents/mechanic_bonus_draws for their
-weighted randomization to reflect the newly-randomized costs, matching the
-original code's call order (already preserved in ISO_Patcher._apply_mechanics).
+Order of operations:
+    0. mode off - values are left at their vanilla settings, but a
+                  multiplier below still applies to them, so a player can
+                  scale a stat without randomizing it.
+    1. shuffle   - redeal the vanilla values among the cards, so the overall
+                   distribution is unchanged and only the assignment moves.
+                   Takes priority over minimum/maximum when enabled.
+       randomize - otherwise, roll every value independently in
+                   [minimum, maximum].
+    2. multiply  - scale whatever came out of step 1 and floor it. Use 1 for
+                   no scaling.
 """
-import random
+
 import logging
+import random
 
-from worlds.LostKingdoms2 import *
-from .card_randomizer_helpers import CARD_INFO_TABLE_ADDRESS
+from .stats_database import StatsDatabase, MODE_RANDOMIZE, MODE_SHUFFLE
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
+
+FIELD = "magic_stone_cost"
 
 
-def apply(patcher, output_data):
-    random.seed(output_data.get("Seed", -1) + 3)
-    for card_name in sorted(lost_kingdoms_2_cards):
-        new_mana_cost = random.randint(1, 15)
-        # Mana cost is 1 byte
-        patcher.patch_value(CARD_INFO_TABLE_ADDRESS + 352 * lost_kingdoms_2_cards[card_name][
-            "orderInMemory"] + 226, new_mana_cost, 1)
-        lost_kingdoms_2_cards[card_name]["mana_cost"] = new_mana_cost
-        logger.info("Setting " + str(card_name) + " mana cost to " + str(new_mana_cost))
+def apply(patcher, output_data, minimum, maximum, mode, multiplier):
+    rng = random.Random(output_data.get("Seed", -1) + 3)
+    db = StatsDatabase(patcher)
+    slots = db.slots(FIELD)
+
+    if mode == MODE_SHUFFLE:
+        results = db.shuffle_field(FIELD, rng, slots=slots)
+        how = "shuffled"
+    elif mode == MODE_RANDOMIZE:
+        results = db.randomize_field(FIELD, minimum, maximum, rng, slots=slots)
+        how = f"randomized to {minimum}..{maximum}"
+    else:
+        # Mode off, but a multiplier can still scale the vanilla values -
+        # that is the whole reason this branch exists rather than returning.
+        results = {}
+        how = "left vanilla"
+
+    if multiplier != 1:
+        results = db.scale_field(FIELD, multiplier, slots=slots)
+        how += f", then x{multiplier}"
+
+    if not results:
+        logger.info(f"[{FIELD}] nothing to do (mode off, multiplier 1)")
+        return
+
+    logger.info(f"[magic_stone_cost] {how} across {len(results)} value(s)")
+    for (card_id, index), value in sorted(results.items(),
+                                          key=lambda kv: (kv[0][0], kv[0][1] or 0)):
+        where = "" if index is None else f"[{index}]"
+        logger.debug(f"[magic_stone_cost] card {card_id}{where} "
+                     f"({db.read_string(card_id, 'name_jp')}) = {value}")

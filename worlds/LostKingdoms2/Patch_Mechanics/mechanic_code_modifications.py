@@ -133,6 +133,9 @@ case something in that specific interaction type ever behaves
 unexpectedly.
 """
 
+from . import monster_database
+from .stats_database import StatsDatabase
+
 # (address, new_instruction) pairs, grouped to match the explanation above.
 PATCHES = [
     # --- Group 1: SetKeyItemObtained (write path only - see docstring) ---
@@ -157,6 +160,54 @@ PATCHES = [
 
     # --- Group 7: allow A to dismiss the placeholder-card popup ---
     (0x80024854, 0x60000000),  # beq LAB_80024ccc (messageCode==0 guard) -> NOP
+
+    # --- Group 10: stop red fairies from revealing combos ---
+    #
+    # A combo is revealed in the combo menu two ways: by performing it, or by
+    # picking up a red fairy that tells you about it. Both set a bit in the
+    # same 8-byte mask - SetComboRevealed writes
+    #     saveData + 0x64 + (comboId >> 5) * 4
+    # which for player 0 is the mask at 0x8025D070. These NOPs remove only
+    # the fairy route.
+    #
+    # THERE ARE TWO CALL SITES, NOT ONE. ProcessWorldInteraction dispatches on
+    # the interaction target's type, and the fairy family 0xC8/0xC9/0xCA is
+    # split across two near-identical branches:
+    #
+    #     if (0x9a < type) {
+    #         if (type == 0xca)      -> 0x80078E50   PlayAnimation(target+0x110)
+    #         else if (type < 0xca) {
+    #             if (type < 200)    -> unrelated handling
+    #             else               -> 0x80078EC8   PlayAnimation(target)
+    #         }
+    #     }
+    #
+    # so 0x80078E50 covers type 0xCA and 0x80078EC8 covers 0xC8 and 0xC9.
+    # Both branches then do exactly the same three things:
+    #     eventFlags[...] |= 1 << ...            mark this fairy collected
+    #     bl 0x800770CC                          <-- reveal the combo
+    #     *currentInteractionTarget = 0          despawn
+    # differing only in which entity gets the pickup animation. NOPing the
+    # calls leaves the fairies behaving normally in every other respect -
+    # they still animate, still count as collected, still vanish.
+    #
+    # Patching only the first site is the easy mistake here: it looks like a
+    # complete fix, but two of the three fairy types would still reveal.
+    #
+    # The callee (named SetLevelFromWorldMapNode by the decompiler, which is
+    # wrong) does nothing but 24 hardcoded (levelId, fairyIndex) ->
+    # SetComboRevealed branches, and ProcessWorldInteraction is its only
+    # caller, so these two NOPs cover the whole fairy route.
+    # mechanic_fairysanity.py already patches UpdateRedFairyBehavior, the
+    # function immediately preceding 0x800770CC.
+    #
+    # Deliberately NOT affected: SetComboRevealed's two other callers.
+    # CheckMultiCreatureStateTransition is the reveal-by-performing-it path
+    # and is the whole point of keeping this narrow. ScriptOp_CallHelper6E6F0
+    # reveals a combo from a script argument - if a cutscene or tutorial
+    # script ever reveals one, it still will.
+    (0x80078e50, 0x60000000),  # bl 0x800770cc, fairy type 0xCA      -> NOP
+    (0x80078ec8, 0x60000000),  # bl 0x800770cc, fairy types 0xC8/0xC9 -> NOP
 ]
 
 # --- Group 6: placeholder-card popup text - raw ISO byte patches against
@@ -277,6 +328,64 @@ TEXT_PATCHES = [
 ]
 
 
+# --- Group 9: shop prices for cards the vanilla game never sells.
+# 25 cards ship with a price of 0. Twenty-four of them are ordinary cards
+# that simply were not purchasable; the twenty-fifth is card 299
+# (キャプチャーカード, the Capture Card - rarity 0, no upgrades, absent from
+# the enemy table, and special-cased in DisplayCardCatalogEntry), which is
+# deliberately left at 0 so it stays out of shops.
+#
+# This runs before the randomizer price mechanic, so a later
+# mechanic_randomize_card_prices pass sees these as the vanilla values and
+# will shuffle/scale them like any other price. Each card is verified to
+# still read 0 before writing - same abort-rather-than-overwrite convention
+# as TEXT_PATCHES above.
+CUSTOM_PRICES = {
+    "Jack-O-Lantern": {"price": 1000},
+    "Great Turtle": {"price": 8000},
+    "Birdman": {"price": 1500},
+    "Blue Dragon": {"price": 8000},
+    "Golden Phoenix": {"price": 8000},
+    "White Tiger": {"price": 8000},
+    "God of Destruction": {"price": 9999},
+    "Doppelganger": {"price": 9999},
+    "Fafnir": {"price": 6000},
+    "Hell Hound": {"price": 1200},
+    "Rabandos": {"price": 3500},
+    "Uroboros": {"price": 4500},
+    "Sekmet": {"price": 3000},
+    "Stone Golem": {"price": 2000},
+    "Talos": {"price": 3000},
+    "Crystal Magic": {"price": 3000},
+    "Pegasus": {"price": 2500},
+    "Ryuhi": {"price": 3000},
+    "Demon Swordsman": {"price": 2000},
+    "Ice Skeleton": {"price": 5000},
+    "Sacred Umpire": {"price": 5000},
+    "Emperor": {"price": 7000},
+    "Sleipnir": {"price": 3500},
+    "Pazuzu": {"price": 4000},
+}
+
+
+def _apply_custom_prices(patcher):
+    database = StatsDatabase(patcher)
+    ids = {entry["name"]: card_id
+           for card_id, entry in monster_database.MONSTERS.items()}
+
+    for name, values in CUSTOM_PRICES.items():
+        card_id = ids.get(name)
+        if card_id is None:
+            raise ValueError(f"No card named {name!r} in monster_database.")
+        current = database.read(card_id, "price")
+        if current != 0:
+            raise ValueError(
+                f"Expected {name!r} (card {card_id}) to have a vanilla price of 0, "
+                f"found {current} instead. Aborting rather than overwrite something "
+                f"unexpected."
+            )
+        database.write(card_id, "price", values["price"])
+
 def apply(patcher):
     for addr, new_instruction in PATCHES:
         patcher.patch_word(addr, new_instruction)
@@ -291,3 +400,5 @@ def apply(patcher):
             )
         patcher.file.seek(iso_offset)
         patcher.file.write(new_bytes)
+
+    _apply_custom_prices(patcher)

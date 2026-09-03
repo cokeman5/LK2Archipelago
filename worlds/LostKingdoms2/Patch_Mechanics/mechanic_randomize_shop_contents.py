@@ -6,7 +6,11 @@ import random
 import logging
 
 from worlds.LostKingdoms2 import *
-from .card_randomizer_helpers import get_card_weights, CARD_SHOP_ADDRESS, CARD_INFO_TABLE_ADDRESS
+from .card_randomizer_helpers import get_card_weights
+
+# The shop's own card list. Only this mechanic writes it, so the address
+# lives here rather than in the shared weighting helper.
+CARD_SHOP_ADDRESS = 0x80168700
 
 logger = logging.getLogger()
 
@@ -19,16 +23,11 @@ def apply(patcher, output_data):
     cards = sorted(list(set(cards) - set(excluded_cards)))
 
     for x in range(32):
-        weights = get_card_weights(cards, output_data.get("randomize_shop_contents", 0) == 1, (x // 8) * 4)
+        weights = get_card_weights(cards, output_data.get("randomize_shop_contents", 0) == 1,
+                                   (x // 8) * 4, patcher=patcher)
         card_name = random.choices(cards, weights=weights, k=1)[0]
         logger.info("Card set to shop slot " + str(x) + ": " + card_name)
         # Card IDs are 2 bytes
         patcher.patch_value(CARD_SHOP_ADDRESS + x * 2,
                              int(lost_kingdoms_2_cards[card_name]["hexCode"], 16), 2)
         cards.remove(card_name)
-
-    # Add custom prices for cards that lack prices
-    for card in lostkingdoms_2_custom_prices:
-        # Prices are usually 2 bytes
-        patcher.patch_value(CARD_INFO_TABLE_ADDRESS + 230 + 22 * 16 * lost_kingdoms_2_cards[card][
-            "orderInMemory"], lostkingdoms_2_custom_prices[card]["price"], 2)
