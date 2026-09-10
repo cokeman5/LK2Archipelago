@@ -1,4 +1,4 @@
-# Lost Kingdoms II — Archipelago
+# Lost Kingdoms II Archipelago
 
 An [Archipelago](https://archipelago.gg) randomizer world for **Lost Kingdoms II** (Nintendo GameCube).
 
@@ -11,8 +11,8 @@ other players' games, and your own progression arrives from theirs.
 
 | | |
 |---|---|
-| **Archipelago** | 0.5.0 or newer — [releases](https://github.com/ArchipelagoMW/Archipelago/releases) |
-| **Dolphin** | 5.0-19870 or newer — [dolphin-emu.org](https://dolphin-emu.org/download/) |
+| **Archipelago** | 0.5.0 or newer [releases](https://github.com/ArchipelagoMW/Archipelago/releases) |
+| **Dolphin** | 5.0-19870 or newer [dolphin-emu.org](https://dolphin-emu.org/download/) |
 | **A game disc image** | `Lost Kingdoms II (USA)`, GameCube, unmodified `.iso` |
 | **This APWorld** | `lost_kingdoms_2.apworld` from [Releases](../../releases) |
 
@@ -31,9 +31,9 @@ addresses throughout.
 1. Install Archipelago.
 2. Double-click `lost_kingdoms_2.apworld`. It installs into your Archipelago `custom_worlds` folder.
    If that does not work, copy it there yourself:
-   - **Windows** — `%localappdata%\Archipelago\custom_worlds\`
-   - **Linux** — `~/Archipelago/custom_worlds/`
-   - **macOS** — `~/Library/Application Support/Archipelago/custom_worlds/`
+   - **Windows**  `%localappdata%\Archipelago\custom_worlds\`
+   - **Linux**  `~/Archipelago/custom_worlds/`
+   - **macOS**  `~/Library/Application Support/Archipelago/custom_worlds/`
 3. Restart the Archipelago Launcher.
 
 ---
@@ -74,7 +74,7 @@ Patching may take up to a minute, and will automatically open your Dolphin and t
 1. Open your patched `.iso` in Dolphin and start the game if it did not open automatically.
 2. In the Archipelago Launcher, click **Lost Kingdoms 2 Client** if it did not open automatically.
 3. Enter the server address, your slot name, and the password if the host set one. This typically comes in the form of SlotName:Password@HostName:Port;
-   for example, if you are hosting locally it may look like `Cokeman5:None@localhost:38281`
+   for example, if you are hosting locally it may look like `Cokeman5:None@localhost:38281`. The player name is set in the .yaml file
 4. Click `Connect`
 5. The client finds Dolphin automatically once the game is running. If it does not, you should get a message indicating it is waiting on the connection to Dolphin.
 
@@ -124,13 +124,6 @@ All the optional options can be switched on or off, and many can be weighted, in
 that Archipelago generates lists every option with its own explanation and default. 
 Typically `50` means enabled, and `0` means disabled.
 
-### A note on level variations
-
-Several levels change once you have beaten them — different enemies, a different goal, sometimes a
-different starting point. Normally that replaces the original for good. This randomizer gives those
-levels a submenu on the world map so you can replay any version at any time, and multi-part levels
-get an entry for each part, unlocked in order as you clear them.
-
 ---
 
 ## Troubleshooting
@@ -163,7 +156,7 @@ the **#future-game-design** channel.
 
 [Join the Archipelago Discord](https://discord.gg/8Z65BR2)
 
-Logs from the Archipelago client help a great deal — they are in your Archipelago `logs/` folder.
+Logs from the Archipelago client help a great deal. They are in your Archipelago `logs/` folder.
 
 ---
 
@@ -174,7 +167,7 @@ Culk on Discord who has created a wonderful Poptracker(https://github.com/culk/l
 Flamjam on Discord who created the AP Card art seen in the LK2 Apworld.
 Built on [Archipelago](https://archipelago.gg).
 
-Thanks to everyone who has tested seeds and reported bugs — a great deal of this was found by
+Thanks to everyone who has tested seeds and reported bugs. A great deal of this was found by
 players noticing something was off and being specific about it.
 
 ## AI Disclaimer
