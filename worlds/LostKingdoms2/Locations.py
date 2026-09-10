@@ -193,7 +193,9 @@ lost_kingdoms_2_chests = {
     "Fairy House - collect 70 fairies": {'level': 'Fairy House', 'cardName': 'Whip Worm', 'isoAddress': '183A3B', 'missable': 0, 'RAMAddress': '8025d033', 'type': 'Chest', 'bitOffset': 70, 'rule': "fairy_70", 'location_id': 172},
     "Fairy House - collect 80 fairies": {'level': 'Fairy House', 'cardName': 'Global Bust', 'isoAddress': '183A3D', 'missable': 0, 'RAMAddress': '8025d033', 'type': 'Chest', 'bitOffset': 80, 'rule': "fairy_80", 'location_id': 173},
     "Fairy House - collect 90 fairies": {'level': 'Fairy House', 'cardName': 'Crystal Magic', 'isoAddress': '183A3F', 'missable': 0, 'RAMAddress': '8025d033', 'type': 'Chest', 'bitOffset': 90, 'rule': "fairy_90", 'location_id': 174},
-    "Fairy House - collect 100 fairies": {'level': 'Fairy House', 'cardName': 'Circasaurus', 'isoAddress': '183A41', 'missable': 1, 'RAMAddress': '8025d033', 'type': 'Chest', 'bitOffset': 100, 'rule': "fairy_100", 'location_id': 175}
+    "Fairy House - collect 100 fairies": {'level': 'Fairy House', 'cardName': 'Circasaurus', 'isoAddress': '183A41', 'missable': 1, 'RAMAddress': '8025d033', 'type': 'Chest', 'bitOffset': 100, 'rule': "fairy_100", 'location_id': 175},
+    "Krasheen Mountains - Birdman": {'level': 'Krasheen Mountains', 'cardName': 'Birdman', 'isoAddress': 'A25AED9', 'missable': 0, 'RAMAddress': '8025df12', 'type': 'Chest', 'bitOffset': 0, 'location_id': 176},
+    "Plains of Rowahl - God Of Destruction": {'level': 'Plains of Rowahl', 'cardName': '', 'isoAddress': '967A754', 'missable': 0, 'RAMAddress': '81045434', 'type': 'Chest', 'bitOffset': 3, 'rule': "jewel_and_gate", 'location_id': 177},
 }
 
 lost_kingdoms_2_red_fairies = {
@@ -1735,7 +1737,7 @@ lost_kingdoms_2_enemysanity_light = {
     "Enemysanity - Gold Butterfly" : {"type" : "Enemysanity Light", 'missable': 0, "currentState": 0, 'location_id': 70052, 'proving_grounds': False, 'level': ["Sarvan", "Proving Grounds F10"]},
     "Enemysanity - Ghoul" : {"type" : "Enemysanity Light", 'missable': 0, "currentState": 0, 'location_id': 70053, 'proving_grounds': True, 'level': "Proving Grounds F11"},
     "Enemysanity - Treant" : {"type" : "Enemysanity Light", 'missable': 0, "currentState": 0, 'location_id': 70054, 'proving_grounds': True, 'level': "Proving Grounds F2"},
-    "Enemysanity - Nueh" : {"type" : "Enemysanity Light", 'missable': 0, "currentState": 0, 'location_id': 70055, 'proving_grounds': False, 'level': ["Sacred Battle Arena 1", "Proving Grounds F19"]},
+    "Enemysanity - Nueh" : {"type" : "Enemysanity Light", 'missable': 0, "currentState": 0, 'location_id': 70055, 'proving_grounds': False, 'level': ["Sacred Battle Arena 1", "Proving Grounds F19"],'rule': "wood_proficiency"},
     "Enemysanity - Sea Monk" : {"type" : "Enemysanity Light", 'missable': 0, "currentState": 0, 'location_id': 70056, 'proving_grounds': True, 'level': "Proving Grounds F13"},
     "Enemysanity - Crystal Rose" : {"type" : "Enemysanity Light", 'missable': 0, "currentState": 0, 'location_id': 70057, 'proving_grounds': False, 'level': "Runestone Caverns - Upper Chambers"},
     "Enemysanity - Dark Raven" : {"type" : "Enemysanity Light", 'missable': 0, "currentState": 0, 'location_id': 70058, 'proving_grounds': False, 'level': "Nobleman's Residence"},

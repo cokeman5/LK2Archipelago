@@ -521,8 +521,8 @@ SLOT_STRIDE = 0x24
 #                                              itself would cost 3)
 DONOR_TABLE_ENTRY_FORMAT = ">BBH"  # only the fixed-width prefix - the two u24 fields are packed manually
 DONOR_TABLE_ENTRY_SIZE = (struct.calcsize(DONOR_TABLE_ENTRY_FORMAT) + 3 + 3 + 1
-                          + 4 * MAX_TEXTURES_PER_MONSTER)
-assert DONOR_TABLE_ENTRY_SIZE == 59
+                          + 6 * MAX_TEXTURES_PER_MONSTER)
+assert DONOR_TABLE_ENTRY_SIZE == 83
 
 DTE_DONOR_CARD_ID = 0x00       # u8
 DTE_DONOR_LEVEL_ID = 0x01      # u8
@@ -530,8 +530,9 @@ DTE_DONOR_SOUND_ID = 0x02      # u16
 DTE_DONOR_FILE_OFFSET = 0x04   # u24
 DTE_DONOR_SIZE = 0x07          # u24
 DTE_DONOR_TEXTURE_COUNT = 0x0a   # u8, how many of the slots below are real
-DTE_DONOR_TEXTURES = 0x0b        # per slot: u24 file offset + u8 size index
-DTE_TEXTURE_STRIDE = 4
+DTE_DONOR_TEXTURES = 0x0b        # per slot: u24 offset, u8 size index, u16 id
+DTE_TEXTURE_ID = 0x04            # ...within a slot
+DTE_TEXTURE_STRIDE = 6
 
 NO_RUN_AVAILABLE = 0xFF
 
@@ -588,10 +589,10 @@ def _pack_donor_table_entry(donor_entry):
         + _pack_u24(donor_entry["donor_size"])
         + struct.pack(">B", len(donor_entry.get("donor_textures", [])))
         + b"".join(
-            _pack_u24(off) + struct.pack(">B", size_index)
-            for off, size_index in donor_entry.get("donor_textures", [])
+            _pack_u24(off) + struct.pack(">BH", size_index, texture_id)
+            for off, size_index, texture_id in donor_entry.get("donor_textures", [])
         )
-        + (b"\x00" * 4) * (MAX_TEXTURES_PER_MONSTER
+        + (b"\x00" * 6) * (MAX_TEXTURES_PER_MONSTER
                             - len(donor_entry.get("donor_textures", [])))
     )
 
@@ -878,6 +879,34 @@ MEMCPY = 0x8000551C                 # memcpy(dst, src, len)
 # NO allocation of its own, unlike LoadEntityAnimationTable (which MemAllocs a
 # resolved-pointer array), so registering a donor texture costs nothing.
 LOAD_AND_CACHE_ANIMATION_TEXTURE = 0x8004A0D4
+
+# InvalidateAnimationTextureCacheEntry(cacheSlot) - the exact inverse of the
+# registration above:
+#     if (HASH_TABLE[slot->id] == slot) HASH_TABLE[slot->id] = 0;
+#     slot->inUse = 0;
+# It clears the id mapping only if it still points at THIS slot, so undoing
+# our own registrations can never disturb anybody else's.
+#
+# REVISION 43: this is required, and its absence was a real bug. The texture
+# cache is NOT cleared between levels - InitModelCacheSystem, which zeroes all
+# 1024 slots and all 0x10000 hash entries, is called only from main(), once at
+# boot. REVISION 39 removed the old cleanup on the stated grounds that the
+# cache was wiped per level; that was simply wrong, and never checked.
+#
+# The consequences, in order:
+#   * registration stores a RAW POINTER to our texture buffer in a cache slot
+#     and marks the slot used,
+#   * the id -> slot mapping is first-come-first-served ("if (entry == 0)"),
+#     so it is never replaced once set,
+#   * so after a level whose donors we registered, those ids stay bound to
+#     slots pointing at memory we freed on the way out. A later level playing
+#     the CARD of one of those monsters registers its own texture, gets a new
+#     slot, but the id still resolves to our stale one - and renders freed
+#     memory. Observed as Land Shark and Hell Hound, donors in level 1, having
+#     corrupt textures in Temple of Sharacia.
+#   * slots are never reclaimed either, so every level visit permanently
+#     consumed some of the 1024.
+INVALIDATE_ANIMATION_TEXTURE_CACHE_ENTRY = 0x8004A0A4
 
 # Staging buffer for texture reads. DVD reads must be SECTOR aligned (see
 # _compute_read_params' own note - 32-byte alignment is not enough), but a
@@ -1251,7 +1280,7 @@ def apply(patcher, output_data):
             "donor_file_offset": donor_data["file_offset"],
             "donor_size": donor_data["size"],
             "donor_textures": [
-                (t[1], _texture_size_index(t[2])) for t in donor_textures
+                (t[1], _texture_size_index(t[2]), t[0]) for t in donor_textures
             ],
         })
         donor_texture_lists[native_card_id] = donor_textures
@@ -1280,24 +1309,29 @@ def apply(patcher, output_data):
         # slots that can hold it, so letting a small one take a large slot
         # first would waste it. Anything left unplaced gets 0, meaning the
         # stub allocates for it.
-        native_entry = db.get_monster(swap["native_card_id"])["native_levels"].get(
-            swap["target_level_file"], {}
-        )
-        free_slots = [
-            {"offset": t[1], "size": t[2], "taken": False}
-            for t in native_entry.get("textures", []) if not t[3]
-        ]
+        # REVISION 42: every donor texture is ALLOCATED. Nothing is written
+        # over a native texture slot any more.
+        #
+        # Writing in place looked free - the native monster is being replaced,
+        # so its texture appeared dead. It is not. Texture ids are global asset
+        # ids, and the CARD version of a monster references the same id as the
+        # level's copy. Overwriting the slot therefore corrupted the card too:
+        # in Temple of Sharacia (s05) Land Shark is a native monster with
+        # exclusive texture 0x4e4d, and once it was swapped, playing a Land
+        # Shark card showed the donor's texture. In any level where Land Shark
+        # is not native, the same card was fine.
+        #
+        # The same reasoning applies to anything else sharing an id with a
+        # native monster - level scenery, other entity types - none of which
+        # the "is this texture shared" check could see, since that only
+        # compared monsters against each other within one level.
+        #
+        # A zero destination means "allocate", which every entry now is. The
+        # per-texture destination is kept in the record rather than removed so
+        # that a future in-place scheme (one that can prove a slot is truly
+        # unreferenced) can reuse it.
         donor_textures = donor_texture_lists.get(swap["native_card_id"], [])
-        dests = [0] * len(donor_textures)
-        for idx in sorted(range(len(donor_textures)),
-                          key=lambda i: -donor_textures[i][2]):
-            need = donor_textures[idx][2]
-            for slot in free_slots:
-                if not slot["taken"] and slot["size"] >= need:
-                    slot["taken"] = True
-                    dests[idx] = slot["offset"]
-                    break
-        swap["texture_dests"] = dests
+        swap["texture_dests"] = [0] * len(donor_textures)
 
     # ================================================================
     # REVISION 14: pack SWAPS into a compact binary record table
@@ -1453,6 +1487,17 @@ def apply(patcher, output_data):
     tex_src_offset_addr = patcher.alloc_cave(4)
     tex_dest_offset_addr = patcher.alloc_cave(4)
     tex_alloc_count_addr = patcher.alloc_cave(4)
+    # Cache slots we registered this visit, so EXIT_HOOK can hand each back.
+    # Every registered texture needs an entry, not just the allocated ones:
+    # an in-place texture's slot is just as stale once the level blob is gone.
+    tex_slot_count_addr = patcher.alloc_cave(4)
+    tex_slot_index_addr = patcher.alloc_cave(4)
+    tex_slot_scratch_addr = patcher.alloc_cave(
+        max_group_size * MAX_TEXTURES_PER_MONSTER * 4)
+    for _i in range(max_group_size * MAX_TEXTURES_PER_MONSTER):
+        patcher.patch_word(tex_slot_scratch_addr + _i * 4, 0)
+    patcher.patch_word(tex_slot_count_addr, 0)
+    patcher.patch_word(tex_slot_index_addr, 0)
     tex_alloc_scratch_addr = patcher.alloc_cave(
         max_group_size * MAX_TEXTURES_PER_MONSTER * 4)
     for _i in range(max_group_size * MAX_TEXTURES_PER_MONSTER):
@@ -2074,6 +2119,8 @@ def apply(patcher, output_data):
     # REVISION 41: this visit's texture allocations start empty.
     instructions2.append(_li(3, 0))
     instructions2 += emit_store_mem_word(3, 4, tex_alloc_count_addr)
+    instructions2.append(_li(3, 0))
+    instructions2 += emit_store_mem_word(3, 4, tex_slot_count_addr)
 
     # --- REVISION 39: allocate the shared texture staging buffer once, here,
     # rather than per monster. Every donor texture is read into it and then
@@ -2783,6 +2830,22 @@ def apply(patcher, output_data):
     instructions2.append(None)
     fills2.append((idx, "bl", LOAD_AND_CACHE_ANIMATION_TEXTURE))
 
+    # REVISION 43: remember the cache slot it just claimed (returned in r3) so
+    # EXIT_HOOK can invalidate it. Without this the slot outlives the buffer
+    # it points at, and its id stays bound to freed memory for the rest of the
+    # session - the cache is only ever cleared at boot.
+    instructions2.append(_cmpwi(3, 0))
+    idx = len(instructions2)
+    instructions2.append(None)
+    fills2.append((idx, "beq", "tex_next"))     # no free slot; nothing to undo
+    instructions2 += emit_load_mem_word(4, tex_slot_count_addr)
+    instructions2.append(_rlwinm(5, 4, 2, 0, 29))
+    instructions2 += emit_load_addr(6, tex_slot_scratch_addr)
+    instructions2.append(_add(5, 5, 6))
+    instructions2.append(_stw(3, 0, 5))
+    instructions2.append(_addi(4, 4, 1))
+    instructions2 += emit_store_mem_word(4, 5, tex_slot_count_addr)
+
     labels2["tex_next"] = len(instructions2)
     instructions2 += emit_load_mem_word(3, tex_loop_index_addr)
     instructions2.append(_addi(3, 3, 1))
@@ -3196,6 +3259,45 @@ def apply(patcher, output_data):
     instructions3.append(_li(3, 0))
     instructions3 += emit_store_mem_word(3, 4, disc_blob_ptr_addr)
     labels3["skip_disc_blob_free"] = len(instructions3)
+
+    # --- REVISION 43: hand back every texture cache slot we claimed, BEFORE
+    # freeing the buffers those slots point at.
+    #
+    # InvalidateAnimationTextureCacheEntry clears the id -> slot mapping only
+    # if it still points at this slot, then marks the slot free. Order matters:
+    # doing this after the frees would leave a window where the cache still
+    # advertises freed memory. ---
+    instructions3 += [_li(3, 0)]
+    instructions3 += emit_store_mem_word(3, 4, tex_slot_index_addr)
+
+    labels3["tex_slot_top"] = len(instructions3)
+    instructions3 += emit_load_mem_word(3, tex_slot_index_addr)
+    instructions3 += emit_load_mem_word(4, tex_slot_count_addr)
+    instructions3.append(_cmplw(3, 4))
+    idx3 = len(instructions3)
+    instructions3.append(None)
+    fills3.append((idx3, "bge", "tex_slot_done"))
+    instructions3.append(_rlwinm(5, 3, 2, 0, 29))
+    instructions3 += emit_load_addr(6, tex_slot_scratch_addr)
+    instructions3.append(_add(5, 5, 6))
+    instructions3.append(_lwz(3, 0, 5))
+    instructions3.append(_cmpwi(3, 0))
+    idx3 = len(instructions3)
+    instructions3.append(None)
+    fills3.append((idx3, "beq", "tex_slot_next"))
+    idx3 = len(instructions3)
+    instructions3.append(None)
+    fills3.append((idx3, "bl", INVALIDATE_ANIMATION_TEXTURE_CACHE_ENTRY))
+    labels3["tex_slot_next"] = len(instructions3)
+    instructions3 += emit_load_mem_word(3, tex_slot_index_addr)
+    instructions3.append(_addi(3, 3, 1))
+    instructions3 += emit_store_mem_word(3, 4, tex_slot_index_addr)
+    idx3 = len(instructions3)
+    instructions3.append(None)
+    fills3.append((idx3, "b", "tex_slot_top"))
+    labels3["tex_slot_done"] = len(instructions3)
+    instructions3 += [_li(3, 0)]
+    instructions3 += emit_store_mem_word(3, 4, tex_slot_count_addr)
 
     # --- REVISION 41: free every texture that had to be allocated because no
     # native slot could hold it. Walks the count recorded during HOOK2 rather

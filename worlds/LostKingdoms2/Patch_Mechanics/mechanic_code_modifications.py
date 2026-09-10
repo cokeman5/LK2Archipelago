@@ -15,7 +15,7 @@ correct if this ever needs to be re-derived against a different revision.
 --- Group 1: SetKeyItemObtained ---
 Redirects the write path only (game's own key-item-granted logic, e.g.
 awarding Keil Runestone for defeating the Stranger) to write directly into
-key_item_location (0x8025e652, from LK2Client.STORAGE_ADDRESSES) as a
+key_item_location (from LK2Client.STORAGE_ADDRESSES) as a
 bitmask, instead of the real per-bit bitmask at player-struct offset 0x5c.
 This makes "the game just granted a key item" into a check-completion
 signal the AP client can watch for, decoupled from actually unlocking
@@ -133,13 +133,50 @@ case something in that specific interaction type ever behaves
 unexpectedly.
 """
 
+import logging
+import struct
+
+from worlds.LostKingdoms2.LK2Client import STORAGE_ADDRESSES
+
 from . import monster_database
 from .stats_database import StatsDatabase
+
+logger = logging.getLogger()  # root logger, matching ISO_Patcher.py's own convention
+
+
+def _addi_to_storage(instruction: int, storage_key: str) -> int:
+    """Rebuild an `addi rD, rA, imm` so it lands on a STORAGE_ADDRESSES entry.
+
+    SetKeyItemObtained reaches its target with `lis` + `addi`, so the address
+    is split across two instructions and the low half is baked into the addi.
+    Deriving that half here means moving the storage block only requires
+    editing LK2Client - which matters, because the block has moved once
+    already and a stale immediate would silently write to whatever now lives
+    at the old address.
+
+    Only the low half is rebuilt. The `lis` is left alone deliberately: it is
+    already correct for anything in the 0x8025xxxx page, and every storage
+    address is. The assertion below is what enforces that.
+    """
+    address = STORAGE_ADDRESSES[storage_key]['address']
+    low = address & 0xFFFF
+    # addi sign-extends, so `lis 0x8026` + a low half >= 0x8000 is what
+    # actually produces 0x8025xxxx. A low half below 0x8000 would resolve to
+    # 0x8026xxxx instead - a different page, silently.
+    assert low >= 0x8000, (
+        f"STORAGE_ADDRESSES['{storage_key}'] = {hex(address)} has a low half "
+        f"below 0x8000, which addi would sign-extend into the wrong page. "
+        f"The lis in SetKeyItemObtained would need changing too."
+    )
+    return (instruction & 0xFFFF0000) | low
+
 
 # (address, new_instruction) pairs, grouped to match the explanation above.
 PATCHES = [
     # --- Group 1: SetKeyItemObtained (write path only - see docstring) ---
-    (0x8006e774, 0x38a5e652),  # addi r5, r5, -12276 (base=0x8025d00c) -> addi r5, r5, -6574 (base=0x8025e652)
+    # addi r5, r5, -12276 (base=0x8025d00c) -> the low half of key_item_location,
+    # derived from STORAGE_ADDRESSES rather than written out here.
+    (0x8006e774, _addi_to_storage(0x38a50000, 'key_item_location')),
     (0x8006e78c, 0x80850000),  # lwz r4, 92(r5) -> lwz r4, 0(r5)
     (0x8006e798, 0x90050000),  # stw r0, 92(r5) -> stw r0, 0(r5)
 
@@ -368,6 +405,86 @@ CUSTOM_PRICES = {
 }
 
 
+
+# ===== Group 11: Bhashea High Road part 2 without visiting Kadishu =====
+#
+# Bhashea High Road (level 2) has two parts. Vanilla gates the second on an
+# event flag that Kadishu (level 3) sets, so the intended route is: beat
+# Bhashea, unlock Kadishu, enter Kadishu, come back. With levels randomized
+# or handed out as items that ordering cannot be relied on, so the gate is
+# rewritten to "you beat Bhashea High Road" instead.
+#
+# The condition is not in the DOL. It is three copies of a script opcode
+# inside s02.pds - opcode 128, ScriptOp_CheckEventFlagBit - which resolves
+# its address as:
+#
+#     eventFlagsBase + level * 0x40 + (bitIndex >> 5) * 4 + 4
+#
+# with the shift being ARITHMETIC (srawi r0,r5,5 at 0x800881bc), and then
+# tests bit (bitIndex & 0x1f). Currently each reads level 3, bit 18 - the
+# 0x40000 "Kadishu visited" flag at 0x8025DC90.
+#
+# Changing them to level 2, bit -7 gives (-7 >> 5) = -1, so the -4 cancels
+# the +4 and the word read becomes record 2 + 0 = 0x8025DC4C, the Bhashea
+# completion byte, with (-7 & 0x1f) = 25. Byte +0 occupies bits 24-31 of
+# that big-endian word, so bit 25 is its 0x02 bit - exactly the "== 2"
+# that the old client-side workaround tested for.
+#
+# Only the two argument words change. The opcode, its argument count and
+# the instruction length are untouched, so nothing moves and no code is
+# added or removed.
+#
+# This replaces a runtime hack in the AP client that shuffled the Kadishu
+# flag byte in and out of a spare slot, and which failed if the player
+# reached Kadishu before finishing Bhashea the first time.
+# s02.pds's own offset within the ISO (size 0x567360), read off the real
+# image with dump_pds_offsets.py rather than assumed.
+S02_ISO_OFFSET = 0x6d4a0c0
+
+BHASHEA_LEVEL_ID = 2
+KADISHU_LEVEL_ID = 3
+KADISHU_VISITED_BIT = 18
+
+# -7: (>> 5) = -1 selects record+0 rather than record+4, and (& 0x1f) = 25
+# selects the 0x02 bit of the completion byte.
+BHASHEA_BEATEN_BIT = 0xFFFFFFF9
+
+# File offsets within s02.pds of the three checks. Each instruction holds
+# the level id at +8 and the bit index at +16.
+BHASHEA_GATE_CHECK_OFFSETS = [0x555778, 0x555b9c, 0x556718]
+SCRIPT_CHECK_LEVEL_FIELD = 8
+SCRIPT_CHECK_BIT_FIELD = 16
+
+
+def _retarget_bhashea_gate(patcher):
+    """Point Bhashea High Road's part-2 checks at its own completion flag."""
+    for file_offset in BHASHEA_GATE_CHECK_OFFSETS:
+        base = S02_ISO_OFFSET + file_offset
+
+        patcher.file.seek(base + SCRIPT_CHECK_LEVEL_FIELD)
+        level = struct.unpack(">I", patcher.file.read(4))[0]
+        patcher.file.seek(base + SCRIPT_CHECK_BIT_FIELD)
+        bit = struct.unpack(">I", patcher.file.read(4))[0]
+
+        if level != KADISHU_LEVEL_ID or bit != KADISHU_VISITED_BIT:
+            raise ValueError(
+                f"Expected a level {KADISHU_LEVEL_ID} / bit {KADISHU_VISITED_BIT} "
+                f"check at s02.pds+{hex(file_offset)} (iso {hex(base)}), found "
+                f"level {level} / bit {bit}. Aborting rather than rewriting an "
+                f"unknown script instruction."
+            )
+
+        patcher.file.seek(base + SCRIPT_CHECK_LEVEL_FIELD)
+        patcher.file.write(struct.pack(">I", BHASHEA_LEVEL_ID))
+        patcher.file.seek(base + SCRIPT_CHECK_BIT_FIELD)
+        patcher.file.write(struct.pack(">I", BHASHEA_BEATEN_BIT))
+
+    logger.info(
+        f"[mechanic_code_modifications] Bhashea High Road part 2 now gated on "
+        f"its own completion flag ({len(BHASHEA_GATE_CHECK_OFFSETS)} script "
+        f"checks retargeted), not on having visited Kadishu"
+    )
+
 def _apply_custom_prices(patcher):
     database = StatsDatabase(patcher)
     ids = {entry["name"]: card_id
@@ -402,3 +519,4 @@ def apply(patcher):
         patcher.file.write(new_bytes)
 
     _apply_custom_prices(patcher)
+    _retarget_bhashea_gate(patcher)

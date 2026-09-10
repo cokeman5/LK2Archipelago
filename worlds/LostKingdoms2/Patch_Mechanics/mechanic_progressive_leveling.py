@@ -45,6 +45,22 @@ PROCESS_LEVEL_UP = 0x80073674
 XP_CHECK_BRANCH = 0x800736d0
 ADD_PLAYER_EXP_CALL_SITE = 0x8007d0f8
 
+# The OTHER call to ProcessLevelUp, and the reason a player could gain a level
+# with no AP item involved. ProcessLevelUp has exactly two callers in the
+# whole DOL - this one and AddPlayerEXP above - and because XP_CHECK_BRANCH
+# NOPs the "have I earned it?" test inside the function, ANY surviving call
+# grants a level unconditionally. Blocking only AddPlayerEXP left this one
+# live.
+#
+# It is reached during monster capture:
+#     ApplyCardStealEffect -> RecordDamageTaken +0x60 -> ProcessLevelUp
+# so capturing a monster silently levelled the player up, which looked like
+# this mechanic firing on its own.
+#
+# ProcessLevelUp returns void and the result is unused here, so removing the
+# call removes the level-up and nothing else.
+RECORD_DAMAGE_CALL_SITE = 0x8007d080
+
 MAX_LEVEL_SAFETY_CAP = 20
 MAX_LEVEL = 20  # ProcessLevelUp's own hard cap (playerLevel != 20 gate)
 PROGRESSIVE_LEVELING_BASELINE = 1
@@ -112,6 +128,14 @@ def _beq(from_addr, to_addr):
 
 def _bne(from_addr, to_addr):
     return 0x40820000 | ((to_addr - from_addr) & 0xFFFC)
+
+
+def _bgt(from_addr, to_addr):
+    return 0x41810000 | ((to_addr - from_addr) & 0xFFFC)
+
+
+def _blr():
+    return 0x4E800020
 
 
 def _b(from_addr, to_addr):
@@ -226,10 +250,12 @@ def apply(patcher):
     # (the other two ANDed conditions in ProcessLevelUp) stay fully intact.
     patcher.patch_word(XP_CHECK_BRANCH, 0x60000000)
 
-    # NOP the original AddPlayerEXP -> ProcessLevelUp call site, so normal
-    # combat XP gain can't also trigger a free level-up now that the XP
-    # check itself is disabled.
+    # NOP BOTH ProcessLevelUp call sites, so nothing but this mechanic can
+    # grant a level now that the XP check itself is disabled. These two are
+    # the complete set - verified by scanning the whole DOL for calls to
+    # ProcessLevelUp, not by inspection of the likely-looking ones.
     patcher.patch_word(ADD_PLAYER_EXP_CALL_SITE, 0x60000000)
+    patcher.patch_word(RECORD_DAMAGE_CALL_SITE, 0x60000000)
 
     stub_addr = _build_stub(patcher)
     patcher.register_tick_mechanic(stub_addr)

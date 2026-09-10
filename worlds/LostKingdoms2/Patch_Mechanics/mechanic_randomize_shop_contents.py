@@ -22,7 +22,7 @@ def apply(patcher, output_data):
         "Stone Golem"]
     cards = sorted(list(set(cards) - set(excluded_cards)))
 
-    for x in range(32):
+    for x in range(40):
         weights = get_card_weights(cards, output_data.get("randomize_shop_contents", 0) == 1,
                                    (x // 8) * 4, patcher=patcher)
         card_name = random.choices(cards, weights=weights, k=1)[0]

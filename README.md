@@ -1,148 +1,184 @@
-# [Archipelago](https://archipelago.gg) ![Discord Shield](https://discordapp.com/api/guilds/731205301247803413/widget.png?style=shield) | [Install](https://github.com/ArchipelagoMW/Archipelago/releases)
+# Lost Kingdoms II — Archipelago
 
-Archipelago provides a generic framework for developing multiworld capability for game randomizers. In all cases,
-presently, Archipelago is also the randomizer itself.
+An [Archipelago](https://archipelago.gg) randomizer world for **Lost Kingdoms II** (Nintendo GameCube).
 
-Currently, the following games are supported:
+Cards, levels, shops, enemies and more are shuffled into the multiworld. Items you find go to
+other players' games, and your own progression arrives from theirs.
 
-* The Legend of Zelda: A Link to the Past
-* Factorio
-* Subnautica
-* Risk of Rain 2
-* The Legend of Zelda: Ocarina of Time
-* Timespinner
-* Super Metroid
-* Secret of Evermore
-* Final Fantasy
-* VVVVVV
-* Raft
-* Super Mario 64
-* Meritous
-* Super Metroid/Link to the Past combo randomizer (SMZ3)
-* ChecksFinder
-* Hollow Knight
-* The Witness
-* Sonic Adventure 2: Battle
-* Starcraft 2
-* Donkey Kong Country 3
-* Dark Souls 3
-* Super Mario World
-* Pokémon Red and Blue
-* Hylics 2
-* Overcooked! 2
-* Zillion
-* Lufia II Ancient Cave
-* Blasphemous
-* Wargroove
-* Stardew Valley
-* The Legend of Zelda
-* The Messenger
-* Kingdom Hearts 2
-* The Legend of Zelda: Link's Awakening DX
-* Adventure
-* DLC Quest
-* Noita
-* Undertale
-* Bumper Stickers
-* Mega Man Battle Network 3: Blue Version
-* Muse Dash
-* DOOM 1993
-* Terraria
-* Lingo
-* Pokémon Emerald
-* DOOM II
-* Shivers
-* Heretic
-* Landstalker: The Treasures of King Nole
-* Final Fantasy Mystic Quest
-* TUNIC
-* Kirby's Dream Land 3
-* Celeste 64
-* Castlevania 64
-* A Short Hike
-* Yoshi's Island
-* Mario & Luigi: Superstar Saga
-* Bomb Rush Cyberfunk
-* Aquaria
-* Yu-Gi-Oh! Ultimate Masters: World Championship Tournament 2006
-* A Hat in Time
-* Old School Runescape
-* Kingdom Hearts 1
-* Mega Man 2
-* Yacht Dice
-* Faxanadu
-* Saving Princess
-* Castlevania: Circle of the Moon
-* Inscryption
-* Civilization VI
-* The Legend of Zelda: The Wind Waker
-* Jak and Daxter: The Precursor Legacy
-* Super Mario Land 2: 6 Golden Coins
-* shapez
-* Paint
-* Celeste (Open World)
-* Choo-Choo Charles
-* APQuest
-* Satisfactory
-* EarthBound
+---
 
-For setup and instructions check out our [tutorials page](https://archipelago.gg/tutorial/).
-Downloads can be found at [Releases](https://github.com/ArchipelagoMW/Archipelago/releases), including compiled
-windows binaries.
+## What you need:
 
-## History
+| | |
+|---|---|
+| **Archipelago** | 0.5.0 or newer — [releases](https://github.com/ArchipelagoMW/Archipelago/releases) |
+| **Dolphin** | 5.0-19870 or newer — [dolphin-emu.org](https://dolphin-emu.org/download/) |
+| **A game disc image** | `Lost Kingdoms II (USA)`, GameCube, unmodified `.iso` |
+| **This APWorld** | `lost_kingdoms_2.apworld` from [Releases](../../releases) |
 
-Archipelago is built upon a strong legacy of brilliant hobbyists. We want to honor that legacy by showing it here.
-The repositories which Archipelago is built upon, inspired by, or otherwise owes its gratitude to are:
+Your disc image must be a **full, untrimmed dump of the USA release**. The patcher writes into
+padding past the end of the file system, and refuses to run on a trimmed or scrubbed image rather
+than producing a broken game. PAL and JP discs are not supported — the patches use USA memory
+addresses throughout.
 
-* [bonta0's MultiWorld](https://github.com/Bonta0/ALttPEntranceRandomizer/tree/multiworld_31)
-* [AmazingAmpharos' Entrance Randomizer](https://github.com/AmazingAmpharos/ALttPEntranceRandomizer)
-* [VT Web Randomizer](https://github.com/sporchia/alttp_vt_randomizer)
-* [Dessyreqt's alttprandomizer](https://github.com/Dessyreqt/alttprandomizer)
-* [Zarby89's](https://github.com/Ijwu/Enemizer/commits?author=Zarby89)
-  and [sosuke3's](https://github.com/Ijwu/Enemizer/commits?author=sosuke3) contributions to Enemizer, which make up the
-  vast majority of Enemizer contributions.
+> This project does not distribute game files. You must supply your own disc image, dumped from a
+> disc you own.
 
-We recognize that there is a strong community of incredibly smart people that have come before us and helped pave the
-path. Just because one person's name may be in a repository title does not mean that only one person made that project
-happen. We can't hope to perfectly cover every single contribution that lead up to Archipelago, but we hope to honor
-them fairly.
+---
 
-### Path to the Archipelago
+## Installation
 
-Archipelago was directly forked from bonta0's `multiworld_31` branch of ALttPEntranceRandomizer (this project has a
-long legacy of its own, please check it out linked above) on January 12, 2020. The repository was then named to
-_MultiWorld-Utilities_ to better encompass its intended function. As Archipelago matured, then known as
-"Berserker's MultiWorld" by some, we found it necessary to transform our repository into a root level repository
-(as opposed to a 'forked repo') and change the name (which came later) to better reflect our project.
+1. Install Archipelago.
+2. Double-click `lost_kingdoms_2.apworld`. It installs into your Archipelago `custom_worlds` folder.
+   If that does not work, copy it there yourself:
+   - **Windows** — `%localappdata%\Archipelago\custom_worlds\`
+   - **Linux** — `~/Archipelago/custom_worlds/`
+   - **macOS** — `~/Library/Application Support/Archipelago/custom_worlds/`
+3. Restart the Archipelago Launcher.
 
-## Running Archipelago
+---
 
-For most people, all you need to do is head over to
-the [releases page](https://github.com/ArchipelagoMW/Archipelago/releases), then download and run the appropriate
-installer, or AppImage for Linux-based systems.
+## Generating a game
 
-If you are a developer or are running on a platform with no compiled releases available, please see our doc on
-[running Archipelago from source](docs/running%20from%20source.md).
+1. In the Archipelago Launcher, click **Generate Template Options**. This writes
+   `Lost Kingdoms 2.yaml` into your `Players/Templates` folder.
+2. Copy it into `Players/`, open it in a text editor, set your name, and choose your options
+   (see [Options](#options)). 
+   Alternatively, you can use the "Options Creator" in the Archipelago Launcher.
+3. Click **Generate**. The output lands in `output/` as a `.zip`.
+4. Upload the `.zip` to [the Archipelago website](https://archipelago.gg/uploads) to host, or host
+   it locally by searching for "Host" in the Archipelago Launcher and selecting your `.zip` file when prompted.
+5. When hosting on the Archipelago website, the generated room should contain a link to download the patch file
+   for Lost Kingdoms 2. Download it. It should be a .aplk2 file.
+6. If hosting locally, the .aplk2 file should be in the generated .zip folder. Copy and paste it from this folder.
 
-## Related Repositories
+For a solo game you can skip hosting and generate on your own machine.
 
-This project makes use of multiple other projects. We wouldn't be here without these other repositories and the
-contributions of their developers, past and present.
+---
 
-* [z3randomizer](https://github.com/ArchipelagoMW/z3randomizer)
-* [Enemizer](https://github.com/Ijwu/Enemizer)
-* [Ocarina of Time Randomizer](https://github.com/TestRunnerSRL/OoT-Randomizer)
+## Patching your disc image
 
-## Contributing
+1. In the Archipelago Launcher, click **Open Patch**.
+2. Select the `.aplk2` file from your generated seed.
+3. When prompted, select your `Lost Kingdoms II (USA).iso` and your `Dolphin.exe`.
 
-To contribute to Archipelago, including the WebHost, core program, or by adding a new game, see our
-[Contributing guidelines](/docs/contributing.md).
+The patcher writes a new `.iso` to wherever your .aplk2 file is located. **Your original file is not modified**; keep
+it, since every new seed patches from a clean copy.
 
-## FAQ
+Patching may take up to a minute, and will automatically open your Dolphin and the Lost Kingdoms 2 Launcher.
 
-For Frequently asked questions, please see the website's [FAQ Page](https://archipelago.gg/faq/en/).
+---
 
-## Code of Conduct
+## Playing
 
-Please refer to our [code of conduct](/docs/code_of_conduct.md).
+1. Open your patched `.iso` in Dolphin and start the game if it did not open automatically.
+2. In the Archipelago Launcher, click **Lost Kingdoms 2 Client** if it did not open automatically.
+3. Enter the server address, your slot name, and the password if the host set one. This typically comes in the form of SlotName:Password@HostName:Port;
+   for example, if you are hosting locally it may look like `Cokeman5:None@localhost:38281`
+4. Click `Connect`
+5. The client finds Dolphin automatically once the game is running. If it does not, you should get a message indicating it is waiting on the connection to Dolphin.
+
+The client must stay open while you play — it is what sends your checks and delivers your items.
+
+**Save often.** Items you receive are written into the game's save data, so anything collected
+since your last save is re-delivered on load rather than lost, but saving keeps the two in step.
+
+---
+
+## What does this randomize?
+
+### Randomization Options
+
+- Starting Deck(Optional)
+- Shop Contents(Optional)
+- Bonus Rewards(Optional)
+- Shop Prices(Optional)
+- Copy XP Costs(Optional)
+- Upgrade XP Costs(Optional)
+- Magic Stone Costs(Optional)
+- Music(Optional)
+- Player Model(Optional)
+- Level Unlocks(Optional)
+
+### Items
+
+- Cards
+- Key items
+- Level Unlocks(Optional)
+- Character levels(Optional)
+- Attribute Proficiencies(Optional)
+
+### Locations
+
+- Chests & other card rewards
+- Key item pickups throughout the levels
+- Red Fairies(Optional)
+- Enemysanity(Optional)
+- Combosanity(Optional)
+
+### Other
+
+- Deathlink
+
+All the optional options can be switched on or off, and many can be weighted, in your `.yaml`. The template
+that Archipelago generates lists every option with its own explanation and default. 
+Typically `50` means enabled, and `0` means disabled.
+
+### A note on level variations
+
+Several levels change once you have beaten them — different enemies, a different goal, sometimes a
+different starting point. Normally that replaces the original for good. This randomizer gives those
+levels a submenu on the world map so you can replay any version at any time, and multi-part levels
+get an entry for each part, unlocked in order as you clear them.
+
+---
+
+## Troubleshooting
+
+**"Unable to patch your Lost Kingdoms 2 ROM as expected"**
+Usually a disc image that is not an unmodified USA dump. Check the region, and check the file has
+not been trimmed or scrubbed. The message ends with a short detail naming what failed.
+
+**The client will not connect to Dolphin**
+Start the game first, then the client. Make sure the game is actually running rather than paused at
+the emulator's menu, and that you opened the *patched* image.
+
+**The client connects but nothing happens**
+Confirm the slot name in the client exactly matches the one in your `.yaml`, including case.
+
+**Enemies have wrong or corrupted textures**
+Make sure you are on the latest release. If it persists on a fresh patch, please open an issue with
+your seed number and the level where you saw it.
+
+**Items arrive but disappear after a reset**
+Save in-game after receiving items. Anything since your last save is re-sent on connect, so nothing
+should be permanently lost.
+
+---
+
+## Reporting issues
+
+Bug reports and questions go to the **Archipelago Discord** — find the **Lost Kingdoms 2** thread in
+the **#future-game-design** channel.
+
+[Join the Archipelago Discord](https://discord.gg/8Z65BR2)
+
+Logs from the Archipelago client help a great deal — they are in your Archipelago `logs/` folder.
+
+---
+
+## Credits
+
+PapayaJordane on Github for his Lost Kingdoms 2 Randomizer, for which this APworld got its start.(https://github.com/PapayaJordane/Lost-Kingdoms-2-Randomizer)
+Culk on Discord who has created a wonderful Poptracker(https://github.com/culk/lost-kingdoms-2-poptracker-pack) and frequently reports bugs to me.
+Flamjam on Discord who created the AP Card art seen in the LK2 Apworld.
+Built on [Archipelago](https://archipelago.gg).
+
+Thanks to everyone who has tested seeds and reported bugs — a great deal of this was found by
+players noticing something was off and being specific about it.
+
+## AI Disclaimer
+- Lost Kingdoms 2 Archipelago is **partially** coded with the help of AI
+- Lost Kingdoms 2 Archipelago does **not** contain AI art
+- AI helps me with making tweaks to the games that would otherwise be infeasible due to the complexity of fully compiled gamecube era code.
+- AI is almost exclusively used for understanding the game's code, and adding features that require tweaking the game's code at the PowerPC level, rather than the AP side of the code.

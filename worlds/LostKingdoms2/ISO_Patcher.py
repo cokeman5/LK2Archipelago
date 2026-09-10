@@ -770,5 +770,5 @@ def _apply_mechanics(patcher: ISOPatcher, output_data: dict, cardback_gtx: bytes
         from .Patch_Mechanics import mechanic_randomize_music
         mechanic_randomize_music.apply(patcher, output_data)
 
-    from .Patch_Mechanics import mechanic_world_map_submenu
-    mechanic_world_map_submenu.apply(patcher, output_data)
+    from .Patch_Mechanics import mechanic_world_map_variations
+    mechanic_world_map_variations.apply(patcher, output_data)

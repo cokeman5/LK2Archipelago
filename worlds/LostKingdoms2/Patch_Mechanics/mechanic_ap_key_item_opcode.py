@@ -71,9 +71,13 @@ S20_STONE_OF_SEALING_CHECK_OFFSETS = [0x414fa4]
 
 S21_ISO_OFFSET = 0xbffc1e0
 
-# File-relative offsets within s21.pds of 4 sequential "has this blade
-# already been obtained" checks (opcode 135, argcount 2) - one per
-# blade (key item indices 19/18/17/16). Redirecting to opcode 499
+# File-relative offsets within s21.pds of the "has this blade already been
+# obtained" checks (opcode 135, argcount 2). Four are sequential, one per
+# blade (arguments 19/18/17/16), and a fifth sits well away from them at
+# 0x4fa7b8 - a SECOND check for argument 16, the Blade of Skill, which the
+# original list missed. s21.pds contains exactly five opcode-135 checks and
+# all five are now redirected, so no blade is left half-patched.
+# Redirecting to opcode 499
 # (always reports "not obtained") makes the branch that follows each
 # check always take its own "stay active" skip path, using its own,
 # original, correct skip amount - confirmed in-game this correctly
@@ -87,7 +91,7 @@ S21_ISO_OFFSET = 0xbffc1e0
 # disabled every puzzle unconditionally; reverted). The
 # pedestal-breaking side effect of this redirect remains an open,
 # unresolved problem.
-S21_BLADE_CHECK_OFFSETS = [0x4f8590, 0x4f860c, 0x4f8664, 0x4f86ac]
+S21_BLADE_CHECK_OFFSETS = [0x4f8590, 0x4f860c, 0x4f8664, 0x4f86ac, 0x4fa7b8]
 
 S10_ISO_OFFSET = 0x921dcc0
 
@@ -134,10 +138,18 @@ S23_ISO_OFFSET = 0xc98b540
 
 # File-relative offsets within s23.pds of all 3 "has Olf Runestone
 # already been obtained" checks (opcode 135, argument 24 - key item
-# index 23, Olf Runestone). A 4th, unrelated opcode-135 check in this
-# same file (argument 15, Mysterious Key, same as seen in s01.pds) is
-# deliberately NOT touched.
+# index 23, Olf Runestone).
 S23_OLF_RUNESTONE_CHECK_OFFSETS = [0x42b89c, 0x42d14c, 0x42d5e4]
+
+# The 4th opcode-135 check in the same file: argument 15, Mysterious Key.
+#
+# s23.pds holds exactly one check for this item and s01.pds holds five. Only
+# this one is redirected, matching every other entry here - the redirect
+# marks the point the item is GRANTED, which is what the client watches for.
+# The five in s01 are gates that test whether the player already holds
+# the key, and redirecting those would report the location on every door
+# rather than on pickup.
+S23_MYSTERIOUS_KEY_CHECK_OFFSETS = [0x42d614]
 
 S14_ISO_OFFSET = 0xa26d160
 
@@ -358,6 +370,13 @@ def apply(patcher):
         S23_ISO_OFFSET,
         S23_OLF_RUNESTONE_CHECK_OFFSETS,
         "s23.pds",
+    )
+
+    _redirect_opcode_135_checks(
+        patcher,
+        S23_ISO_OFFSET,
+        S23_MYSTERIOUS_KEY_CHECK_OFFSETS,
+        "s23.pds (Mysterious Key)",
     )
 
     _redirect_opcode_135_checks(

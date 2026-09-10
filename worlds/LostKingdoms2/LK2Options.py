@@ -159,7 +159,7 @@ class RandomizeMagicCostsMax(Range):
 
 class MagicCostsMultiplier(Range):
     """Multiplies all the of the magic stone costs by amount divided by 100;
-    So 100 means no multiplier, 50 means half cost, 200 means double, etc
+    So 100 means no multiplier, 50 means half cost, 200 means double, etc.
     Takes place after any randomization and is clamped by what the game allows."""
     range_start = 0
     range_end = 1000

@@ -696,16 +696,16 @@ class LostKingdoms2World(World):
                 location.progress_type = LocationProgressType.EXCLUDED
 
             match location.name:
-                case "Sacred Battle Arena 1 - defeat Lich":
+                case "Sacred Battle Arena 1 - defeat Lich" | "Enemysanity - Lich":
                     if self.options.progressive_attribute_proficiencies.value:
                         add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Earth", self.player, 3))
-                case "Sacred Battle Arena 1 - defeat Nueh":
+                case "Sacred Battle Arena 1 - defeat Nueh" | "Enemysanity - Nueh":
                     if self.options.progressive_attribute_proficiencies.value:
                         add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Wood",self.player,3))
-                case "Sacred Battle Arena 1 - defeat Gemini":
+                case "Sacred Battle Arena 1 - defeat Gemini" | "Enemysanity - Gemini":
                     if self.options.progressive_attribute_proficiencies.value:
                         add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Fire",self.player,3))
-                case "Sacred Battle Arena 1 - defeat Kraken":
+                case "Sacred Battle Arena 1 - defeat Kraken" | "Enemysanity - Kraken":
                     if self.options.progressive_attribute_proficiencies.value:
                         add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Water",self.player,3))
                 case "Sacred Battle Arena 2 - defeat Rabandos" | "Sacred Battle Arena 2 - defeat Helena":

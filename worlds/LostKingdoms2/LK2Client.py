@@ -72,18 +72,18 @@ God_of_Harmony_ID_ADDRESS = 0x80223e54 # = 2149813784
 Emperor_ID_ADDRESS = 0x80223f64 # = 80238e18
 Emperor_Status = 0
 
-#Stored/Trigger values 0x8025e650-0x8025e68b
 STORAGE_ADDRESSES = {
-    'item_index':              {'address': 0x8025e650, 'size': 2},
-    'key_item_location':      {'address': 0x8025e652, 'size': 4},
-    'progressive_leveling':   {'address': 0x8025e656, 'size': 1},
-    'progressive_fire_attribute': {'address': 0x8025e657, 'size': 1},
-    'progressive_water_attribute': {'address': 0x8025e658, 'size': 1},
-    'progressive_earth_attribute': {'address': 0x8025e659, 'size': 1},
-    'progressive_wood_attribute': {'address': 0x8025e65a, 'size': 1},
-    'progressive_neutral_attribute': {'address': 0x8025e65b, 'size': 1},
-    'progressive_mech_attribute': {'address': 0x8025e65c, 'size': 1},
-    'shop_location':           {'address': 0x8025e65d, 'size': 5},
+    'item_index':                    {'address': 0x8025ed50, 'size': 2},
+    'key_item_location':             {'address': 0x8025ed52, 'size': 4},
+    'progressive_leveling':          {'address': 0x8025ed56, 'size': 1},
+    'progressive_fire_attribute':    {'address': 0x8025ed57, 'size': 1},
+    'progressive_water_attribute':   {'address': 0x8025ed58, 'size': 1},
+    'progressive_earth_attribute':   {'address': 0x8025ed59, 'size': 1},
+    'progressive_wood_attribute':    {'address': 0x8025ed5a, 'size': 1},
+    'progressive_neutral_attribute': {'address': 0x8025ed5b, 'size': 1},
+    'progressive_mech_attribute':    {'address': 0x8025ed5c, 'size': 1},
+    'shop_location':                 {'address': 0x8025ed5d, 'size': 5},
+    'level_progress':              {'address': 0x8025ed90, 'size': 90},
 }
 
 PLAYER1_META_ADDRESSES = {
@@ -589,22 +589,6 @@ def level_modifications(ctx):
         elif (not is_in_level() or read_memory(0x802e941e)!=55968) and read_memory(0x8025e150,1) != 0:
             write_memory(0x8025e151, read_memory(0x8025e150, 1), 1)
             write_memory(0x8025e150, 0, 1)
-    #Make it so if you beat Bhashea High Road, p2 loads without needing to enter Kadishu
-    elif level_id==lost_kingdoms_2_regions["Bhashea High Road"]["levelID"] and (ctx.slot_data.get("randomize_levels", 0) or ctx.slot_data.get("level_unlocks_as_items", 0)) :
-        #If Kadishu hasn't been beaten, then load the first part of it
-        if read_memory(0x8025dc4c,1)==0:
-            if read_memory(0x8025dc91,1)!=0:
-                write_memory(0x8025dc90,read_memory(0x8025dc91,1),1)
-                write_memory(0x8025dc91, 0, 1)
-        #If Kadishu has been beaten exactly once, load the 2nd part of it
-        elif read_memory(0x8025dc4c,1)==2:
-            if read_memory(0x8025dc91,1)==0:
-                write_memory(0x8025dc91, 4, 1)
-    #Put the value back in the right place if not in Bhashea High Road
-    if not is_in_level() and (ctx.slot_data.get("randomize_levels", 0) or ctx.slot_data.get("level_unlocks_as_items", 0)):
-        if read_memory(0x8025dc90,1) != 0:
-            write_memory(0x8025dc91, read_memory(0x8025dc90,1), 1)
-            write_memory(0x8025dc90, 0, 1)
 
     if ctx.slot_data.get("randomize_levels", 0) or ctx.slot_data.get("level_unlocks_as_items", 0):
         if not is_in_level():
