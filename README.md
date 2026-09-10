@@ -126,26 +126,34 @@ Typically `50` means enabled, and `0` means disabled.
 ## Troubleshooting
 
 **"Unable to patch your Lost Kingdoms 2 ROM as expected"**
+
 Usually a disc image that is not an unmodified USA dump. Check the region, and check the file has
 not been trimmed or scrubbed. The message ends with a short detail naming what failed.
 
 **The client will not connect to Dolphin**
+
 Start the game first, then the client. Make sure the game is actually running rather than paused at
 the emulator's menu, and that you opened the *patched* image.
 
 **The client connects but nothing happens**
+
 Confirm the slot name in the client exactly matches the one in your `.yaml`, including case.
 
 **Enemies have wrong or corrupted textures**
+
 Make sure you are on the latest release. If it persists on a fresh patch, please open an issue with
 your seed number and the level where you saw it.
 
 **Items arrive but disappear after a reset**
+
 Save in-game after receiving items. Anything since your last save is re-sent on connect, so nothing
 should be permanently lost.
 
 **It says it is connecting to Dolphin and the AP Server, but nothing is being sent or received**
-The LK2 APworld 
+
+The LK2 APworld expects that you are playing with default Dolphin settings; please ensure that there
+are no problematic settings, such as memory override, or CPU clock override enabled. If the issue 
+persists you may try deleting the Dolphin Emulator folder in your AppData folder, then reinstalling Dolphin.
 
 ---
 
