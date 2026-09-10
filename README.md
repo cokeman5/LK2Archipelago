@@ -1,11 +1,8 @@
 # Lost Kingdoms II Archipelago
 
-An [Archipelago](https://archipelago.gg) randomizer world for **Lost Kingdoms II** (Nintendo GameCube).
+An [Archipelago](https://archipelago.gg) randomizer world for **Lost Kingdoms II** (Nintendo GameCube). 
 
-Cards, levels, shops, enemies and more are shuffled into the multiworld. Items you find go to
-other players' games, and your own progression arrives from theirs.
-
----
+Archipelago is a cross-game modification system which randomizes different games, then uses the result to build a single unified multi-player game. Items from one game may be present in another, and you will need your fellow players to find items you need in their games to help you complete your own.
 
 ## What you need:
 
@@ -78,7 +75,7 @@ Patching may take up to a minute, and will automatically open your Dolphin and t
 4. Click `Connect`
 5. The client finds Dolphin automatically once the game is running. If it does not, you should get a message indicating it is waiting on the connection to Dolphin.
 
-The client must stay open while you play — it is what sends your checks and delivers your items.
+The client must stay open while you play, it is what sends your checks and delivers your items.
 
 **Save often.** Items you receive are written into the game's save data, so anything collected
 since your last save is re-delivered on load rather than lost, but saving keeps the two in step.
@@ -108,7 +105,7 @@ since your last save is re-delivered on load rather than lost, but saving keeps 
 - Character levels(Optional)
 - Attribute Proficiencies(Optional)
 
-### Locations
+### Locations/Checks
 
 - Chests & other card rewards
 - Key item pickups throughout the levels
@@ -146,6 +143,9 @@ your seed number and the level where you saw it.
 **Items arrive but disappear after a reset**
 Save in-game after receiving items. Anything since your last save is re-sent on connect, so nothing
 should be permanently lost.
+
+**It says it is connecting to Dolphin and the AP Server, but nothing is being sent or received**
+The LK2 APworld 
 
 ---
 
