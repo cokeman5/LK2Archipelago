@@ -162,10 +162,10 @@ Logs from the Archipelago client help a great deal. They are in your Archipelago
 
 ## Credits
 
-PapayaJordane on Github for his Lost Kingdoms 2 Randomizer, for which this APworld got its start.(https://github.com/PapayaJordane/Lost-Kingdoms-2-Randomizer)
-Culk on Discord who has created a wonderful Poptracker(https://github.com/culk/lost-kingdoms-2-poptracker-pack) and frequently reports bugs to me.
-Flamjam on Discord who created the AP Card art seen in the LK2 Apworld.
-Built on [Archipelago](https://archipelago.gg).
+- PapayaJordane on Github for his Lost Kingdoms 2 Randomizer, for which this APworld got its start.(https://github.com/PapayaJordane/Lost-Kingdoms-2-Randomizer)
+- culk on Discord/Github who has created a wonderful Poptracker for this APworld (https://github.com/culk/lost-kingdoms-2-poptracker-pack) and frequently reports bugs to me.
+- Flamjam on Discord who created the AP Card art seen in the LK2 Apworld.
+- Built on [Archipelago](https://archipelago.gg).
 
 Thanks to everyone who has tested seeds and reported bugs. A great deal of this was found by
 players noticing something was off and being specific about it.
