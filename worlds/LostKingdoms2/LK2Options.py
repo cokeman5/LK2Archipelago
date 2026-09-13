@@ -46,10 +46,10 @@ class EnemysanityConditionOption(Choice):
     Plus means that enemies in the Proving Grounds will be included, otherwise they are excluded.
     Be warned that some spawn triggers in this game are very unintuitive, hidden, and
     once a level is beaten it will have new enemy spawn triggers. Please report any issue you encounter.
-    Light: +109 locations
-    Light Plus: +199 locations
-    Enemysanity: +530 locations
-    Enemysanity Plus: +935 locations"""
+    Light: ~113 locations
+    Light Plus: ~203 locations
+    Enemysanity: ~552 locations
+    Enemysanity Plus: ~955 locations"""
     display_name = "Enemysanity"
     option_disabled = 0
     option_enemysanity_light = 1

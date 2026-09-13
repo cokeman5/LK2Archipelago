@@ -142,11 +142,22 @@ class LostKingdoms2World(World):
                 lost_kingdoms_2_filler_cards.append(key)
             else:
                 lost_kingdoms_2_progression_cards.append(key)
-        num_of_random_cards = len(lost_kingdoms_2_chests) + (self.options.combosanity.value * len(lost_kingdoms_2_combos)) + (self.options.shopsanity.value * len(lost_kingdoms_2_shop_purchases)) - len(lost_kingdoms_2_progression_cards) - 19 * self.options.progressive_leveling.value - 34 * self.options.progressive_attribute_proficiencies.value
-        if self.options.enemysanity.value!=0:
-            for location in lost_kingdoms_2_enemies:
-                if self.options.enemysanity.value == 2 or not ("Proving Grounds" in location):
-                    num_of_random_cards += 1
+        num_of_random_cards = len(lost_kingdoms_2_chests)+ (self.options.combosanity.value * len(lost_kingdoms_2_combos)) + (self.options.shopsanity.value * len(lost_kingdoms_2_shop_purchases)) - len(lost_kingdoms_2_progression_cards) - 19 * self.options.progressive_leveling.value - 34 * self.options.progressive_attribute_proficiencies.value - self.options.level_unlocks_as_items * len(lost_kingdoms_2_level_unlocks)
+        match self.options.enemysanity.value:
+            case 1:
+                for location in lost_kingdoms_2_enemysanity_light:
+                    if not lost_kingdoms_2_enemysanity_light[location]['proving_grounds']:
+                        num_of_random_cards += 1
+            case 2:
+                for location in lost_kingdoms_2_enemysanity_light:
+                        num_of_random_cards += 1
+            case 3:
+                for location in lost_kingdoms_2_enemies:
+                    if not "Proving Grounds" in location:
+                        num_of_random_cards += 1
+            case 4:
+                for location in lost_kingdoms_2_enemies:
+                        num_of_random_cards += 1
         #Ensure there is always enough filler cards by doubling the pool until it's large enough
         while len(lost_kingdoms_2_filler_cards)*multiplier < num_of_random_cards:
             for key in lost_kingdoms_2_filler_cards:
@@ -427,10 +438,18 @@ class LostKingdoms2World(World):
                 for level_name in level_names:
                     new_region_name = new_region_name + "|" + level_name
                 new_region_name = new_region_name[1:]
-                region = Region(new_region_name, self.player, self.multiworld)
-                self.multiworld.regions.append(region)
+                region = 0
+                for reg in self.multiworld.get_regions():
+                    if reg.name == new_region_name:
+                        region = reg
+                        break
+
+                if region==0:
+                    region = Region(new_region_name, self.player, self.multiworld)
+                    self.multiworld.regions.append(region)
                 for level_name in level_names:
-                    self.multiworld.get_region(level_name, self.player).connect(region,f"{region.name}")
+                    if self.multiworld.get_region(level_name, self.player) not in region.entrances:
+                        self.multiworld.get_region(level_name, self.player).connect(region,f"{region.name}")
                 location_data = LK2LocationData(self.location_name_to_id[key])
                 location = LK2Location(self.player, key, region, location_data)
                 if lost_kingdoms_2_locations[key].get("missable", 0) == 1:
@@ -696,33 +715,41 @@ class LostKingdoms2World(World):
                 location.progress_type = LocationProgressType.EXCLUDED
 
             match location.name:
-                case "Sacred Battle Arena 1 - defeat Lich" | "Enemysanity - Lich":
+                case "Sacred Battle Arena 1 - defeat Lich" | "Enemysanity - Lich" | "Sacred Battle Arena 1 - Enemysanity - Lich #1":
                     if self.options.progressive_attribute_proficiencies.value:
                         add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Earth", self.player, 3))
-                case "Sacred Battle Arena 1 - defeat Nueh" | "Enemysanity - Nueh":
+                case "Sacred Battle Arena 1 - defeat Nueh" | "Enemysanity - Nueh" | "Sacred Battle Arena 1 - Enemysanity - Nueh #1":
                     if self.options.progressive_attribute_proficiencies.value:
                         add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Wood",self.player,3))
-                case "Sacred Battle Arena 1 - defeat Gemini" | "Enemysanity - Gemini":
+                case "Sacred Battle Arena 1 - defeat Gemini" | "Enemysanity - Gemini" | "Sacred Battle Arena 1 - Enemysanity - Gemini #1":
                     if self.options.progressive_attribute_proficiencies.value:
                         add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Fire",self.player,3))
-                case "Sacred Battle Arena 1 - defeat Kraken" | "Enemysanity - Kraken":
+                case "Sacred Battle Arena 1 - defeat Kraken" | "Enemysanity - Kraken" | "Sacred Battle Arena 1 - Enemysanity - Kraken #1":
                     if self.options.progressive_attribute_proficiencies.value:
                         add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Water",self.player,3))
-                case "Sacred Battle Arena 2 - defeat Rabandos" | "Sacred Battle Arena 2 - defeat Helena":
+                case "Sacred Battle Arena 2 - defeat Rabandos" | "Sacred Battle Arena 2 - defeat Helena" | "Sacred Battle Arena 2 - Enemysanity - Rabandos #1" | "Sacred Battle Arena 2 - Enemysanity - Helena #1" | "Enemysanity - Rabandos" | "Enemysanity - Helena"  :
                     if self.options.progressive_attribute_proficiencies.value:
-                        add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Neutral",self.player,3))
-                case "Sacred Battle Arena 2 - defeat AstroBot" | "Sacred Battle Arena 2 - Red Fairy machines":
+                        add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Neutral",self.player,5))
+                case "Sacred Battle Arena 2 - defeat AstroBot" | "Sacred Battle Arena 2 - Red Fairy machines" | "Sacred Battle Arena 2 - Enemysanity - AstroBot #1" | "Enemysanity - AstroBot" :
                     if self.options.progressive_attribute_proficiencies.value:
-                        add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Mech",self.player,3))
-                case "Sacred Battle Arena 2 - defeat Leod":
+                        add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Mech",self.player,5))
+                case "Sacred Battle Arena 2 - defeat Leod" | "Sacred Battle Arena 2 - Enemysanity - Leod #1" |"Enemysanity - Leod" :
                     add_rule(location,lambda state: state.can_reach_region("Royal Tower, Upper", self.player), self.player)
                     if self.options.progressive_attribute_proficiencies.value:
-                        add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Mech",self.player,3))
-                case "Sacred Battle Arena 2 - defeat Thalnos" | "Sacred Battle Arena 2 - defeat Katia" | "Sacred Battle Arena 2 - Red Fairy Queen Katia":
+                        add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Mech",self.player,5))
+                case "Sacred Battle Arena 2 - defeat Thalnos" | "Sacred Battle Arena 2 - defeat Katia" | "Sacred Battle Arena 2 - Red Fairy Queen Katia" | "Sacred Battle Arena 2 - Enemysanity - Thalnos #1" | "Sacred Battle Arena 2 - Enemysanity - Katia #1" | "Enemysanity - Thalnos" | "Enemysanity - Katia"  :
                     add_rule(location, lambda state: state.can_reach_region("Royal Tower, Upper", self.player), self.player)
                     if self.options.progressive_attribute_proficiencies.value:
-                        add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Mech",self.player,3))
-                        add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Neutral",self.player,3))
+                        add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Mech",self.player,5))
+                        add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Neutral",self.player,5))
+                case "Enemysanity - Stranger":
+                    add_rule(location, lambda state: state.can_reach_region("Nobleman's Residence", self.player) and lost_kingdoms_2_logic["mysterious_key"], "or")
+                    add_rule(location, lambda state: state.can_reach_region("Isamat Urbur", self.player), "or")
+                    add_rule(location, lambda state: state.can_reach_region("Gromtull Desert", self.player) and lost_kingdoms_2_logic["black_liquid_logic"], "or")
+                    add_rule(location, lambda state: state.can_reach_region("Ruldo Forest", self.player), "or")
+                    add_rule(location, lambda state: state.can_reach_region("Fossil Boneyard", self.player) and lost_kingdoms_2_logic["jump_and_boosters"], "or")
+                    add_rule(location, lambda state: state.can_reach_region("Plains of Rowahl", self.player), "or")
+                    add_rule(location, lambda state: state.can_reach_region("Sacred Battle Arena 1", self.player), "or")
                 case "Combo - Triple Hagan":
                     add_rule(location, lambda state: state.has("Rock Hagan", self.player))
                     add_rule(location, lambda state: state.has("Bum Hagan", self.player))

@@ -81,8 +81,8 @@ lost_kingdoms_2_chests = {
     "Ruldo Forest - flight chest": {'level': 'Ruldo Forest', 'cardName': 'Night Mare', 'isoAddress': '885DEB9', 'missable': 0, 'RAMAddress': '8025dd92', 'type': 'Chest', 'bitOffset': 5, 'rule': "flight_only", 'location_id': 60},
     "Ruldo Forest - cockatrice chest 1": {'level': 'Ruldo Forest', 'cardName': 'Demon Hound', 'isoAddress': '885E039', 'missable': 0, 'RAMAddress': '8025dd92', 'type': 'Chest', 'bitOffset': 7, 'location_id': 61},
     "Ruldo Forest - cockatrice chest 2": {'level': 'Ruldo Forest', 'cardName': 'Raflesia', 'isoAddress': '885DF79', 'missable': 0, 'RAMAddress': '8025dd92', 'type': 'Chest', 'bitOffset': 6, 'location_id': 62},
-    "Sacred Battle Arena 1 - defeat Lich": {'level': 'Sacred Battle Arena 1', 'cardName': 'Lich', 'isoAddress': 'CDB809B', 'missable': 0, 'RAMAddress': '8025e190', 'type': 'Chest', 'bitOffset': 3,'rule': "earth_proficiency", 'location_id': 63},
-    "Sacred Battle Arena 1 - defeat Nueh": {'level': 'Sacred Battle Arena 1', 'cardName': 'Nueh', 'isoAddress': 'CDB78E3', 'missable': 0, 'RAMAddress': '8025e190', 'type': 'Chest', 'bitOffset': 1,'rule': "wood_proficiency", 'location_id': 64},
+    "Sacred Battle Arena 1 - defeat Lich": {'level': 'Sacred Battle Arena 1', 'cardName': 'Lich', 'isoAddress': 'CDB809B', 'missable': 0, 'RAMAddress': '8025e190', 'type': 'Chest', 'bitOffset': 3, 'location_id': 63},
+    "Sacred Battle Arena 1 - defeat Nueh": {'level': 'Sacred Battle Arena 1', 'cardName': 'Nueh', 'isoAddress': 'CDB78E3', 'missable': 0, 'RAMAddress': '8025e190', 'type': 'Chest', 'bitOffset': 1, 'location_id': 64},
     "Sacred Battle Arena 1 - defeat Gemini": {'level': 'Sacred Battle Arena 1', 'cardName': 'Gemini', 'isoAddress': 'CDB7CBF', 'missable': 0, 'RAMAddress': '8025e190', 'type': 'Chest', 'bitOffset': 2, 'location_id': 65},
     "Sacred Battle Arena 1 - defeat Kraken": {'level': 'Sacred Battle Arena 1', 'cardName': 'Kraken', 'isoAddress': 'CDB8477', 'missable': 0, 'RAMAddress': '8025e190', 'type': 'Chest', 'bitOffset': 4, 'location_id': 66},
     "Sacred Battle Arena 2 - defeat Rabandos": {'level': 'Sacred Battle Arena 2', 'cardName': 'Rabandos', 'isoAddress': 'D293F83', 'missable': 0, 'RAMAddress': '8025e1d0', 'type': 'Chest', 'bitOffset': 3, 'location_id': 67},
@@ -194,8 +194,8 @@ lost_kingdoms_2_chests = {
     "Fairy House - collect 80 fairies": {'level': 'Fairy House', 'cardName': 'Global Bust', 'isoAddress': '183A3D', 'missable': 0, 'RAMAddress': '8025d033', 'type': 'Chest', 'bitOffset': 80, 'rule': "fairy_80", 'location_id': 173},
     "Fairy House - collect 90 fairies": {'level': 'Fairy House', 'cardName': 'Crystal Magic', 'isoAddress': '183A3F', 'missable': 0, 'RAMAddress': '8025d033', 'type': 'Chest', 'bitOffset': 90, 'rule': "fairy_90", 'location_id': 174},
     "Fairy House - collect 100 fairies": {'level': 'Fairy House', 'cardName': 'Circasaurus', 'isoAddress': '183A41', 'missable': 1, 'RAMAddress': '8025d033', 'type': 'Chest', 'bitOffset': 100, 'rule': "fairy_100", 'location_id': 175},
-    "Krasheen Mountains - Birdman": {'level': 'Krasheen Mountains', 'cardName': 'Birdman', 'isoAddress': 'A25AED9', 'missable': 0, 'RAMAddress': '8025df12', 'type': 'Chest', 'bitOffset': 0, 'location_id': 176},
-    "Plains of Rowahl - God Of Destruction": {'level': 'Plains of Rowahl', 'cardName': '', 'isoAddress': '967A754', 'missable': 0, 'RAMAddress': '81045434', 'type': 'Chest', 'bitOffset': 3, 'rule': "jewel_and_gate", 'location_id': 177},
+    "Krasheen Mountains - Birdman": {'level': 'Krasheen Mountains', 'cardName': 'Birdman', 'isoAddress': 'A25D29F', 'missable': 0, 'RAMAddress': '8025df12', 'type': 'Chest', 'bitOffset': 0, 'location_id': 176},
+    "Plains of Rowahl - God Of Destruction": {'level': 'Plains of Rowahl', 'cardName': 'God of Destruction', 'isoAddress': '967A757', 'missable': 0, 'RAMAddress': '8025de50', 'type': 'Chest', 'bitOffset': 5, 'rule': "jewel_and_gate", 'location_id': 177},
 }
 
 lost_kingdoms_2_red_fairies = {
@@ -302,9 +302,9 @@ lost_kingdoms_2_red_fairies = {
 }
 
 lost_kingdoms_2_key_locations = {
-    "Kendarie Fortress - Kendarie Soldier 1": {'level': 'Kendarie Fortress', 'type': 'Key Item','bitOffset': 2, 'missable': 1, 'location_id': 20001},
-    "Kendarie Fortress - Kendarie Soldier 2": {'level': 'Kendarie Fortress', 'type': 'Key Item','bitOffset': 1, 'missable': 1, 'rule': "blue_key", 'location_id': 20002},
-    "Kendarie Fortress - Kendarie Soldier 3": {'level': 'Kendarie Fortress', 'type': 'Key Item', 'bitOffset': 3, 'missable': 1, 'rule': "red_key", 'location_id': 20003},
+    "Kendarie Fortress - Blue Key Pickup": {'level': 'Kendarie Fortress', 'type': 'Key Item','bitOffset': 2, 'missable': 1, 'location_id': 20001},
+    "Kendarie Fortress - Red Key Pickup": {'level': 'Kendarie Fortress', 'type': 'Key Item','bitOffset': 1, 'missable': 1, 'rule': "blue_key", 'location_id': 20002},
+    "Kendarie Fortress - Green Key Pickup": {'level': 'Kendarie Fortress', 'type': 'Key Item', 'bitOffset': 3, 'missable': 1, 'rule': "red_key", 'location_id': 20003},
     "Fossil Boneyard - Fossil Head Pickup": {'level': 'Fossil Boneyard', 'type': 'Key Item','bitOffset': 4, 'rule': "jump_and_boosters", 'location_id': 20004},
     "Fossil Boneyard - Fossil Torso Pickup": {'level': 'Fossil Boneyard', 'type': 'Key Item','bitOffset': 5, 'rule': "hellhound_or_unicorn_and_booster_and_jumper", 'location_id': 20005},
     "Fossil Boneyard - Fossil Tail Pickup": {'level': 'Fossil Boneyard', 'type': 'Key Item', 'bitOffset': 6, 'rule': "jump_and_boosters", 'location_id': 20006},
@@ -317,8 +317,8 @@ lost_kingdoms_2_key_locations = {
     "Gromtull Desert - Bottle Pickup": {'level': 'Gromtull Desert', 'type': 'Key Item', 'bitOffset': 13, 'missable': 1, 'location_id': 20013},
     "Gromtull Desert - Black Liquid Pickup": {'level': 'Gromtull Desert', 'type': 'Key Item','bitOffset': 14, 'rule': "bottle_only", 'location_id': 20014},
     "Sacred Battle Arena 1 - Gurd Reward": {'level': 'Sacred Battle Arena 1', 'type': 'Key Item','bitOffset': 15, 'location_id': 20015},
-    "Bhashea Castle - Blade of Skill Puzzle": {'level': 'Bhashea Castle', 'type': 'Key Item', 'bitOffset': 16, 'location_id': 20016},
-    "Bhashea Castle - Steel Skeleton Defeat": {'level': 'Bhashea Castle', 'type': 'Key Item','bitOffset': 17, 'location_id': 20017},
+    "Bhashea Castle - Blade of Skill Pickup": {'level': 'Bhashea Castle', 'type': 'Key Item', 'bitOffset': 16, 'location_id': 20016},
+    "Bhashea Castle - Blade of Power Pickup": {'level': 'Bhashea Castle', 'type': 'Key Item','bitOffset': 17, 'location_id': 20017},
     "Bhashea Castle - Blade of Wisdom Pickup": {'level': 'Bhashea Castle', 'type': 'Key Item','bitOffset': 18, 'location_id': 20018},
     "Bhashea Castle - Blade of Time Pickup": {'level': 'Bhashea Castle', 'type': 'Key Item', 'bitOffset': 19, 'location_id': 20019},
     "Grenfoel Cathedral - Jewel of Alanjeh Reward": {'level': 'Grenfoel Cathedral', 'type': 'Key Item', 'bitOffset': 20, 'location_id': 20020},
@@ -681,6 +681,7 @@ lost_kingdoms_2_enemies = {
     "Nobleman's Residence - Enemysanity - Succubus #4" : {"level" : "Nobleman's Residence","RAMAddress" : "802252d8", "type" : "Enemysanity", 'missable': 0, 'rule': "mysterious_key", "currentState": 0, "group": 3, 'location_id': 60020},
     "Nobleman's Residence - Enemysanity - Hell Hound #4" : {"level" : "Nobleman's Residence","RAMAddress" : "802253e8", "type" : "Enemysanity", 'missable': 0, 'rule': "mysterious_key", "currentState": 0, "group": 3, 'location_id': 60021},
     "Nobleman's Residence - Enemysanity - Hell Hound #5" : {"level" : "Nobleman's Residence","RAMAddress" : "802243f8", "type" : "Enemysanity", 'missable': 0, 'rule': "mysterious_key", "currentState": 0, "group": 4, 'location_id': 60022},
+    "Nobleman's Residence - Enemysanity - Stranger #1" : {"level" : "Nobleman's Residence","RAMAddress" : "80224e98", "type" : "Enemysanity", 'missable': 0, 'rule': "mysterious_key", "currentState": 0, "group": 12, 'location_id': 60943},
 
     "Bhashea High Road - Enemysanity - Porcupig #1" : {"level" : "Bhashea High Road","RAMAddress" : "80226928", "type" : "Enemysanity", 'missable': 1, "currentState": 0, "group": 1, 'location_id': 60023},
     "Bhashea High Road - Enemysanity - Porcupig #2" : {"level" : "Bhashea High Road","RAMAddress" : "80224508", "type" : "Enemysanity", 'missable': 1, "currentState": 0, "group": 2, 'location_id': 60024},
@@ -692,9 +693,11 @@ lost_kingdoms_2_enemies = {
     "Bhashea High Road - Enemysanity - Porcupig #5" : {"level" : "Bhashea High Road","RAMAddress" : "802241d8", "type" : "Enemysanity", 'missable': 1, "currentState": 0, "group": 4, 'location_id': 60030},
     "Bhashea High Road - Enemysanity - Storm Hagan #1" : {"level" : "Bhashea High Road","RAMAddress" : "802253e8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 5, 'location_id': 60031},
     "Bhashea High Road - Enemysanity - Storm Hagan #2" : {"level" : "Bhashea High Road","RAMAddress" : "802254f8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 5, 'location_id': 60032},
+    "Bhashea High Road - Enemysanity - Man Trap #4" : {"level" : "Bhashea High Road","RAMAddress" : "80224fa8", "type" : "Enemysanity", 'missable': 1, "currentState": 0, "group": 13, 'location_id': 60936},
+    "Bhashea High Road - Enemysanity - Man Trap #5" : {"level" : "Bhashea High Road","RAMAddress" : "802250b8", "type" : "Enemysanity", 'missable': 1, "currentState": 0, "group": 13, 'location_id': 60937},
 
     #Part 2
-    "Bhashea High Road - Enemysanity - Man Trap #4" : {"level" : "Bhashea High Road","RAMAddress" : "80225a48", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 6, 'location_id': 60033},
+    "Bhashea High Road - Enemysanity - Man Trap #6" : {"level" : "Bhashea High Road","RAMAddress" : "80225a48", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 6, 'location_id': 60033},
     "Bhashea High Road - Enemysanity - Porcupig #6" : {"level" : "Bhashea High Road","RAMAddress" : "80225608", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 6, 'location_id': 60034},
     "Bhashea High Road - Enemysanity - Kendarie Soldier #1" : {"level" : "Bhashea High Road","RAMAddress" : "80225d78", "type" : "Enemysanity", 'missable': 1, "currentState": 0, "group": 8, 'location_id': 60035},
     "Bhashea High Road - Enemysanity - Aggressor GL2 #1" : {"level" : "Bhashea High Road","RAMAddress" : "802240c8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 7, 'location_id': 60036},
@@ -705,10 +708,10 @@ lost_kingdoms_2_enemies = {
     "Bhashea High Road - Enemysanity - Aggressor GL2 #3" : {"level" : "Bhashea High Road","RAMAddress" : "80224a58", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 10, 'location_id': 60041},
 
     #Requires Flight or Jump
-    "Bhashea High Road - Enemysanity - Man Trap #5" : {"level" : "Bhashea High Road","RAMAddress" : "80225828", "type" : "Enemysanity", 'missable': 0, 'rule': "jump_or_flight_or_unicorn", "currentState": 0, "group": 11, 'location_id': 60042},
+    "Bhashea High Road - Enemysanity - Man Trap #7" : {"level" : "Bhashea High Road","RAMAddress" : "80225828", "type" : "Enemysanity", 'missable': 0, 'rule': "jump_or_flight_or_unicorn", "currentState": 0, "group": 11, 'location_id': 60042},
     "Bhashea High Road - Enemysanity - Storm Hagan #3" : {"level" : "Bhashea High Road","RAMAddress" : "80225938", "type" : "Enemysanity", 'missable': 0, 'rule': "jump_or_flight_or_unicorn", "currentState": 0, "group": 11, 'location_id': 60043},
     "Bhashea High Road - Enemysanity - Chaos Knight #1" : {"level" : "Bhashea High Road","RAMAddress" : "80223ea8", "type" : "Enemysanity", 'missable': 0, 'rule': "jump_or_flight_or_unicorn", "currentState": 0, "group": 12, 'location_id': 60044},
-    "Bhashea High Road - Enemysanity - Man Trap #6" : {"level" : "Bhashea High Road","RAMAddress" : "80224e98", "type" : "Enemysanity", 'missable': 0, 'rule': "jump_or_flight_or_unicorn", "currentState": 0, "group": 12, 'location_id': 60045},
+    "Bhashea High Road - Enemysanity - Man Trap #8" : {"level" : "Bhashea High Road","RAMAddress" : "80224e98", "type" : "Enemysanity", 'missable': 0, 'rule': "jump_or_flight_or_unicorn", "currentState": 0, "group": 12, 'location_id': 60045},
     "Bhashea High Road - Enemysanity - Storm Hagan #4" : {"level" : "Bhashea High Road","RAMAddress" : "80225718", "type" : "Enemysanity", 'missable': 0, 'rule': "jump_or_flight_or_unicorn", "currentState": 0, "group": 12, 'location_id': 60046},
 
     "Kendarie Fortress - Enemysanity - Mandragora #1" : {"level" : "Kendarie Fortress","RAMAddress" : "80224728", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 1, 'location_id': 60047},
@@ -722,7 +725,11 @@ lost_kingdoms_2_enemies = {
     "Kendarie Fortress - Enemysanity - Aggressor GL2 #6" : {"level" : "Kendarie Fortress","RAMAddress" : "802262c8", "type" : "Enemysanity", 'missable': 0, 'rule': "blue_and_red", "currentState": 0, "group": 6, 'location_id': 60055},
     "Kendarie Fortress - Enemysanity - Aggressor GL2 #7" : {"level" : "Kendarie Fortress","RAMAddress" : "802263d8", "type" : "Enemysanity", 'missable': 0, 'rule': "blue_and_red", "currentState": 0, "group": 7, 'location_id': 60056},
     "Kendarie Fortress - Enemysanity - Aggressor GL2 #8" : {"level" : "Kendarie Fortress","RAMAddress" : "802261b8", "type" : "Enemysanity", 'missable': 0, 'rule': "blue_and_red", "currentState": 0, "group": 8, 'location_id': 60057},
-    #"Kendarie Fortress - Enemysanity - Kendarie Soldier #1" : {"level" : "Kendarie Fortress","RAMAddress" : "802241d8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 9},
+    "Kendarie Fortress - Enemysanity - Kendarie Soldier #1" : {"level" : "Kendarie Fortress","RAMAddress" : "80223ea8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 9, 'location_id': 60961},
+    "Kendarie Fortress - Enemysanity - Kendarie Soldier #2" : {"level" : "Kendarie Fortress","RAMAddress" : "802240c8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 10, 'location_id': 60962},
+    "Kendarie Fortress - Enemysanity - Kendarie Soldier #3" : {"level" : "Kendarie Fortress","RAMAddress" : "802241d8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 11, 'location_id': 60963},
+    "Kendarie Fortress - Enemysanity - Kendarie Soldier #4" : {"level" : "Kendarie Fortress","RAMAddress" : "80223fb8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 12, 'location_id': 60964},
+
 
     "Runestone Caverns - Upper Chambers - Enemysanity - Land Shark #1" : {"level" : "Runestone Caverns - Upper Chambers","RAMAddress" : "80224948", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 2, 'location_id': 60058},
     "Runestone Caverns - Upper Chambers - Enemysanity - Land Shark #2" : {"level" : "Runestone Caverns - Upper Chambers","RAMAddress" : "80224a58", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 2, 'location_id': 60059},
@@ -826,6 +833,8 @@ lost_kingdoms_2_enemies = {
     "Ruldo Forest - Enemysanity - Demon Hound #9" : {"level" : "Ruldo Forest","RAMAddress" : "802253e8", "type" : "Enemysanity", 'missable': 1, "currentState": 0, "group": 13, 'location_id': 60148},
     "Ruldo Forest - Enemysanity - Demon Hound #10" : {"level" : "Ruldo Forest","RAMAddress" : "802254f8", "type" : "Enemysanity", 'missable': 1, "currentState": 0, "group": 13, 'location_id': 60149},
     "Ruldo Forest - Enemysanity - Elf #8" : {"level" : "Ruldo Forest","RAMAddress" : "80225608", "type" : "Enemysanity", 'missable': 1, "currentState": 0, "group": 13, 'location_id': 60150},
+    "Ruldo Forest - Enemysanity - Stranger #1" : {"level" : "Ruldo Forest","RAMAddress" : "80223ea8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 15, 'location_id': 60946},
+
 
     "Ruldo Forest - Enemysanity - Cockatrice #1" : {"level" : "Ruldo Forest","RAMAddress" : "80223fb8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 10, 'location_id': 60151},
     "Ruldo Forest - Enemysanity - Cockatrice #2" : {"level" : "Ruldo Forest","RAMAddress" : "802240c8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 10, 'location_id': 60152},
@@ -841,6 +850,20 @@ lost_kingdoms_2_enemies = {
     "Ruldo Forest - Enemysanity - Myconid #4" : {"level" : "Ruldo Forest","RAMAddress" : "80225c68", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 7, 'location_id': 60161},
     "Ruldo Forest - Enemysanity - Mandra Dancer #3" : {"level" : "Ruldo Forest","RAMAddress" : "80224b68", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 9, 'location_id': 60162},
     "Ruldo Forest - Enemysanity - Elf #7" : {"level" : "Ruldo Forest","RAMAddress" : "802261b8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 9, 'location_id': 60163},
+
+    "Sacred Battle Arena 1 - Enemysanity - Stranger #1" : {"level" : "Sacred Battle Arena 1","RAMAddress" : "802242e8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 1, 'location_id': 60947},
+    "Sacred Battle Arena 1 - Enemysanity - Kraken #1" : {"level" : "Sacred Battle Arena 1","RAMAddress" : "802241d8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 2, 'location_id': 60950},
+    "Sacred Battle Arena 1 - Enemysanity - Lich #1" : {"level" : "Sacred Battle Arena 1","RAMAddress" : "802240c8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 3, 'location_id': 60951},
+    "Sacred Battle Arena 1 - Enemysanity - Nueh #1" : {"level" : "Sacred Battle Arena 1","RAMAddress" : "80223ea8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 4, 'location_id': 60952},
+    "Sacred Battle Arena 1 - Enemysanity - Gemini #1" : {"level" : "Sacred Battle Arena 1","RAMAddress" : "80223fb8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 5, 'location_id': 60953},
+    "Sacred Battle Arena 1 - Enemysanity - Kendarie Soldier #1" : {"level" : "Sacred Battle Arena 1","RAMAddress" : "802243f8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 6, 'location_id': 60954},
+
+    "Sacred Battle Arena 2 - Enemysanity - Rabandos #1" : {"level" : "Sacred Battle Arena 2","RAMAddress" : "80223ea8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 1, 'location_id': 60955},
+    "Sacred Battle Arena 2 - Enemysanity - Helena #1" : {"level" : "Sacred Battle Arena 2","RAMAddress" : "80223fb8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 2, 'location_id': 60956},
+    "Sacred Battle Arena 2 - Enemysanity - AstroBot #1" : {"level" : "Sacred Battle Arena 2","RAMAddress" : "802240c8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 3, 'location_id': 60957},
+    "Sacred Battle Arena 2 - Enemysanity - Leod VIII #1" : {"level" : "Sacred Battle Arena 2","RAMAddress" : "802241d8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 4, 'location_id': 60958, 'rule': "reach_royal_upper"},
+    "Sacred Battle Arena 2 - Enemysanity - Thalnos #1" : {"level" : "Sacred Battle Arena 2","RAMAddress" : "802242e8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 5, 'location_id': 60959, 'rule': "reach_royal_upper"},
+    "Sacred Battle Arena 2 - Enemysanity - Katia #1" : {"level" : "Sacred Battle Arena 2","RAMAddress" : "802243f8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 6, 'location_id': 60960, 'rule': "reach_royal_upper"},
 
     "Fossil Boneyard - Enemysanity - Baby Dragon #1" : {"level" : "Fossil Boneyard","RAMAddress" : "80223ea8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 1, 'location_id': 60164},
     "Fossil Boneyard - Enemysanity - Caterpoker #1" : {"level" : "Fossil Boneyard","RAMAddress" : "80224e98", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 2, 'location_id': 60165},
@@ -868,12 +891,18 @@ lost_kingdoms_2_enemies = {
     "Fossil Boneyard - Enemysanity - Baby Dragon #9" : {"level" : "Fossil Boneyard","RAMAddress" : "80224728", "type" : "Enemysanity", 'missable': 0, 'rule': "jump_and_boosters", "currentState": 0, "group": 18, 'location_id': 60186},
     "Fossil Boneyard - Enemysanity - Amber Dragon #1" : {"level" : "Fossil Boneyard","RAMAddress" : "80224a58", "type" : "Enemysanity", 'missable': 0, 'rule': "jump_and_boosters", "currentState": 0, "group": 14, 'location_id': 60187},
     "Fossil Boneyard - Enemysanity - Gnome #5" : {"level" : "Fossil Boneyard","RAMAddress" : "80225d78", "type" : "Enemysanity", 'missable': 1, 'rule': "jump_and_boosters", "currentState": 0, "group": 11, 'location_id': 60188},
+    "Fossil Boneyard - Enemysanity - Stranger #1" : {"level" : "Fossil Boneyard","RAMAddress" : "80224838", "type" : "Enemysanity", 'missable': 0, 'rule': "jump_and_boosters", "currentState": 0, "group": 20, 'location_id': 60948},
+
 
     "Fossil Boneyard - Enemysanity - Caterpoker #10" : {"level" : "Fossil Boneyard","RAMAddress" : "80225f98", "type" : "Enemysanity", 'missable': 0, 'rule': "jump_boost_flight", "currentState": 0, "group": 11, 'location_id': 60189},
 
     #Requires Hell Hound
     "Fossil Boneyard - Enemysanity - Gnome #6" : {"level" : "Fossil Boneyard","RAMAddress" : "80225608", "type" : "Enemysanity", 'missable': 0, 'rule': "hellhound_or_unicorn_and_booster_and_jumper", "currentState": 0, "group": 12, 'location_id': 60190},
     "Fossil Boneyard - Enemysanity - Catoblepas #3" : {"level" : "Fossil Boneyard","RAMAddress" : "80225e88", "type" : "Enemysanity", 'missable': 0, 'rule': "hellhound_or_unicorn_and_booster_and_jumper", "currentState": 0, "group": 19, 'location_id': 60191},
+
+    #Requires all fossils
+    "Fossil Boneyard - Enemysanity - Zombie Dragon #1" : {"level" : "Fossil Boneyard","RAMAddress" : "80224948", "type" : "Enemysanity", 'missable': 0, 'rule': "zombie_dragon", "currentState": 0, "group": 21, 'location_id': 60967},
+
 
     "Sarvan - Enemysanity - Evil Eye #1" : {"level" : "Sarvan","RAMAddress" : "80224618", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 1, 'location_id': 60192},
     "Sarvan - Enemysanity - Jade Giant #1" : {"level" : "Sarvan","RAMAddress" : "802242e8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 2, 'location_id': 60193},
@@ -899,6 +928,12 @@ lost_kingdoms_2_enemies = {
     "Sarvan - Enemysanity - Jade Giant #10" : {"level" : "Sarvan","RAMAddress" : "80225b58", "type" : "Enemysanity", 'missable': 1, "currentState": 0, "group": 10, 'location_id': 60212},
     "Sarvan - Enemysanity - Gold Butterfly #3" : {"level" : "Sarvan","RAMAddress" : "80225a48", "type" : "Enemysanity", 'missable': 1, "currentState": 0, "group": 10, 'location_id': 60213},
     "Sarvan - Enemysanity - Siren #4" : {"level" : "Sarvan","RAMAddress" : "80225938", "type" : "Enemysanity", 'missable': 1, "currentState": 0, "group": 10, 'location_id': 60214},
+
+    "Sarvan - Enemysanity - Evil Eye #6" : {"level" : "Sarvan","RAMAddress" : "80224d88", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 12, 'location_id': 60938},
+    "Sarvan - Enemysanity - Evil Eye #7" : {"level" : "Sarvan","RAMAddress" : "80224c78", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 12, 'location_id': 60939},
+    "Sarvan - Enemysanity - Jade Giant #11" : {"level" : "Sarvan","RAMAddress" : "80224838", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 13, 'location_id': 60940},
+    "Sarvan - Enemysanity - Jade Giant #12" : {"level" : "Sarvan","RAMAddress" : "80224948", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 13, 'location_id': 60941},
+    "Sarvan - Enemysanity - Gold Butterfly #4" : {"level" : "Sarvan","RAMAddress" : "80224728", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 13, 'location_id': 60942},
 
     "Holzogh Town - Enemysanity - Aggressor DX5 #1" : {"level" : "Holzogh Town","RAMAddress" : "80224948", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 7, 'location_id': 60215},
     "Holzogh Town - Enemysanity - Aggressor DX5 #2" : {"level" : "Holzogh Town","RAMAddress" : "80224838", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 7, 'location_id': 60216},
@@ -941,6 +976,7 @@ lost_kingdoms_2_enemies = {
     "Plains of Rowahl - Enemysanity - Sand Golem #6" : {"level" : "Plains of Rowahl","RAMAddress" : "80225828", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 6, 'location_id': 60251},
     "Plains of Rowahl - Enemysanity - Devil Plant #10" : {"level" : "Plains of Rowahl","RAMAddress" : "80225938", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 6, 'location_id': 60252},
     "Plains of Rowahl - Enemysanity - Devil Plant #11" : {"level" : "Plains of Rowahl","RAMAddress" : "80225a48", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 6, 'location_id': 60253},
+    "Plains of Rowahl - Enemysanity - Kendarie Soldier" : {"level" : "Plains of Rowahl","RAMAddress" : "802250b8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 13, 'location_id': 60965},
 
     #Requires Gate Key
     "Plains of Rowahl - Enemysanity - Devil Plant #12" : {"level" : "Plains of Rowahl","RAMAddress" : "802260a8", "type" : "Enemysanity", 'missable': 0, 'rule': "castle_gate", "currentState": 0, "group": 8, 'location_id': 60254},
@@ -952,6 +988,7 @@ lost_kingdoms_2_enemies = {
     "Plains of Rowahl - Enemysanity - Manticore #1" : {"level" : "Plains of Rowahl","RAMAddress" : "80224d88", "type" : "Enemysanity", 'missable': 0, 'rule': "castle_gate", "currentState": 0, "group": 2, 'location_id': 60260},
     "Plains of Rowahl - Enemysanity - Devil Plant #8" : {"level" : "Plains of Rowahl","RAMAddress" : "80224e98", "type" : "Enemysanity", 'missable': 0, 'rule': "castle_gate", "currentState": 0, "group": 2, 'location_id': 60261},
     "Plains of Rowahl - Enemysanity - Devil Plant #9" : {"level" : "Plains of Rowahl","RAMAddress" : "80224fa8", "type" : "Enemysanity", 'missable': 0, 'rule': "castle_gate", "currentState": 0, "group": 2, 'location_id': 60262},
+    "Plains of Rowahl - Enemysanity - Stranger #1" : {"level" : "Plains of Rowahl","RAMAddress" : "80223ea8", "type" : "Enemysanity", 'missable': 0,'rule': "castle_gate", "currentState": 0, "group": 12, 'location_id': 60949},
 
     #Requires jewel of Alanjah
     "Plains of Rowahl - Enemysanity - Sand Golem #10" : {"level" : "Plains of Rowahl","RAMAddress" : "80225608", "type" : "Enemysanity", 'missable': 0, 'rule': "jewel_and_gate", "currentState": 0, "group": 11, 'location_id': 60263},
@@ -1119,7 +1156,7 @@ lost_kingdoms_2_enemies = {
     "Bhashea Castle - Enemysanity - Stone Head #8" : {"level" : "Bhashea Castle","RAMAddress" : "80225718", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 15, 'location_id': 60413},
     "Bhashea Castle - Enemysanity - Dark Elf #8" : {"level" : "Bhashea Castle","RAMAddress" : "80224b68", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 15, 'location_id': 60414},
     "Bhashea Castle - Enemysanity - Dark Elf #9" : {"level" : "Bhashea Castle","RAMAddress" : "80224c78", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 15, 'location_id': 60415},
-
+    "Bhashea Castle - Enemysanity - Steel Skeleton #1" : {"level" : "Bhashea Castle","RAMAddress" : "80226e78", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 18, 'location_id': 60966},
 
     #Requires all 4 blades
     "Bhashea Castle - Enemysanity - Death #10" : {"level" : "Bhashea Castle","RAMAddress" : "802254f8", "type" : "Enemysanity", 'missable': 1, 'rule': "all_blades", "currentState": 0, "group": 17, 'location_id': 60416},
@@ -1133,6 +1170,7 @@ lost_kingdoms_2_enemies = {
     "Isamat Urbur - Enemysanity - Puppet Master #1" : {"level" : "Isamat Urbur","RAMAddress" : "802240c8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 1, 'location_id': 60421},
     "Isamat Urbur - Enemysanity - Devata #1" : {"level" : "Isamat Urbur","RAMAddress" : "802241d8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 1, 'location_id': 60422},
     "Isamat Urbur - Enemysanity - Devata #2" : {"level" : "Isamat Urbur","RAMAddress" : "802242e8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 1, 'location_id': 60423},
+    "Isamat Urbur - Enemysanity - Stranger #1" : {"level" : "Isamat Urbur","RAMAddress" : "802243f8", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 10, 'location_id': 60944},
 
     #Requires all runestones
     "Isamat Urbur - Enemysanity - Puppet Master #2" : {"level" : "Isamat Urbur","RAMAddress" : "80224838", "type" : "Enemysanity", 'missable': 0, 'rule': "all_runestones", "currentState": 0, "group": 2, 'location_id': 60424},
@@ -1187,6 +1225,8 @@ lost_kingdoms_2_enemies = {
     "Gromtull Desert - Enemysanity - Mummy #11" : {"level" : "Gromtull Desert","RAMAddress" : "802261b8", "type" : "Enemysanity", 'missable': 0, 'rule': "black_liquid_only", "currentState": 0, "group": 15, 'location_id': 60470},
     "Gromtull Desert - Enemysanity - Sand Beetle #6" : {"level" : "Gromtull Desert","RAMAddress" : "80224b68", "type" : "Enemysanity", 'missable': 0, 'rule': "black_liquid_only", "currentState": 0, "group": 16, 'location_id': 60471},
     "Gromtull Desert - Enemysanity - Pixie #3" : {"level" : "Gromtull Desert","RAMAddress" : "802254f8", "type" : "Enemysanity", 'missable': 0, 'rule': "black_liquid_only", "currentState": 0, "group": 16, 'location_id': 60472},
+    "Gromtull Desert - Enemysanity - Stranger #1" : {"level" : "Gromtull Desert","RAMAddress" : "80226708", "type" : "Enemysanity", 'missable': 0, "currentState": 0, 'rule': "black_liquid_logic", "group": 17, 'location_id': 60945},
+
 
     "Obenoix Gorge - Enemysanity - Vodianoi #1" : {"level" : "Obenoix Gorge","RAMAddress" : "80224508", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 1, 'location_id': 60473},
     "Obenoix Gorge - Enemysanity - Vodianoi #2" : {"level" : "Obenoix Gorge","RAMAddress" : "80224618", "type" : "Enemysanity", 'missable': 0, "currentState": 0, "group": 1, 'location_id': 60474},
@@ -1737,7 +1777,7 @@ lost_kingdoms_2_enemysanity_light = {
     "Enemysanity - Gold Butterfly" : {"type" : "Enemysanity Light", 'missable': 0, "currentState": 0, 'location_id': 70052, 'proving_grounds': False, 'level': ["Sarvan", "Proving Grounds F10"]},
     "Enemysanity - Ghoul" : {"type" : "Enemysanity Light", 'missable': 0, "currentState": 0, 'location_id': 70053, 'proving_grounds': True, 'level': "Proving Grounds F11"},
     "Enemysanity - Treant" : {"type" : "Enemysanity Light", 'missable': 0, "currentState": 0, 'location_id': 70054, 'proving_grounds': True, 'level': "Proving Grounds F2"},
-    "Enemysanity - Nueh" : {"type" : "Enemysanity Light", 'missable': 0, "currentState": 0, 'location_id': 70055, 'proving_grounds': False, 'level': ["Sacred Battle Arena 1", "Proving Grounds F19"],'rule': "wood_proficiency"},
+    "Enemysanity - Nueh" : {"type" : "Enemysanity Light", 'missable': 0, "currentState": 0, 'location_id': 70055, 'proving_grounds': False, 'level': ["Sacred Battle Arena 1", "Proving Grounds F19"]},
     "Enemysanity - Sea Monk" : {"type" : "Enemysanity Light", 'missable': 0, "currentState": 0, 'location_id': 70056, 'proving_grounds': True, 'level': "Proving Grounds F13"},
     "Enemysanity - Crystal Rose" : {"type" : "Enemysanity Light", 'missable': 0, "currentState": 0, 'location_id': 70057, 'proving_grounds': False, 'level': "Runestone Caverns - Upper Chambers"},
     "Enemysanity - Dark Raven" : {"type" : "Enemysanity Light", 'missable': 0, "currentState": 0, 'location_id': 70058, 'proving_grounds': False, 'level': "Nobleman's Residence"},
@@ -1873,13 +1913,18 @@ lost_kingdoms_2_enemysanity_light = {
     "Enemysanity - Aggressor DX5" : {"type" : "Enemysanity Light", 'missable': 0, "currentState": 0, 'location_id': 70189, 'proving_grounds': False, 'level': ["Holzogh Town", "Royal Tower, Middle", "Royal Tower, Lower"], 'rule': "god"},
     "Enemysanity - MechLance 5L" : {"type" : "Enemysanity Light", 'missable': 0, "currentState": 0, 'location_id': 70190, 'proving_grounds': False, 'level': "Alanjeh Castle"},
     "Enemysanity - Claws-R-Us" : {"type" : "Enemysanity Light", 'missable': 0, "currentState": 0, 'location_id': 70191, 'proving_grounds': False, 'level': "Alanjeh Castle"},
-    "Enemysanity - TriBlaster" : {"type" : "Enemysanity Light", 'missable': 0, "currentState": 0, 'location_id': 70192, 'proving_grounds': False, 'level': ["Holzogh Town"]},
+    "Enemysanity - TriBlaster" : {"type" : "Enemysanity Light", 'missable': 0, "currentState": 0, 'location_id': 70192, 'proving_grounds': False, 'level': "Holzogh Town"},
     "Enemysanity - LazerBug 39K" : {"type" : "Enemysanity Light", 'missable': 0, "currentState": 0, 'location_id': 70193, 'proving_grounds': False, 'level': ["Holzogh Town", "Royal Tower, Lower"]},
     "Enemysanity - AstroBot" : {"type" : "Enemysanity Light", 'missable': 0, "currentState": 0, 'location_id': 70194, 'proving_grounds': False, 'level': "Sacred Battle Arena 2"},
     "Enemysanity - AcidBot" : {"type" : "Enemysanity Light", 'missable': 0, "currentState": 0, 'location_id': 70195, 'proving_grounds': False, 'level': "Alanjeh Castle"},
     "Enemysanity - God of Harmony" : {"type" : "Enemysanity Light", 'missable': 0, "currentState": 0, 'location_id': 70196, 'proving_grounds': False, 'level': "Royal Tower, Upper"},
     "Enemysanity - Kendarie Soldier" : {"type" : "Enemysanity Light", 'missable': 0, "currentState": 0, 'location_id': 70197, 'proving_grounds': False, 'level': "Bhashea High Road"},
     "Enemysanity - Leod VIII" : {"type" : "Enemysanity Light", 'missable': 0, "currentState": 0, 'location_id': 70198, 'proving_grounds': False, 'level': "Royal Tower, Middle"},
+    "Enemysanity - Helena" : {"type" : "Enemysanity Light", 'missable': 0, "currentState": 0, 'location_id': 70199, 'proving_grounds': False, 'level': "Sacred Battle Arena 2"},
+    "Enemysanity - Thalnos" : {"type" : "Enemysanity Light", 'missable': 0, "currentState": 0, 'location_id': 70200, 'proving_grounds': False, 'level': "Sacred Battle Arena 2"},
+    "Enemysanity - Katia" : {"type" : "Enemysanity Light", 'missable': 0, "currentState": 0, 'location_id': 70201, 'proving_grounds': False, 'level': "Sacred Battle Arena 2"},
+    "Enemysanity - Stranger" : {"type" : "Enemysanity Light", 'missable': 0, "currentState": 0, 'location_id': 70202, 'proving_grounds': False, 'level': ["Nobleman's Residence","Isamat Urbur","Gromtull Desert","Ruldo Forest","Sacred Battle Arena 1","Fossil Boneyard","Plains of Rowahl"]},
+
 }
 
 magic_boosters_location = {'level': 'Ruldo Forest', 'cardName': '', 'isoAddress': '', 'missable': 0,'RAMAddress': '8025dd90', 'type': 'Magic Boosters', 'bitOffset': 3, 'location_id': 80001}

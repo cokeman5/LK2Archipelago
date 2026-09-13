@@ -852,8 +852,16 @@ def get_enemy_species(RAMAddress: str) -> str:
             return "Leod VIII"
         case 0x00f0:
             return "Body of the God"
-        case 0x0120:
+        case 0x0120 | 0x011e:
             return "Kendarie Soldier"
+        case 0x0112 | 0x0113 | 0x0111 | 0x010d | 0x0110 | 0x010f | 0x010e:
+            return "Stranger"
+        case 0x0101:
+            return "Helena"
+        case 0x0102:
+            return "Thalnos"
+        case 0x0100:
+            return "Katia"
 
     for card in lost_kingdoms_2_cards:
         if hex_code_of_enemy == int(lost_kingdoms_2_cards[card]["hexCode"].lower(), 16):
