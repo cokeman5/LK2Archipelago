@@ -754,6 +754,10 @@ def _apply_mechanics(patcher: ISOPatcher, output_data: dict, cardback_gtx: bytes
         "randomize_upgrade_xp_costs", "randomize_upgrade_xp_costs_min",
         "randomize_upgrade_xp_costs_max", "upgrade_xp_cost_multiplier")
 
+    if output_data.get("randomize_upgrades", 0):
+        from .Patch_Mechanics import mechanic_randomize_upgrades
+        mechanic_randomize_upgrades.apply(patcher, output_data,output_data.get("randomize_upgrades"))
+
     if output_data.get("randomize_starting_deck", 0):
         from .Patch_Mechanics import mechanic_randomize_starting_deck
         mechanic_randomize_starting_deck.apply(patcher, output_data)

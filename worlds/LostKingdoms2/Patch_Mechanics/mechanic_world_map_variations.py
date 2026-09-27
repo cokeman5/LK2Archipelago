@@ -310,6 +310,48 @@ LEVEL_COMPLETION_VALUES = {
     2: (0, 2, 3),   # Bhashea High Road: part 1 unbeaten, part 1 beaten, part 2
 }
 
+# Entries that load a DIFFERENT level from the one whose node they sit under.
+#
+# Royal Tower, Lower is two levels in one: a cutscene halfway through hands off
+# from level 12 to level 18. So its second entry has to load 18, while
+# everything else about the entry - when it unlocks, whose progress it writes,
+# which record the map-visible test reads - still belongs to 12.
+#
+# That split is why the node carries the level TWICE. node[1] is the level the
+# game loads, and node[13] is the level this mechanic accounts against; they
+# differ only for the entries listed here. Reading node[13] in the stubs costs
+# nothing over reading node[1], and keeping the progress on 12 is what stops
+# the second entry from deadlocking: keyed to 18 it would need level 18 beaten
+# before it would appear, and 18 can only be reached through it.
+#
+#     level id -> {entry number: level id to load instead}
+LEVEL_LOAD_OVERRIDES = {
+    12: {2: 18},    # Royal Tower, Lower part 2 is level 18
+}
+
+# A level reached only through an override needs its own completion flag set
+# on the way in, because the handoff reads it. Entering Royal Tower, Lower
+# part 1 must clear level 18's flag - the cutscene that hands over mid-level
+# places the player using it, and a stale 1 puts them in the wrong spot - and
+# entering part 2 must set it.
+#
+# The value written is node[12], the same byte the entry writes for its own
+# level, which works because 0 and 1 are exactly what is wanted here. The
+# assert below keeps that true: a level with more than two parts would carry
+# values like 2 and 3, which are not valid completion flags for a second
+# level.
+SECONDARY_COMPLETION_LEVELS = {
+    level: sorted({target for target in overrides.values()})[0]
+    for level, overrides in LEVEL_LOAD_OVERRIDES.items()
+}
+assert all(
+    LEVEL_COMPLETION_VALUES.get(level, DEFAULT_COMPLETION_VALUES) == (0, 1)
+    for level in SECONDARY_COMPLETION_LEVELS
+), (
+    "a level with a load override must use the default (0, 1) completion "
+    "values, because those double as the flag written to the override target"
+)
+
 # The progress table spans more than one record, so one record's +2 byte falls
 # inside it, and the game's map-reset loop masks every such byte with 0xDF.
 # That clears bit 5 only, so any value below 0x20 survives untouched. No
@@ -424,16 +466,23 @@ def apply(patcher, output_data=None):
         entries = b""
         for number, (layout, completion_value) in enumerate(
                 zip(layouts, values), start=1):
+            load_level = LEVEL_LOAD_OVERRIDES.get(level_id, {}).get(number, level_id)
             entries += struct.pack(
                 ">BBHHHHHBBBB",
-                NODE_TYPE_LEAF, level_id, icon_id,
+                NODE_TYPE_LEAF, load_level, icon_id,
                 layout["x"], layout["y"], layout["w"], layout["h"],
                 # +12 carries the completion value this entry writes. Vanilla
                 # submenu leaves hold 0 here and nothing reads it on a leaf,
                 # so it is ours to use - and keeping it per-node means the
                 # stub needs no table lookup.
                 completion_value,
-                0, 0, number,
+                # +13 is the level this entry is ACCOUNTED against, which is
+                # not always the one it loads - see LEVEL_LOAD_OVERRIDES.
+                level_id,
+                # +14 is a second level whose completion flag this entry also
+                # writes, or 0 - see SECONDARY_COMPLETION_LEVELS.
+                SECONDARY_COMPLETION_LEVELS.get(level_id, 0),
+                number,
             )
         entries += bytes([LIST_TERMINATOR]) + b"\x00" * (NODE_SIZE - 1)
 
@@ -489,14 +538,23 @@ def _extend_submenu(patcher, slot, table_address):
                 f"configured for it"
             )
 
+            level_id = node[1]
+            overrides = LEVEL_LOAD_OVERRIDES.get(level_id, {})
+
             first = bytearray(node)
             first[12] = values[0]      # the value this entry writes on entry
+            first[13] = level_id       # the level it is accounted against
+            first[14] = SECONDARY_COMPLETION_LEVELS.get(level_id, 0)
             first[15] = 1
+            first[1] = overrides.get(1, level_id)
             rebuilt += bytes(first)
 
             second = bytearray(node)
             second[12] = values[1]
+            second[13] = level_id
+            second[14] = SECONDARY_COMPLETION_LEVELS.get(level_id, 0)
             second[15] = 2
+            second[1] = overrides.get(2, level_id)
             y = struct.unpack_from(">H", node, 6)[0] + DUPLICATE_Y_OFFSET
             struct.pack_into(">H", second, 6, y)
             rebuilt += bytes(second)
@@ -886,12 +944,23 @@ def _emit_completion_flag_stub(patcher):
         # variation number instead would assume "beaten == 1", which is wrong
         # for any level with more than one part.
         _lbz(6, 12, 5),
-        _lbz(7, 1, 5),                 # level id
+        _lbz(7, 13, 5),                # the level this entry is accounted
+                               # against - node[1] is the level it
+                               # LOADS, which can differ
         _rlwinm(7, 7, 6, 0, 25),       # * 0x40, the record stride
         _lis(8, (LEVEL_RECORD_BASE >> 16) & 0xFFFF),
         _ori(8, 8, LEVEL_RECORD_BASE & 0xFFFF),
         _add(7, 8, 7),
         _stb(6, 0, 7),                 # completion flag = the chosen state
+
+        # A second level's flag, when this entry has one. r8 still holds the
+        # record base and r6 the value, so this costs six instructions.
+        _lbz(7, 14, 5),
+        _cmpwi(7, 0),
+        ("beq", "prompt"),             # no secondary level
+        _rlwinm(7, 7, 6, 0, 25),       # * 0x40
+        _add(7, 8, 7),
+        _stb(6, 0, 7),
 
         ("label", "prompt"),
         ("bl", INIT_DIALOGUE_BOX_MESSAGE),   # the call we replaced
@@ -941,7 +1010,7 @@ def _emit_visibility_stubs(patcher):
     # replaced and the node kept in r8. r0/r3-r8 are all scratch this early.
     leaf = [
         _mr(8, 3),                      # keep the node pointer
-        _lbz(4, 1, 3),                  # level id
+        _lbz(4, 13, 3),                 # accounted-against level, not node[1]
         _lbz(5, 15, 3),                 # variation number; 0 on vanilla nodes
         _lis(0, (LEVEL_RECORD_BASE >> 16) & 0xFFFF),
         _ori(0, 0, LEVEL_RECORD_BASE & 0xFFFF),
@@ -995,7 +1064,7 @@ def _emit_visibility_stubs(patcher):
         _cmpwi(4, 0),
         ("beq", "shown"),               # a vanilla node
 
-        _lbz(4, 1, 5),                  # level id
+        _lbz(4, 13, 5),                 # accounted-against level, not node[1]
     ] + _progress_address(4, 6) + [
         _lbz(7, 0, 6),                  # progress reached
         _lbz(4, 12, 5),                 # the value this entry requires

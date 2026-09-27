@@ -3,6 +3,7 @@ import hashlib
 import sys
 import time
 import traceback
+from collections import Counter
 from typing import TYPE_CHECKING, Any
 from unittest import case
 
@@ -64,11 +65,15 @@ SHOP_MENU_ADDRESS = 0x80275c58
 LEVEL_ID_ADDRESS = 0x80209262
 CURR_HEALTH_ADDR = 0x80223c98
 CARDS_LOADED = 0x80732bd4
+BONUS_REWARD_SCREEN_STATE = 0x802b016c
+current_bonus_reward_state = 10
 
 God_of_Harmony_Health_ADDRESS = 0x80223eb8
 God_of_Harmony_ID_ADDRESS = 0x80223e54 # = 2149813784
 Emperor_ID_ADDRESS = 0x80223f64 # = 80238e18
 Emperor_Status = 0
+
+
 
 STORAGE_ADDRESSES = {
     'item_index':                    {'address': 0x8025ed50, 'size': 2},
@@ -639,6 +644,9 @@ def modify_default_level_selections():
 def is_level_unlocked(level: str) -> bool:
     return read_memory(int(lost_kingdoms_2_regions[level]["RAMAddress"],16), 1) > 0
 
+def is_level_beaten(level: str) -> bool:
+    return read_memory(int(lost_kingdoms_2_regions[level]["RAMAddress"],16)-2, 1) > 0
+
 def is_in_level() -> bool:
     return read_memory(CURRENT_MENU_ADDR, 1) in (0,2,8,9)
 
@@ -773,12 +781,36 @@ def check_regular_location(ctx: LK2Context, location: str) -> bool:
                                 return check_breakable(location)
                         else:
                             lost_kingdoms_2_breakables[location]["currentState"] = 0
+                case "Bonussanity":
+                    if ctx.slot_data.get("bonussanity", 0):
+                        return check_bonussanity(ctx,location)
+                case "Levelsanity":
+                    if ctx.slot_data.get("levelsanity", 0):
+                        return is_level_beaten(lost_kingdoms_2_locations[location].get("level"))
 
 
 
     #If on the world map, reset any enemysanity states from 1 to 0
     if read_memory(CURRENT_MENU_ADDR,1) == 4 and lost_kingdoms_2_locations[location]["type"] == "Enemysanity" and lost_kingdoms_2_locations[location]["currentState"] == 1:
         lost_kingdoms_2_locations[location]["currentState"] = 0
+    return False
+
+def check_bonussanity(ctx: LK2Context, location) -> bool:
+    global current_bonus_reward_state
+    if current_bonus_reward_state in [8,9]:
+        selection_bitmask = read_memory(0x802b0170, 1)
+        card_ids = []
+        for x in range(6):
+            card_ids.append(read_memory(0x802b0184+2*x, 2))
+
+        card_ids_sorted = Counter(card_ids).most_common()
+        location_index = int(location.split("#")[1]) - 1
+
+        if len(card_ids_sorted) >= location_index+1:
+            for x in range(6):
+                if (selection_bitmask >> x) & 1:
+                    if card_ids_sorted[location_index][0] == card_ids[x]:
+                        return True
     return False
 
 def check_breakable(location):
@@ -1099,6 +1131,8 @@ async def dolphin_sync_task_main_task(ctx: LK2Context):
                         if ctx.slot_data.get("shopsanity", 0) & check_inshop():
                             await track_shop_purchases(ctx)
                         level_modifications(ctx)
+                        global current_bonus_reward_state
+                        current_bonus_reward_state = read_memory(BONUS_REWARD_SCREEN_STATE,1)
                         await check_victory_conditions(ctx)
                         await give_items(ctx)
                         await check_locations(ctx)

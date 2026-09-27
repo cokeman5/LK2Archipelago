@@ -251,40 +251,81 @@ def _slugify(name):
 # testing, then narrow down to the minimal fix before a real release
 # (whole-level exclusion is a safe fallback if a specific slot can't
 # be cleanly identified, at the cost of that level never getting
-# randomized). EXCLUDED_NATIVE_CARD_IDS (below) is a separate,
+# randomized). RESTRICTED_NATIVE_CARD_IDS (below) is a separate,
 # currently-populated exclusion by monster identity rather than by
 # level/slot location.
 EXCLUDED_LEVELS = set()
 EXCLUDED_SLOTS = set()
 
-# EXCLUDED_NATIVE_CARD_IDS: specific monsters (by card_id) hard-mapped
-# to THEMSELVES as their own donor, rather than participating in the
-# normal random donor assignment - they still go through the exact
-# same donor-loading pipeline as every other swap (see apply()'s own
-# comment near where this is used), just always ending up as a no-op
-# in terms of which monster actually appears. Also removed from the
-# general donor pool, so no OTHER slot can be randomized into becoming
-# one of these either.
+# RESTRICTED_NATIVE_CARD_IDS: monsters that cannot take an arbitrary
+# donor, but CAN take one from a known-good shortlist. Gargoyle (0xca),
+# Horus (0xcf) and Black Dragon (0x40) were previously hard-mapped to
+# THEMSELVES - effectively unrandomized - while an issue involving them
+# was investigated. All three are native to s13.pds (Black Dragon also
+# to s68.pds), and s13's five natives form ONE contiguous run, which is
+# what made them delicate: see the note on self-mapping below.
 #
-# NOTE: an earlier version of this fix instead skipped these monsters'
-# own swaps entirely (leaving them truly unswapped/vanilla) - that was
-# WRONG and caused a real crash: native-memory-reuse pools an entire
-# contiguous run's own space together, so a skipped monster's own
-# still-vanilla data could get silently overwritten by a NEIGHBORING
-# swap's donor write within the same run, since the run's own total
-# capacity accounting didn't know to leave that specific slot alone.
-# Self-mapping avoids this entirely, since the donor's own file_offset/
-# size is then IDENTICAL to the native slot's, by construction.
+# They are now randomized again, but only among RESTRICTED_DONOR_POOL -
+# a list confirmed in-game to swap with them without issues. Every
+# member is a flying monster, which is presumably why they are
+# interchangeable where an arbitrary ground monster is not.
 #
-# TEMPORARY - Gargoyle (0xca), Horus (0xcf), and Black Dragon (0x40)
-# excluded while investigating an issue involving them, all three
-# native to s13.pds (Black Dragon is also native to s68.pds - excluded
-# from randomization there too, since exclusion is per-card_id, not
-# per-level).
+# NOTE on why self-mapping was used rather than skipping: an earlier
+# version skipped these monsters' swaps entirely (leaving them truly
+# vanilla) and that caused a real crash. Native-memory-reuse pools an
+# entire contiguous run's space together, so a skipped monster's
+# still-vanilla data could be silently overwritten by a NEIGHBORING
+# swap's donor write within the same run - the run's capacity
+# accounting did not know to leave that slot alone. Any future
+# exclusion must self-map for the same reason, never skip.
+#
 # (Note: 0x4d is "Fire Gargoyle," a DIFFERENT monster native to
 # s27.pds - an earlier version of this set mistakenly used 0x4d
 # instead of the correct 0xca; corrected.)
-EXCLUDED_NATIVE_CARD_IDS = {0xca, 0xcf, 0x40}
+RESTRICTED_NATIVE_CARD_IDS = {0xca, 0xcf, 0x40}
+
+# Donors these three may receive. Confirmed in-game.
+RESTRICTED_DONOR_POOL = {
+    0x2f,  # Flying Ray
+    0x69,  # Larval Fly
+    0x3f,  # Dark Raven
+    0x44,  # Birdman
+    0x5a,  # Golden Phoenix
+    0x65,  # Beelzebub
+    0x40,  # Black Dragon
+    0x34,  # Garuda
+    0xbf,  # Popgun Charlie
+    0x87,  # Acid Cloud
+    0xca,  # Gargoyle
+    0xa1,  # Phooka
+    0xcf,  # Horus
+    0x85,  # Baba Yaga
+}
+
+# These three ARE eligible as donors for ordinary slots - the shortlist
+# constrains only who may REPLACE them, not where they may go. That
+# distinction is what keeps the arithmetic working: NATIVE_SLOTS holds
+# 196 distinct natives and exactly 196 monsters qualify as donors, so
+# the mapping is precisely bijective with no spare donor anywhere.
+# Withholding these three from the general pool would leave 193 donors
+# for 193 general natives AND remove up to three more when the
+# restricted natives drew from the shortlist's other eleven members -
+# generation would fail outright.
+#
+# Nothing is excluded from the donor pool any more, so the old
+# EXCLUDED_NATIVE_CARD_IDS is gone; RESTRICTED_NATIVE_CARD_IDS above
+# now carries the whole meaning.
+
+
+# Thanatos must not be the donor for anything native to Obenoix Gorge.
+# Thanatos is itself one of that level's six natives, so this forbids a
+# self-mapping too.
+#
+# The forbidden natives are read from NATIVE_SLOTS rather than listed
+# here, so the rule follows the database if the level's occupants ever
+# change.
+THANATOS_CARD_ID = 0x07
+THANATOS_FORBIDDEN_LEVEL = "s25.pds"   # Obenoix Gorge
 
 
 def _build_swaps_from_native_slots():
@@ -1179,10 +1220,51 @@ def lo(addr):
 
 
 
+def _reject_thanatos_in_forbidden_level(donor_mapping, rng):
+    """Move Thanatos off any Obenoix Gorge native, in place.
+
+    Repairing afterwards rather than constraining the shuffle keeps
+    build_random_donor_mapping a plain bijection - the mapping is
+    already exactly 1:1 with no spare donor, so a constrained draw
+    could paint itself into a corner and fail outright.
+
+    The repair swaps two natives' donors, which preserves the bijection
+    by construction. The partner is chosen from natives that are
+    themselves neither Obenoix natives (they must not receive Thanatos
+    either) nor restricted (they must keep a shortlist donor), so the
+    swap cannot violate another rule while fixing this one.
+    """
+    forbidden = set(db.NATIVE_SLOTS.get(THANATOS_FORBIDDEN_LEVEL, {}).values())
+    holder = next(
+        (native for native in forbidden
+         if donor_mapping.get(native) == THANATOS_CARD_ID),
+        None,
+    )
+    if holder is None:
+        return
+
+    candidates = sorted(
+        native for native in donor_mapping
+        if native not in forbidden
+        and native not in RESTRICTED_NATIVE_CARD_IDS
+    )
+    if not candidates:
+        raise ValueError(
+            "Thanatos landed on an Obenoix Gorge native and no other slot "
+            "can take it - every remaining native is either an Obenoix "
+            "native or restricted."
+        )
+
+    partner = rng.choice(candidates)
+    donor_mapping[holder], donor_mapping[partner] = (
+        donor_mapping[partner], donor_mapping[holder],
+    )
+
+
 def get_donor_mapping(seed):
     """The single source of truth for random donor assignment - returns
     a {native_card_id: donor_card_id} dict, including Gargoyle/Horus's
-    own self-mapping (see EXCLUDED_NATIVE_CARD_IDS's own comment on
+    own restricted donor pool (see RESTRICTED_NATIVE_CARD_IDS's comment on
     apply(), below, for why they're self-mapped rather than omitted).
 
     apply() itself calls this rather than duplicating this logic inline
@@ -1191,7 +1273,7 @@ def get_donor_mapping(seed):
     mapping the actual ISO patch used, to correctly match randomized
     donor species against live game state) previously reimplemented
     this logic separately by hand, and drifted out of sync with it
-    (missed the EXCLUDED_NATIVE_CARD_IDS filtering on both the donor
+    (missed the RESTRICTED_NATIVE_CARD_IDS filtering on both the donor
     pool AND the native list before the shuffle, which - since the
     shuffle's own result depends on its exact input list - silently
     produced a DIFFERENT mapping than the ISO's own, despite using the
@@ -1204,33 +1286,48 @@ def get_donor_mapping(seed):
     donor_pool_card_ids = sorted(
         cid for cid, m in db.MONSTERS.items()
         if m["native_levels"] and m["sound_id"] is not None
-        and cid not in EXCLUDED_NATIVE_CARD_IDS
     )
     distinct_native_card_ids = sorted(set(swap["native_card_id"] for swap in SWAPS))
 
-    # EXCLUDED_NATIVE_CARD_IDS (Gargoyle/Horus, temporary - see its own
-    # comment above) are hard-mapped to THEMSELVES as their own donor,
-    # rather than skipped out of SWAPS entirely - they still go through
-    # the exact same donor-loading pipeline (HOOK1/HOOK2, native-
-    # memory-reuse, run pooling) as every other swap, just with
-    # donor_card_id == native_card_id, a no-op in terms of which
-    # monster actually appears. This is deliberately NOT the same as
-    # skipping their own swap: an earlier version of this fix did skip
-    # them, which left their own space still counted as part of a
-    # shared run's own total poolable capacity (confirmed: s13.pds's
-    # own 5 native monsters - Running Bird, Gargoyle, Horus, Gorgon,
-    # Black Dragon - form ONE single contiguous run) while their own
-    # data never actually got refreshed, so a neighbor's donor write
-    # could land directly on top of their own still-vanilla bytes.
-    # Self-mapping instead means their own donor's file_offset/size is
-    # IDENTICAL to their own native slot's, by construction - no
-    # capacity mismatch is even possible, regardless of what else
-    # shares their own run.
-    natives_to_randomize = [cid for cid in distinct_native_card_ids if cid not in EXCLUDED_NATIVE_CARD_IDS]
-    donor_mapping = build_random_donor_mapping(natives_to_randomize, donor_pool_card_ids, random)
-    for cid in EXCLUDED_NATIVE_CARD_IDS:
-        if cid in distinct_native_card_ids:
-            donor_mapping[cid] = cid
+    # The restricted three are assigned FIRST, from their own shortlist,
+    # and whatever they take is then withheld from the general pool so
+    # the overall mapping stays bijective - no donor serves two natives.
+    #
+    # They are assigned first rather than last because their pool is the
+    # small one: fourteen entries against a general pool of dozens. Left
+    # until the end they could find their shortlist already emptied by
+    # unrelated assignments and fail, and failing here is a hard error
+    # rather than a fallback, since there is no safe arbitrary donor for
+    # them.
+    restricted_natives = [cid for cid in distinct_native_card_ids
+                          if cid in RESTRICTED_NATIVE_CARD_IDS]
+    restricted_pool = sorted(
+        cid for cid in RESTRICTED_DONOR_POOL
+        if cid in db.MONSTERS
+        and db.MONSTERS[cid]["native_levels"]
+        and db.MONSTERS[cid]["sound_id"] is not None
+    )
+    if len(restricted_pool) < len(restricted_natives):
+        raise ValueError(
+            f"{len(restricted_natives)} restricted monster(s) need a donor "
+            f"but only {len(restricted_pool)} of RESTRICTED_DONOR_POOL are "
+            f"usable (need native_levels and a sound_id in "
+            f"monster_database.py)."
+        )
+
+    donor_mapping = build_random_donor_mapping(
+        restricted_natives, restricted_pool, random
+    )
+    taken = set(donor_mapping.values())
+
+    natives_to_randomize = [cid for cid in distinct_native_card_ids
+                            if cid not in RESTRICTED_NATIVE_CARD_IDS]
+    general_pool = [cid for cid in donor_pool_card_ids if cid not in taken]
+    donor_mapping.update(
+        build_random_donor_mapping(natives_to_randomize, general_pool, random)
+    )
+
+    _reject_thanatos_in_forbidden_level(donor_mapping, random)
 
     return donor_mapping
 

@@ -165,14 +165,51 @@ S14_ISO_OFFSET = 0xa26d160
 # handles, not a coincidental byte match.
 S14_JEWEL_OF_ALANJAH_CHECK_OFFSETS = [0x4c465c]
 
-# File-relative offsets within s20.pds of the 1st and 3rd of 3 "has
-# Nebeth Runestone already been obtained" checks (opcode 135, argument
-# 27 - key item index 26, Nebeth Runestone). Part of a sequential
-# puzzle-gating chain of 8 checks in this same file (one per runestone
-# plus this triple-occurrence one), matching the structural pattern
-# seen in s21.pds's blade puzzles. Per the user, the 2nd occurrence
-# (0x414e64) is left untouched - only the 1st and 3rd redirected.
-S20_NEBETH_RUNESTONE_CHECK_OFFSETS = [0x414998, 0x415168]
+# File-relative offset within s20.pds of the "has Nebeth Runestone
+# already been obtained" check (opcode 135, argument 27 - key item
+# index 26) that gates the STRANGER who only appears while the player
+# does NOT hold the runestone.
+#
+# s20.pds contains exactly THREE argument-27 checks and no more - all
+# ten opcode-135 checks in the file were enumerated to be sure:
+#
+#     0x414998  arg2 0   standalone, before the chain
+#     0x414a5c  arg 21  )
+#     0x414b08  arg 22  )
+#     0x414bb4  arg 23  ) a chain at a regular 0xAC stride,
+#     0x414c60  arg 24  ) one check per runestone
+#     0x414d0c  arg 25  )
+#     0x414db8  arg 26  )
+#     0x414e64  arg2 4  ) <- the chain's own argument-27 link
+#     0x414fa4  arg 28      Stone of Sealing, handled separately
+#     0x415168  arg2 0   standalone, after the chain
+#
+# The three argument-27 checks are byte-identical except for their
+# SECOND argument, and that is what identifies them at runtime:
+# arg2 is 4 for the chain link and 0 for both standalone checks.
+# Confirmed by breaking on opcode 135's handler (0x80087fac, from the
+# dispatch table at 0x80165a38 + 135*4) while approaching the stranger
+# and dumping the decoded instruction at r3:
+#
+#     +0x0c  opcode   0x87  = 135
+#     +0x14  arg1     0x1b  = 27, Nebeth Runestone
+#     +0x20  arg2     0x04  -> the chain link at 0x414e64
+#
+# So the stranger is gated by the chain link, NOT by either standalone
+# check - which is why redirecting only 0x414998 and 0x415168, as this
+# file did previously, changed nothing.
+#
+# The two standalone checks are deliberately NOT redirected here. They
+# branch to different script labels (0x414998 -> label 9, 0x415168 ->
+# label 6) and what they drive is unknown, so they are left alone until
+# something identifies them. Restore the commented line below to put
+# them back.
+#
+# NOTE the chain link is also the seventh link of the runestone chain
+# above, so it may serve the puzzle as well as the stranger. If that
+# puzzle starts misbehaving, this is the cause.
+S20_NEBETH_RUNESTONE_CHECK_OFFSETS = [0x414E64]
+# S20_NEBETH_RUNESTONE_CHECK_OFFSETS = [0x414998, 0x414E64, 0x415168]
 
 
 def _lis(rD, imm16):

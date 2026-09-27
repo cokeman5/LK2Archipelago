@@ -29,9 +29,17 @@ class FairysanityConditionOption(Toggle):
     default = 1
 
 class ShopsanityConditionOption(Toggle):
-    """Choose whether cards in the shop becomes AP items."""
-    visibility = Visibility.none
+    """Choose whether cards in the shop becomes AP items.
+    After purchasing once the cards will return to normal"""
     display_name = "Shopsanity"
+    default = 0
+
+class BonussanityConditionOption(Toggle):
+    """Choose whether to add the end of level bonus rewards as checks
+    Normal bonussanity excludes the provind grounds, while plus does not.
+    bonussanity: 180(60 without proving grounds) locations
+    """
+    display_name = "Bonussanity"
     default = 0
 
 class CombosanityConditionOption(Toggle):
@@ -46,16 +54,12 @@ class EnemysanityConditionOption(Choice):
     Plus means that enemies in the Proving Grounds will be included, otherwise they are excluded.
     Be warned that some spawn triggers in this game are very unintuitive, hidden, and
     once a level is beaten it will have new enemy spawn triggers. Please report any issue you encounter.
-    Light: ~113 locations
-    Light Plus: ~203 locations
-    Enemysanity: ~552 locations
-    Enemysanity Plus: ~955 locations"""
+    Light: ~203(113 without proving grounds) locations
+    Enemysanity: ~955 locations(552 without proving grounds) locations"""
     display_name = "Enemysanity"
     option_disabled = 0
     option_enemysanity_light = 1
-    option_enemysanity_light_plus = 2
-    option_enemysanity = 3
-    option_enemysanity_plus = 4
+    option_enemysanity = 2
     default = 0
 
 class BreaksanityOption(Toggle):
@@ -63,6 +67,19 @@ class BreaksanityOption(Toggle):
     +268 locations"""
     display_name = "Breaksanity"
     default = 0
+
+class LevelsanityOption(Toggle):
+    """Completing levels for the first time rewards checks.
+    +47-470 locations.
+    +27-270 if excluding Proving Grounds"""
+    display_name = "Levelsanity"
+    default = 0
+
+class LevelsanityLocationsPerLevel(Range):
+    """How many checks are rewarded per level completion if levelsanity is enabled."""
+    range_start = 1
+    range_end = 10
+    default = 1
 
 class ProgressiveLevelingOption(Toggle):
     """Choose whether to have character levels as a progressive item. You will no longer be able to level up normally.
@@ -82,16 +99,20 @@ class OpenWorldConditionOption(Toggle):
     display_name = "Open World"
     default = 0
 
-class ExcludeSacredBattleArenaChecksOption(Toggle):
-    """By enabling, prevents the checks in the sacred battle arenas from being progressive.(There are still checks)"""
-    display_name = "Exclude Sacred Battle Checks"
-    default = 0
+class ExcludeSacredBattleArenaLocationsOption(Toggle):
+    """When enabled, removes all locations in the Sacred Battle Arena"""
+    display_name = "Exclude Sacred Battle Locations"
+    default = 1
+
+class ExcludeProvingGroundsLocationsOption(Toggle):
+    """By enabling, removes all locations in the Proving Grounds"""
+    display_name = "Exclude Proving Grounds Locations"
+    default = 1
 
 class LevelUnlocksAsItems(Toggle):
     """Whether to add level unlocks to the pool.
     Instead of unlocking a level after beating a level, you must find the level unlocks as AP items
-    Takes precedence over Level randomization.
-    Experimental; there may be serious bugs, so play at your own risk, and report any issues."""
+    Takes precedence over Level randomization."""
     display_name = "Level Unlocks as Items"
     default = 0
 
@@ -139,6 +160,16 @@ class RandomizeEnemies(Toggle):
     Still very experimental, so play at your own risk. If the game crashes, lags, or becomes corrupted; please report
     with logs."""
     display_name = "Randomize Enemies"
+    default = 0
+
+class RandomizeUpgrades(Choice):
+    """Choose to randomize what each card upgrades into. Cards that previously had upgrades may have none,
+    and cards that did not have upgrades may have some. The total amount of upgrades stays the same.
+    Shuffle swaps the vanilla upgrades randomly."""
+    display_name = "Randomize Upgrades"
+    option_off = 0
+    option_on = 1
+    option_shuffle = 2
     default = 0
 
 class RandomizeMagicCosts(Choice):
@@ -270,7 +301,7 @@ class LevelRandomization(Toggle):
     display_name = "Level Randomization"
     default = 0
 
-class MusicRandomization(Toggle):
+class RandomizeMusic(Toggle):
     """Randomize the music that plays during levels"""
     display_name = "Level Music Randomization"
     default = 0
@@ -305,12 +336,16 @@ class LostKingdoms2Options(PerGameCommonOptions):
     collect_red_fairies_amount : CollectRedFariesAmount
     fairysanity : FairysanityConditionOption
     shopsanity: ShopsanityConditionOption
+    bonussanity: BonussanityConditionOption
     combosanity: CombosanityConditionOption
     enemysanity: EnemysanityConditionOption
     breaksanity: BreaksanityOption
+    levelsanity: LevelsanityOption
+    levelsanitylocationcount: LevelsanityLocationsPerLevel
     open_world : OpenWorldConditionOption
     level_unlocks_as_items : LevelUnlocksAsItems
-    exclude_sacred_battle_arena_checks: ExcludeSacredBattleArenaChecksOption
+    exclude_sacred_battle_arena_locations: ExcludeSacredBattleArenaLocationsOption
+    exclude_proving_grounds_locations: ExcludeProvingGroundsLocationsOption
     progressive_leveling: ProgressiveLevelingOption
     progressive_attribute_proficiencies: ProgressiveAttributeProficienciesOption
     death_link: DeathLink
@@ -319,7 +354,8 @@ class LostKingdoms2Options(PerGameCommonOptions):
     randomize_bonus_draws : RandomizeBonusDraws
     randomize_levels : LevelRandomization
     randomize_enemies: RandomizeEnemies
-    randomize_level_music: MusicRandomization
+    randomize_level_music: RandomizeMusic
+    randomize_upgrades: RandomizeUpgrades
     character_model : CharacterModel
     randomize_magic_stone_costs: RandomizeMagicCosts
     randomize_magic_stone_costs_min: RandomizeMagicCostsMin

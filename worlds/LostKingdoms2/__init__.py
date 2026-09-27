@@ -1,6 +1,7 @@
 import os
 import typing
 import random
+from unittest import case
 
 from worlds.generic.Rules import add_rule
 
@@ -26,6 +27,7 @@ item_name_to_id = {}
 
 rng_seed = None
 level_ordering = None
+final_locations = []
 
 def run_client(*args):
     from .LK2Client import main  # lazy import
@@ -117,11 +119,6 @@ class LostKingdoms2World(World):
         # Having an item in the start inventory won't remove it from the pool.
         # If you want to do that, use start_inventory_from_pool
 
-        for key in lost_kingdoms_2_items:
-            if item_name_to_id.get(key, None) is None:
-                item_name_to_id[key] = lost_kingdoms_2_items[key]["item_id"]
-        globals()['item_name_to_id'] = item_name_to_id
-
         match self.options.win_condition.value:
             case 0:
                 self.multiworld.get_location("Defeat the God of Harmony",self.player,).place_locked_item(LK2Item("Victory", ItemClassification.progression, None, self.player))
@@ -134,7 +131,6 @@ class LostKingdoms2World(World):
         #ensure GoD, stone golem, and all flyers/jumpers are in the pool
         lost_kingdoms_2_filler_cards = []
         lost_kingdoms_2_progression_cards = []
-        multiplier = 1
         for key in lost_kingdoms_2_cards:
             lk2_item = self.create_item(key)
             if lk2_item.classification == ItemClassification.filler:
@@ -142,43 +138,31 @@ class LostKingdoms2World(World):
                 lost_kingdoms_2_filler_cards.append(key)
             else:
                 lost_kingdoms_2_progression_cards.append(key)
-        num_of_random_cards = len(lost_kingdoms_2_chests)+ (self.options.combosanity.value * len(lost_kingdoms_2_combos)) + (self.options.breaksanity.value * len(lost_kingdoms_2_breakables)) + (self.options.shopsanity.value * len(lost_kingdoms_2_shopsanity)) - len(lost_kingdoms_2_progression_cards) - 19 * self.options.progressive_leveling.value - 34 * self.options.progressive_attribute_proficiencies.value - self.options.level_unlocks_as_items * len(lost_kingdoms_2_level_unlocks)
-        match self.options.enemysanity.value:
-            case 1:
-                for location in lost_kingdoms_2_enemysanity_light:
-                    if not lost_kingdoms_2_enemysanity_light[location]['proving_grounds']:
-                        num_of_random_cards += 1
-            case 2:
-                for location in lost_kingdoms_2_enemysanity_light:
-                        num_of_random_cards += 1
-            case 3:
-                for location in lost_kingdoms_2_enemies:
-                    if not "Proving Grounds" in location:
-                        num_of_random_cards += 1
-            case 4:
-                for location in lost_kingdoms_2_enemies:
-                        num_of_random_cards += 1
-        #Ensure there is always enough filler cards by doubling the pool until it's large enough
-        while len(lost_kingdoms_2_filler_cards)*multiplier < num_of_random_cards:
-            for key in lost_kingdoms_2_filler_cards:
-                lost_kingdoms_2_items[key]["Amount"] += 1
-            multiplier+=1
-        random_cards = random.sample(lost_kingdoms_2_filler_cards, num_of_random_cards-len(lost_kingdoms_2_filler_cards)*(multiplier-1))
-        for key in random_cards:
-            lost_kingdoms_2_items[key]["Amount"] += 1
+
+        num_of_random_cards = self.get_filler_count_needed(lost_kingdoms_2_progression_cards)
+
+        #Add filler cards equal to the locations - the amount of progressive items
+        temp_filler_cards = []
+        for x in range(num_of_random_cards):
+            if len(temp_filler_cards) == 0:
+                temp_filler_cards = lost_kingdoms_2_filler_cards.copy()
+                random.shuffle(temp_filler_cards)
+            rand_card = temp_filler_cards.pop()
+            lost_kingdoms_2_items[rand_card]["Amount"] += 1
+
 
 
         for key in lost_kingdoms_2_items:
             #Only include the randomly selected cards from random_cards.
             #This is because there are more cards than locations available.
             #Only include Red Fairies if fairysanity is enabled
-            if (lost_kingdoms_2_items[key]["Type"] == "Red Fairy") and (self.options.fairysanity.value != 1):
+            if lost_kingdoms_2_items[key]["Type"] == "Red Fairy" and self.options.fairysanity.value == 0:
                 continue
-            if (lost_kingdoms_2_items[key]["Type"] == "Progressive Player Level") and (self.options.progressive_leveling.value != 1):
+            if lost_kingdoms_2_items[key]["Type"] == "Progressive Player Level" and self.options.progressive_leveling.value == 0:
                 continue
-            if (lost_kingdoms_2_items[key]["Type"] == "Progressive Attribute Proficiency") and (self.options.progressive_attribute_proficiencies.value != 1):
+            if lost_kingdoms_2_items[key]["Type"] == "Progressive Attribute Proficiency" and self.options.progressive_attribute_proficiencies.value == 0:
                 continue
-            if (lost_kingdoms_2_items[key]["Type"] == "Level Unlock") and (self.options.level_unlocks_as_items.value != 1):
+            if lost_kingdoms_2_items[key]["Type"] == "Level Unlock" and self.options.level_unlocks_as_items.value == 0:
                 continue
             for amount in range(lost_kingdoms_2_items[key]["Amount"]):
                 lk2_item = self.create_item(key)
@@ -204,6 +188,22 @@ class LostKingdoms2World(World):
             return True
         else:
             return False
+
+    def get_filler_count_needed(self, progression_cards: list) -> int:
+        count = len(final_locations)
+
+        #The +1 is for magic boosters item
+        count-=len(progression_cards)+len(lost_kingdoms_2_key_items)+1
+        if self.options.fairysanity.value:
+            count-=len(lost_kingdoms_2_red_fairies)
+        if self.options.progressive_leveling.value:
+            count-=19
+        if self.options.progressive_attribute_proficiencies.value:
+            count-=34
+        if self.options.level_unlocks_as_items:
+            count-=len(lost_kingdoms_2_level_unlocks)
+
+        return count
 
     def generate_early(self) -> None:
 
@@ -408,37 +408,37 @@ class LostKingdoms2World(World):
                     previous_region = self.multiworld.get_region("Proving Grounds F19", self.player)
                     previous_region.connect(region, f"{region.name}")
 
+        global final_locations
         for key in lost_kingdoms_2_locations:
             if lost_kingdoms_2_locations[key]["type"] == "Red Fairy" and self.options.fairysanity.value==0:
                 continue
             if lost_kingdoms_2_locations[key]["type"] == "Combo" and self.options.combosanity.value==0:
                 continue
-            if lost_kingdoms_2_locations[key]["type"] == "Bonus Draw":
+            if lost_kingdoms_2_locations[key]["type"] == "Enemysanity" and self.options.enemysanity.value != 2:
                 continue
-            if lost_kingdoms_2_locations[key]["type"] == "Enemysanity" and self.options.enemysanity.value not in [3,4]:
-                continue
-            if lost_kingdoms_2_locations[key]["type"] == "Enemysanity" and "Proving Grounds" in key and self.options.enemysanity.value!=4:
-                continue
-            if lost_kingdoms_2_locations[key]["type"] == "Enemysanity Light" and self.options.enemysanity.value not in [1,2]:
-                continue
-            if lost_kingdoms_2_locations[key]["type"] == "Enemysanity Light" and lost_kingdoms_2_locations[key]["proving_grounds"] and self.options.enemysanity.value != 2:
+            if lost_kingdoms_2_locations[key]["type"] == "Enemysanity Light" and self.options.enemysanity.value != 1:
                 continue
             if lost_kingdoms_2_locations[key]["type"] == "Breaksanity" and self.options.enemysanity.value==0:
                 continue
             if lost_kingdoms_2_locations[key]["type"] == "Shopsanity" and self.options.shopsanity.value==0:
                 continue
+            if lost_kingdoms_2_locations[key]["type"] == "Bonussanity" and self.options.bonussanity.value==0:
+                continue
+            if lost_kingdoms_2_locations[key]["type"] == "Levelsanity" and (self.options.levelsanity.value==0 or self.options.levelsanitylocationcount.value < int(key.split("#")[1])):
+                continue
             level_names = lost_kingdoms_2_locations[key]["level"]
             if not isinstance(level_names, list):
+                if "Sacred Battle Arena" in lost_kingdoms_2_locations[key]["level"] and self.options.exclude_sacred_battle_arena_locations.value >= 1:
+                    continue
+                if "Proving Grounds" in lost_kingdoms_2_locations[key]["level"] and self.options.exclude_proving_grounds_locations.value >= 1:
+                    continue
                 region = self.multiworld.get_region(level_names, self.player)
-                location_data = LK2LocationData(self.location_name_to_id[key])
-                location = LK2Location(self.player,key, region, location_data)
-                if lost_kingdoms_2_locations[key].get("missable", 0) == 1:
-                    location.progress_type = LocationProgressType.EXCLUDED
-                region.locations.append(location)
             else:
                 new_region_name = ""
                 for level_name in level_names:
                     new_region_name = new_region_name + "|" + level_name
+                if len(level_names) == 2 and "Proving Grounds" in new_region_name and "Sacred Battle Arena" in new_region_name and self.options.exclude_sacred_battle_arena_locations.value >= 1 and self.options.exclude_proving_grounds_locations.value >= 1:
+                    continue
                 new_region_name = new_region_name[1:]
                 region = 0
                 for reg in self.multiworld.get_regions():
@@ -452,11 +452,13 @@ class LostKingdoms2World(World):
                 for level_name in level_names:
                     if self.multiworld.get_region(level_name, self.player) not in region.entrances:
                         self.multiworld.get_region(level_name, self.player).connect(region,f"{region.name}")
-                location_data = LK2LocationData(self.location_name_to_id[key])
-                location = LK2Location(self.player, key, region, location_data)
-                if lost_kingdoms_2_locations[key].get("missable", 0) == 1:
-                    location.progress_type = LocationProgressType.EXCLUDED
-                region.locations.append(location)
+
+            location_data = LK2LocationData(self.location_name_to_id[key])
+            location = LK2Location(self.player, key, region, location_data)
+            if lost_kingdoms_2_locations[key].get("missable", 0) >= 1:
+                location.progress_type = LocationProgressType.EXCLUDED
+            region.locations.append(location)
+            final_locations.append(location)
 
         match self.options.win_condition.value:
             case 0:
@@ -712,37 +714,50 @@ class LostKingdoms2World(World):
                     # Use 'l_func=logic_func' to capture the current function in the local scope
                     add_rule(location, lambda state, l_func=logic_func: l_func(state, self.player))
 
-            # Specific option override for Sacred Battle Arena
-            if self.options.exclude_sacred_battle_arena_checks.value and "Sacred Battle Arena" in location.name:
-                location.progress_type = LocationProgressType.EXCLUDED
-
             if "Shopsanity" in location.name:
                 number = int(location.name.split("#")[1])
                 if 10 <= number < 20:
                     add_rule(location, lambda state: state.can_reach_region("Runestone Caverns - Lower Chambers", self.player))
                 elif 20 <= number < 30:
                     add_rule(location, lambda state: state.can_reach_region("Runestone Caverns - Lower Chambers", self.player) and state.can_reach_region("Royal Tower, Lower", self.player))
-
+            elif "Levelsanity - Sacred Battle Arena 2" in location.name:
+                if self.options.progressive_attribute_proficiencies.value:
+                    add_rule(location,
+                             lambda state: state.has("Progressive Attribute Proficiency: Neutral", self.player, 5))
+                if self.options.progressive_attribute_proficiencies.value:
+                    add_rule(location,lambda state: state.has("Progressive Attribute Proficiency: Mech", self.player, 5))
+                add_rule(location, lambda state: state.can_reach_region("Royal Tower, Upper", self.player), self.player)
+                if self.options.progressive_attribute_proficiencies.value:
+                    add_rule(location,lambda state: state.has("Progressive Attribute Proficiency: Mech", self.player, 5))
+            elif "Levelsanity - Sacred Battle Arena 1" in location.name:
+                if self.options.progressive_attribute_proficiencies.value:
+                    add_rule(location,lambda state: state.has("Progressive Attribute Proficiency: Earth", self.player, 3))
+                if self.options.progressive_attribute_proficiencies.value:
+                        add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Wood",self.player,3))
+                if self.options.progressive_attribute_proficiencies.value:
+                        add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Fire",self.player,3))
+                if self.options.progressive_attribute_proficiencies.value:
+                        add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Water",self.player,3))
             match location.name:
-                case "Sacred Battle Arena 1 - defeat Lich" | "Enemysanity - Lich" | "Sacred Battle Arena 1 - Enemysanity - Lich #1":
+                case "Sacred Battle Arena 1 - defeat Lich" | "Enemysanity - Lich" | "Sacred Battle Arena 1 - Enemysanity - Lich #1" | "Sacred Battle Arena 1 - Bonussanity - Card #1":
                     if self.options.progressive_attribute_proficiencies.value:
                         add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Earth", self.player, 3))
-                case "Sacred Battle Arena 1 - defeat Nueh" | "Enemysanity - Nueh" | "Sacred Battle Arena 1 - Enemysanity - Nueh #1":
+                case "Sacred Battle Arena 1 - defeat Nueh" | "Enemysanity - Nueh" | "Sacred Battle Arena 1 - Enemysanity - Nueh #1" | "Sacred Battle Arena 1 - Bonussanity - Card #1":
                     if self.options.progressive_attribute_proficiencies.value:
                         add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Wood",self.player,3))
-                case "Sacred Battle Arena 1 - defeat Gemini" | "Enemysanity - Gemini" | "Sacred Battle Arena 1 - Enemysanity - Gemini #1":
+                case "Sacred Battle Arena 1 - defeat Gemini" | "Enemysanity - Gemini" | "Sacred Battle Arena 1 - Enemysanity - Gemini #1" | "Sacred Battle Arena 1 - Bonussanity - Card #1":
                     if self.options.progressive_attribute_proficiencies.value:
                         add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Fire",self.player,3))
-                case "Sacred Battle Arena 1 - defeat Kraken" | "Enemysanity - Kraken" | "Sacred Battle Arena 1 - Enemysanity - Kraken #1":
+                case "Sacred Battle Arena 1 - defeat Kraken" | "Enemysanity - Kraken" | "Sacred Battle Arena 1 - Enemysanity - Kraken #1" | "Sacred Battle Arena 1 - Bonussanity - Card #1":
                     if self.options.progressive_attribute_proficiencies.value:
                         add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Water",self.player,3))
-                case "Sacred Battle Arena 2 - defeat Rabandos" | "Sacred Battle Arena 2 - defeat Helena" | "Sacred Battle Arena 2 - Enemysanity - Rabandos #1" | "Sacred Battle Arena 2 - Enemysanity - Helena #1" | "Enemysanity - Rabandos" | "Enemysanity - Helena"  :
+                case "Sacred Battle Arena 2 - defeat Rabandos" | "Sacred Battle Arena 2 - defeat Helena" | "Sacred Battle Arena 2 - Enemysanity - Rabandos #1" | "Sacred Battle Arena 2 - Enemysanity - Helena #1" | "Enemysanity - Rabandos" | "Enemysanity - Helena" | "Sacred Battle Arena 2 - Bonussanity - Card #1":
                     if self.options.progressive_attribute_proficiencies.value:
                         add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Neutral",self.player,5))
-                case "Sacred Battle Arena 2 - defeat AstroBot" | "Sacred Battle Arena 2 - Red Fairy machines" | "Sacred Battle Arena 2 - Enemysanity - AstroBot #1" | "Enemysanity - AstroBot" :
+                case "Sacred Battle Arena 2 - defeat AstroBot" | "Sacred Battle Arena 2 - Red Fairy machines" | "Sacred Battle Arena 2 - Enemysanity - AstroBot #1" | "Enemysanity - AstroBot" | "Sacred Battle Arena 2 - Bonussanity - Card #1" :
                     if self.options.progressive_attribute_proficiencies.value:
                         add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Mech",self.player,5))
-                case "Sacred Battle Arena 2 - defeat Leod" | "Sacred Battle Arena 2 - Enemysanity - Leod VIII #1" |"Enemysanity - Leod VIII" :
+                case "Sacred Battle Arena 2 - defeat Leod" | "Sacred Battle Arena 2 - Enemysanity - Leod VIII #1" |"Enemysanity - Leod VIII" | "Sacred Battle Arena 2 - Bonussanity - Card #1":
                     add_rule(location,lambda state: state.can_reach_region("Royal Tower, Upper", self.player), self.player)
                     if self.options.progressive_attribute_proficiencies.value:
                         add_rule(location, lambda state: state.has("Progressive Attribute Proficiency: Mech",self.player,5))
@@ -927,13 +942,18 @@ class LostKingdoms2World(World):
             "combosanity": self.options.combosanity.value,
             "enemysanity": self.options.enemysanity.value,
             "breaksanity": self.options.breaksanity.value,
+            "bonussanity": self.options.bonussanity.value,
+            "levelsanity": self.options.levelsanity.value,
+            "levelsanitylocationcount": self.options.levelsanitylocationcount.value,
             "open_world": self.options.open_world.value,
             "level_unlocks_as_items": self.options.level_unlocks_as_items.value,
-            "exclude_sacred_battle_arena_checks": self.options.exclude_sacred_battle_arena_checks.value,
+            "exclude_sacred_battle_arena_checks": self.options.exclude_sacred_battle_arena_locations.value,
+            "exclude_proving_grounds_checks": self.options.exclude_proving_grounds_locations.value,
             "death_link": self.options.death_link.value,
             "randomize_starting_deck": self.options.randomize_starting_deck.value,
             "randomize_shop_contents": self.options.randomize_shop_contents.value,
             "randomize_bonus_draws": self.options.randomize_bonus_draws.value,
+            "randomize_upgrades": self.options.randomize_upgrades.value,
             "randomize_magic_stone_costs": self.options.randomize_magic_stone_costs.value,
             "randomize_magic_stone_costs_min": self.options.randomize_magic_stone_costs_min.value,
             "randomize_magic_stone_costs_max": self.options.randomize_magic_stone_costs_max.value,
@@ -1007,13 +1027,18 @@ class LostKingdoms2World(World):
             "combosanity": self.options.combosanity.value,
             "enemysanity": self.options.enemysanity.value,
             "breaksanity": self.options.breaksanity.value,
+            "bonussanity": self.options.bonussanity.value,
+            "levelsanity": self.options.levelsanity.value,
+            "levelsanitylocationcount": self.options.levelsanitylocationcount.value,
             "open_world": self.options.open_world.value,
             "level_unlocks_as_items": self.options.level_unlocks_as_items.value,
-            "exclude_sacred_battle_arena_checks": self.options.exclude_sacred_battle_arena_checks.value,
+            "exclude_sacred_battle_arena_checks": self.options.exclude_sacred_battle_arena_locations.value,
+            "exclude_proving_grounds_checks": self.options.exclude_proving_grounds_locations.value,
             "death_link": self.options.death_link.value,
             "randomize_starting_deck": self.options.randomize_starting_deck.value,
             "randomize_shop_contents": self.options.randomize_shop_contents.value,
             "randomize_bonus_draws": self.options.randomize_bonus_draws.value,
+            "randomize_upgrades": self.options.randomize_upgrades.value,
             "randomize_magic_stone_costs": self.options.randomize_magic_stone_costs.value,
             "randomize_magic_stone_costs_min": self.options.randomize_magic_stone_costs_min.value,
             "randomize_magic_stone_costs_max": self.options.randomize_magic_stone_costs_max.value,
@@ -1070,7 +1095,7 @@ def randomize_exits(start_region: str = "Nobleman's Residence") -> dict:
     # Ensure regions_to_place is a strictly sorted list from the start
     regions_to_place = []
     for region in lost_kingdoms_2_regions.keys():
-        if not lost_kingdoms_2_regions[region]["exclude_from_level_randomization"]:
+        if not lost_kingdoms_2_regions[region][""]:
             regions_to_place.append(region)
     regions_to_place = sorted(regions_to_place)
 

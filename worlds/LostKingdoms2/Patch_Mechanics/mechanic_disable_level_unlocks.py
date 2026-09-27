@@ -102,13 +102,38 @@ ALANJEH_CASTLE_BLOCK_OTHER_LEVELS_ADDR = 0x8007a3f0
 # instruction pair, so either one alone could fire the unlock; both
 # must be zeroed to fully disable it.
 #
+# Sacred Battle Arena 1 -> Sacred Battle Arena 2 (levelID 23 -> 24)
+# is the same kind of ordinary, data-driven opcode 134 instruction as
+# the Royal Tower entries above, and is likewise absent from
+# lost_kingdoms_2_region_exits - that table has no exit unlocking
+# Arena 2 at all, only Ruldo Forest Exit 2 unlocking Arena 1.
+#
+# Confirmed data-driven rather than hardcoded via a write breakpoint
+# on 0x8025e1d2 (Arena 2's own unlock byte, base 0x8025dbcc +
+# levelID 24 * 0x40 + 2) while beating Arena 1: LR came back as
+# 0x8008a48c, inside RunLevelScriptThreads' own opcode dispatch
+# (lwzx r12 from the handler table, then bctrl), not a `stb` in
+# main.dol - so unlike ALANJEH_CASTLE_UNLOCK_ROYAL_TOWER_ADDRS above
+# there is nothing to NOP, just a level ID to zero.
+#
+# Exactly ONE instance exists in s23.pds, at file offset 0x42c038,
+# carrying the identical "86 00 01 00 04 00 00" template followed by
+# the 4-byte target - unlike Royal Tower, Lower/12's own pair, no
+# second copy needs zeroing. s23.pds sits at ISO 0xc98b540 (per
+# dump_pds_offsets.py), putting the target field at 0xcdb7580, which
+# lands just before Arena 1's own chest addresses in Locations.py
+# (0xcdb78e3, 0xcdb809b) - a useful cross-check that the base is
+# right, though _write_checked()'s own pre-write check is what
+# actually guarantees it.
+#
 # STANDARD_UNLOCK_ADDRESSES's own vanilla ID is the CURRENT level's
 # own target (matching _write_checked()'s own pre-write safety
 # check), keyed by a short label for logging.
 STANDARD_UNLOCK_ADDRESSES = {
     "Royal Tower, Middle -> Royal Tower, Upper": (0x0ABDD560, 16),
-    "Royal Tower, Lower/12 -> Royal Tower, Middle (instance 1)": (0x0B94E200 , 15),
-    "Royal Tower, Lower/12 -> Royal Tower, Middle (instance 2)": (0x0B94E3B4 , 15),
+    "Royal Tower, Lower/12 -> Royal Tower, Middle (instance 1)": (0x0B94E200, 15),
+    "Royal Tower, Lower/12 -> Royal Tower, Middle (instance 2)": (0x0B94E3B4, 15),
+    "Sacred Battle Arena 1 -> Sacred Battle Arena 2": (0x0CDB7580, 24),
 }
 
 
