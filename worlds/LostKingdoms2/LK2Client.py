@@ -609,37 +609,46 @@ def level_modifications(ctx):
         if not is_in_level():
             modify_default_level_selections()
 
+
+_default_selection_bases = {}
 def modify_default_level_selections():
-    if is_level_unlocked("Runestone Caverns - Upper Chambers"):
-        write_memory(0x80167668,0x80167420, 4)
-    elif is_level_unlocked("Runestone Caverns - Lower Chambers"):
-        write_memory(0x80167668, 0x80167430, 4)
+    # The child-list table moves into the code cave when
+    # mechanic_world_map_variations is enabled, so read its live address out
+    # of the lis/addi pair the game itself uses to build it.
+    lis, addi = read_memory(0x800A7BD4, 4), read_memory(0x800A7BDC, 4)
+    if lis >> 26 != 15 or addi >> 26 != 14:
+        return
+    table = ((lis & 0xFFFF) << 16) | (addi & 0xFFFF)
 
-    if is_level_unlocked("Kadishu"):
-        write_memory(0x80167664, 0x801673e0, 4)
-    elif is_level_unlocked("Fairy House"):
-        write_memory(0x80167664, 0x801673f0, 4)
-    elif is_level_unlocked("Kadishu Shop"):
-        write_memory(0x80167664, 0x80167400, 4)
+    if _default_selection_bases.get("table") != table:
+        _default_selection_bases.clear()
+        _default_selection_bases["table"] = table
 
-    if is_level_unlocked("Sacred Battle Arena 1"):
-        write_memory(0x8016766c, 0x80167450, 4)
-    elif is_level_unlocked("Sacred Battle Arena 2"):
-        write_memory(0x8016766c, 0x80167460, 4)
+    names = {i["levelID"]: n for n, i in lost_kingdoms_2_regions.items()}
+    names[12] = "Royal Tower, Lower"  # the map node carries 12, regions says 18
 
-    if is_level_unlocked("Alanjeh Castle"):
-        write_memory(0x80167670, 0x80167480, 4)
-    elif is_level_unlocked("Royal Tower, Lower"):
-        write_memory(0x80167670, 0x80167490, 4)
-    elif is_level_unlocked("Royal Tower, Middle"):
-        write_memory(0x80167670, 0x801674a0, 4)
-    elif is_level_unlocked("Royal Tower, Upper"):
-        write_memory(0x80167670, 0x801674b0, 4)
+    for slot in (5, 6, 7, 8, 9):
+        entry = table + slot * 4
+        if slot not in _default_selection_bases:
+            _default_selection_bases[slot] = read_memory(entry, 4)
+        node = base = _default_selection_bases[slot]
 
-    if is_level_unlocked("Grenfoel Cathedral"):
-        write_memory(0x80167674,0x801674d0, 4)
-    elif is_level_unlocked("Grenfoel Cathedral Shop"):
-        write_memory(0x80167674, 0x801674e0, 4)
+        for _ in range(64):
+            n = dolphin_memory_engine.read_bytes(node, 16)
+            if n[0] == 0xFF:
+                node = base
+                break
+            # n[13] is the accounted-against level only on nodes the mechanic
+            # wrote; on a vanilla node it is still the label Y offset, and
+            # n[15] (0 on every vanilla node) is what says which to trust.
+            name = names.get(n[13] if n[15] else n[1])
+            if n[0] == 0 and name and is_level_unlocked(name):
+                break
+            node += 16
+
+        if read_memory(entry, 4) != node:
+            write_memory(entry, node, 4)
+
 
 def is_level_unlocked(level: str) -> bool:
     return read_memory(int(lost_kingdoms_2_regions[level]["RAMAddress"],16), 1) > 0
@@ -974,9 +983,9 @@ async def check_death(ctx: LK2Context) -> None:
 
     :return: `True` if the player is dead, otherwise `False`.
     """
-    if ctx.slot is not None and is_in_level() and read_memory(LEVEL_ID_ADDRESS, 1) != 1:
+    if ctx.slot is not None and is_in_level():
         cur_health = read_memory(CURR_HEALTH_ADDR)
-        if cur_health <= 0:
+        if cur_health <= 0 and read_memory(CURR_HEALTH_ADDR-16) != 0:
             if not ctx.has_send_death and time.time() >= ctx.last_death_link + 10:
                 ctx.has_send_death = True
                 await ctx.send_death(ctx.player_names[1] + " did not believe in the heart of the cards.")
@@ -1033,6 +1042,8 @@ def check_inshop() -> bool:
 async def track_shop_purchases(ctx: LK2Context):
     try:
         index = read_memory(read_memory(SHOP_UI_SELECTION_ADDRESS,4)+0x0A,2)
+        if read_memory(LEVEL_ID_ADDRESS, 1) == 42 and not is_level_beaten("Royal Tower, Upper"):
+            index+=30
     except Exception as e:
         index = 0
         logger.debug("Something broke with shopsanity")

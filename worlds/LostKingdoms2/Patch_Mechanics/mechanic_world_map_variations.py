@@ -48,10 +48,27 @@ That is why a converted node renders blank: our slots have no category-3
 entry, GetUIText returns null, and the null reaches sprintf's %s handler.
 Rather than add text assets, two calls are redirected to stubs:
 
-  * branch: try GetUIText(3, slot); on null fall back to
-    GetUIText(0, node[12]), which is the level's own name. Vanilla branches
-    keep their own names, because the fallback only fires where there was
-    nothing to begin with.
+  * branch: for a slot below VANILLA_SLOT_COUNT, call GetUIText(3, slot)
+    exactly as the original code did; for one of ours, call
+    GetUIText(0, node[12]) instead, which is the level's own name.
+
+    The SLOT NUMBER decides, not whether GetUIText returned null. An earlier
+    version tested the return value, on the assumption that every slot we
+    invent is past the end of category 3. That is false for the very first
+    one. VANILLA_SLOT_COUNT is the size of the CHILD-LIST table, which has
+    nothing to do with how many strings category 3 holds - and category 3
+    does have an index 11: it is the "To %s" format string the map itself
+    fetches with GetUIText(3, 0xb) to label area-transition nodes.
+
+    So slot 11's lookup came back non-null, the stub passed "To %s" off as a
+    label, and RenderFormattedText printed "To" and then took a %s from
+    whatever was next on the stack - a crash inside strlen. Exactly one
+    level was ever affected, the one that happened to be allocated slot 11;
+    slots 12 and up really are past the end of the table.
+  * leaf: after GetUIText(0, level), if node[15] is set, format
+    "<name> <n>" into a scratch buffer. The game already does exactly this
+    for area nodes, using a static buffer consumed before the next node is
+    drawn.
   * leaf: after GetUIText(0, level), if node[15] is set, format
     "<name> <n>" into a scratch buffer. The game already does exactly this
     for area nodes, using a static buffer consumed before the next node is
@@ -759,30 +776,39 @@ def _node_into(register, variant):
 
 
 def _emit_branch_stub(patcher, variant, call_sites):
-    """GetUIText(3, slot), falling back to GetUIText(0, node[12])."""
-    labels = {"keep": 8, "done": 10}
+    """GetUIText(3, slot) for a vanilla slot, GetUIText(0, node[12]) for ours.
+
+    The choice is made from the SLOT NUMBER, before the call, never from
+    whether GetUIText returned null. Category 3 is a text table whose length
+    has nothing to do with VANILLA_SLOT_COUNT, and it does contain an entry at
+    index 11 - the "To %s" format string - so the first slot this mechanic
+    invents got a non-null, completely wrong "name" back. See this module's
+    docstring for the full trace.
+
+    Deciding up front also means only one GetUIText call instead of two.
+
+    r3 and r4 arrive already set up by the code this stub replaced (3 and the
+    slot). The vanilla path leaves them alone; only r6/r7 are borrowed, which
+    are volatile and dead at a call boundary.
+    """
     code = [
         _stwu(1, -16, 1),
         _mflr(0),
         _stw(0, 20, 1),
-        ("bl", GET_UI_TEXT),          # the call this stub replaced
-        _cmpwi(3, 0),
-        ("bne", "keep"),              # slot has a real name - use it
-        _li(3, 0),                    # else look the level's own name up
     ] + _node_into(7, variant) + [
+        _lbz(6, 1, 7),                # this branch's slot
+        _cmpwi(6, VANILLA_SLOT_COUNT),
+        ("blt", "vanilla"),           # a vanilla slot keeps its own name
+        _li(3, 0),                    # ours: the level-name table
         _lbz(4, 12, 7),               # node[12] = this submenu's level id
-        # "keep" lands here for the vanilla path; the fallback falls through
-        ("bl", GET_UI_TEXT),
+        ("label", "vanilla"),
+        ("bl", GET_UI_TEXT),          # the call this stub replaced
         _lwz(0, 20, 1),
         _mtlr(0),
         _addi(1, 1, 16),
         _blr(),
     ]
-    # The fallback must skip the second call when the first succeeded, so
-    # "keep" points past it. Recompute the labels against the real layout.
-    labels = {"keep": 9 + len(_node_into(7, variant))}
-    code[5] = ("bne", "keep")
-    address = _emit(patcher, code, labels)
+    address = _emit(patcher, code)
     for call_site in call_sites:
         patcher.patch_word(call_site, _bl(call_site, address))
     logger.info(
@@ -855,30 +881,32 @@ def _emit_title_stub(patcher, table, entry_count, call_site, register, offset):
     from. A slot -> level id table is emitted instead, covering only the slots
     this mechanic created; vanilla slots take the early exit and keep their
     own titles.
+
+    As in _emit_branch_stub, the slot number alone decides which lookup to
+    make. The previous order - call first, and only consult the slot if the
+    result was null - could never reach the slot test for slot 11, whose
+    category-3 lookup returns the "To %s" format string rather than null.
     """
     code = [
         _stwu(1, -16, 1),
         _mflr(0),
         _stw(0, 20, 1),
-        ("bl", GET_UI_TEXT),           # the call this stub replaced
-        _cmpwi(3, 0),
-        ("bne", "done"),               # vanilla slot - it has a real title
-        _lbz(4, offset, register),     # re-read the slot; r4 died in the call
-        _cmpwi(4, VANILLA_SLOT_COUNT),
-        ("blt", "done"),               # not one of ours, and still no title
-        _addi(4, 4, -VANILLA_SLOT_COUNT),
+        _lbz(6, offset, register),     # the slot this title belongs to
+        _cmpwi(6, VANILLA_SLOT_COUNT),
+        ("blt", "vanilla"),            # vanilla slot - it has a real title
+        _addi(6, 6, -VANILLA_SLOT_COUNT),
         _lis(5, (table >> 16) & 0xFFFF),
         _ori(5, 5, table & 0xFFFF),
-        _lbzx(4, 5, 4),                # level id for this slot
-        _li(3, 0),                     # level name table
-        ("bl", GET_UI_TEXT),
-        _lwz(0, 20, 1),                # "done"
+        _lbzx(4, 5, 6),                # level id for this slot
+        _li(3, 0),                     # level-name table
+        ("label", "vanilla"),
+        ("bl", GET_UI_TEXT),           # the call this stub replaced
+        _lwz(0, 20, 1),
         _mtlr(0),
         _addi(1, 1, 16),
         _blr(),
     ]
-    labels = {"done": 15}
-    address = _emit(patcher, code, labels)
+    address = _emit(patcher, code)
     patcher.patch_word(call_site, _bl(call_site, address))
     logger.info(
         f"[mechanic_world_map_variations] title stub at {hex(address)} for "
@@ -1010,8 +1038,24 @@ def _emit_visibility_stubs(patcher):
     # replaced and the node kept in r8. r0/r3-r8 are all scratch this early.
     leaf = [
         _mr(8, 3),                      # keep the node pointer
-        _lbz(4, 13, 3),                 # accounted-against level, not node[1]
         _lbz(5, 15, 3),                 # variation number; 0 on vanilla nodes
+        # Which level this node answers to. node[13] holds it only on nodes
+        # this mechanic wrote; on a vanilla node +13 is still the game's own
+        # signed label-Y offset, so it must not be read as a level id.
+        #
+        # Reading it unconditionally is what made Royal Tower Upper appear as
+        # soon as anything was unlocked. It is copied through untouched by
+        # _extend_submenu (16 is not in SUBMENU_DUPLICATE_LEVELS) and carries
+        # +13 = 0, so its visibility was keyed to record 0 - and record 0 is
+        # what every exit lights up once mechanic_disable_level_unlocks has
+        # rewritten their unlock targets to 0. Every other untouched vanilla
+        # leaf - Kadishu, the shops, the arenas, Grenfoel, the Proving
+        # Grounds - was keyed to record 0 for the same reason.
+        _lbz(4, 1, 3),                  # vanilla: the level this node enters
+        _cmpwi(5, 0),
+        ("beq", "have_level"),
+        _lbz(4, 13, 3),                 # ours: the accounted-against level
+        ("label", "have_level"),
         _lis(0, (LEVEL_RECORD_BASE >> 16) & 0xFFFF),
         _ori(0, 0, LEVEL_RECORD_BASE & 0xFFFF),
         _rlwinm(3, 4, 6, 0, 25),        # level * 0x40

@@ -418,7 +418,7 @@ class LostKingdoms2World(World):
                 continue
             if lost_kingdoms_2_locations[key]["type"] == "Enemysanity Light" and self.options.enemysanity.value != 1:
                 continue
-            if lost_kingdoms_2_locations[key]["type"] == "Breaksanity" and self.options.enemysanity.value==0:
+            if lost_kingdoms_2_locations[key]["type"] == "Breaksanity" and self.options.breaksanity.value==0:
                 continue
             if lost_kingdoms_2_locations[key]["type"] == "Shopsanity" and self.options.shopsanity.value==0:
                 continue
@@ -716,9 +716,9 @@ class LostKingdoms2World(World):
 
             if "Shopsanity" in location.name:
                 number = int(location.name.split("#")[1])
-                if 10 <= number < 20:
+                if 10 < number <= 20:
                     add_rule(location, lambda state: state.can_reach_region("Runestone Caverns - Lower Chambers", self.player))
-                elif 20 <= number < 30:
+                elif 20 < number <= 30:
                     add_rule(location, lambda state: state.can_reach_region("Runestone Caverns - Lower Chambers", self.player) and state.can_reach_region("Royal Tower, Lower", self.player))
             elif "Levelsanity - Sacred Battle Arena 2" in location.name:
                 if self.options.progressive_attribute_proficiencies.value:

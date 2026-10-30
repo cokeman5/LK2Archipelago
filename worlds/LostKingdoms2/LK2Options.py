@@ -36,7 +36,6 @@ class ShopsanityConditionOption(Toggle):
 
 class BonussanityConditionOption(Toggle):
     """Choose whether to add the end of level bonus rewards as checks
-    Normal bonussanity excludes the provind grounds, while plus does not.
     bonussanity: 180(60 without proving grounds) locations
     """
     display_name = "Bonussanity"
@@ -50,10 +49,9 @@ class CombosanityConditionOption(Toggle):
 
 class EnemysanityConditionOption(Choice):
     """Choose whether to make enemy kills into locations. Light means one check per "species" of enemy.
-    While standard enemysanity is one check per instance of an enemy.
-    Plus means that enemies in the Proving Grounds will be included, otherwise they are excluded.
-    Be warned that some spawn triggers in this game are very unintuitive, hidden, and
-    once a level is beaten it will have new enemy spawn triggers. Please report any issue you encounter.
+    Standard enemysanity is one check per instance of an enemy.
+    Be warned that some spawn triggers in this game are very unintuitive, hidden.
+    Different level variations have different enemy spawns.
     Light: ~203(113 without proving grounds) locations
     Enemysanity: ~955 locations(552 without proving grounds) locations"""
     display_name = "Enemysanity"
@@ -88,9 +86,9 @@ class ProgressiveLevelingOption(Toggle):
     default = 0
 
 class ProgressiveAttributeProficienciesOption(Toggle):
-    """Choose whether to have character levels as a progressive item. You will no longer be able to level up normally.
+    """Choose whether to have attribute proficiencies as items. You will no longer be able to increase/decrease attribute proficiencies as normal.
     +34 items"""
-    display_name = "Progressive Leveling"
+    display_name = "Progressive Attribute Proficiencies"
     default = 0
 
 class OpenWorldConditionOption(Toggle):
